@@ -1,5 +1,9 @@
-# integer-roots [![Hackage](http://img.shields.io/hackage/v/integer-roots.svg)](https://hackage.haskell.org/package/integer-roots) [![Stackage LTS](http://stackage.org/package/integer-roots/badge/lts)](http://stackage.org/lts/package/integer-roots) [![Stackage Nightly](http://stackage.org/package/integer-roots/badge/nightly)](http://stackage.org/nightly/package/integer-roots)
+<!-- # integer-roots [![Hackage](http://img.shields.io/hackage/v/integer-roots.svg)](https://hackage.haskell.org/package/integer-roots) [![Stackage LTS](http://stackage.org/package/integer-roots/badge/lts)](http://stackage.org/lts/package/integer-roots) [![Stackage Nightly](http://stackage.org/package/integer-roots/badge/nightly)](http://stackage.org/nightly/package/integer-roots) -->
 
+## Updated Integer Qquare Root
+Implementation of this paper: [A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic](https://arxiv.org/abs/2406.07751).   As of now, it's not at parity in speed to the original, let alone faster. 
+
+## Original readme
 Calculating integer roots and testing perfect powers of arbitrary precision.
 
 ## Integer square root

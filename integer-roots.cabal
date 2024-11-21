@@ -24,6 +24,11 @@ source-repository head
 library
   build-depends:
     base >=4.9 && <5
+   ,fp-ieee >= 0.1.0.4 
+   ,vector>=0.13.2.0
+   ,fast-digits>=0.3.2.0
+   ,integer-logarithms>=1.0.3.1
+   ,ghc-prim>=0.11.0
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
   else
@@ -40,7 +45,12 @@ library
     Math.NumberTheory.Utils.BitMask
     Math.NumberTheory.Utils.FromIntegral
   default-language: Haskell2010
-  ghc-options: -Wall -Widentities -Wcompat
+  ghc-options: -Wall -Widentities -Wcompat -optc-O3 -optc-ffast-math
+  -- ghc-options: -Wall -O2 -Widentities -Wcompat -mfma -optc-target -optcarm64-apple-macos14.5 -optc-mmacosx-version-min=14.5 -funfolding-use-threshold=16 -O2 -fexcess-precision -optc-O3 -optc-ffast-math -no-recomp -optc-static -optc-lamath -optc-DINTEGER32 -optc-larmpl_lp64 -threaded -optc-DAPPLE -optc-DWORST -optc-DNO_FLOAT128 -optc-DNO_OPENMP -optc-DFOO=$f -optc-DUSE_DOUBLE -optc-O3 -optc-lmpfr -optc-lgmp -optc-lm
+  -- these following are additions to the fork  
+  c-sources: Math/c/fsqrt.c 
+  include-dirs:/opt/homebrew/Cellar/gcc/14.2.0/include 
+  extra-lib-dirs:/opt/homebrew/Cellar/gcc/14.2.0/lib
 
 test-suite integer-roots-tests
   build-depends:
