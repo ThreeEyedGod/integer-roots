@@ -1,7 +1,14 @@
 <!-- # integer-roots [![Hackage](http://img.shields.io/hackage/v/integer-roots.svg)](https://hackage.haskell.org/package/integer-roots) [![Stackage LTS](http://stackage.org/package/integer-roots/badge/lts)](http://stackage.org/lts/package/integer-roots) [![Stackage Nightly](http://stackage.org/package/integer-roots/badge/nightly)](http://stackage.org/nightly/package/integer-roots) -->
 
 ## Updated Integer Qquare Root
-Implementation of this paper: [A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic](https://arxiv.org/abs/2406.07751).   As of now, it's not at parity in speed to the original, let alone faster. 
+Implementation of this paper: [A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic](https://arxiv.org/abs/2406.07751).   As of now, it's not at parity in speed to the original, let alone faster in an as-is comparison. HOWEVER - when the size of the test integers is increased to "Humungous" from merely "Huge",  performance benefits become apparent. isqrtB runs in ~980s vis-a-vis isqrtA in ~1044s - a 4% performance speedup. 
+    
+    Change the 63 to 255 in the test code in Wrappers.hs 
+        instance (Num a, Arbitrary a) => Arbitrary (Huge a) where
+        arbitrary = do
+            Positive l <- arbitrary
+            ds <- vector l
+            return $ Huge $ foldl1 (\acc n -> acc * 2 ^ (63 :: Int) + n) ds
 
 ## Original readme
 Calculating integer roots and testing perfect powers of arbitrary precision.

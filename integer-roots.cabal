@@ -29,6 +29,7 @@ library
    ,fast-digits>=0.3.2.0
    ,integer-logarithms>=1.0.3.1
    ,ghc-prim>=0.11.0
+   ,libBF>=0.6.8
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
   else
