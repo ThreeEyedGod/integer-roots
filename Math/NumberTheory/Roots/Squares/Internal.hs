@@ -182,7 +182,7 @@ isqrtB 0 = 0
 isqrtB n = fromInteger . ni_ . fi_ . dgts_ . fromIntegral $ n
 
 dgts_ :: Integer -> (Integer, [Word32])
-dgts_ n = (n, mkIW32''' n)
+dgts_ n = (n, mkIW32_ n)
 
 fi_ :: (Integer, [Word32]) -> ([Word32], VE.Vector Word32, Integer)
 fi_ (i, _) | i < 0 = error "fi: invalid negative argument"
@@ -195,10 +195,10 @@ fi_ (i, dxs) = (w32Lst, yCurrArr, remInteger)
     vInteger = ir dxs'
     searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
     y1_ = largestNSqLTE searchFrom vInteger
-    y1 = if y1_ == radixW32 then radixW32 - 1 else y1_ -- overflow
+    y1 = if y1_ == radixW32 then pred radixW32 else y1_ -- overflow trap 
     yCurrArr = VE.singleton (fromIntegral y1)
     remInteger_ = vInteger - y1 * y1 
-    remInteger = if remInteger_ == radixW32 then radixW32 - 1 else remInteger_ 
+    remInteger = if remInteger_ == radixW32 then pred radixW32 else remInteger_ 
 
 ni_ :: ([Word32], VE.Vector Word32, Integer) -> Integer
 ni_ (w32Lst, yCurrArr, iRem)
@@ -251,8 +251,8 @@ computeRem_ (tA, tB, tC) (yTilde, pos) = result
 handleRems_ :: (Int, Integer, Integer, Integer, Integer) -> (Integer, Integer)
 handleRems_ (pos, yi, ri, tA, tB)
   | ri == 0 = (yi, ri)
-  | (ri < 0) && (yi > 0) = (nextDownDgt0, calcNewRemainder tA tB nextDownDgt0) -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | (ri > 0) && noExcessLength = (yi, ri) -- all ok just continue no need for any other check if pos =0 then this check is not useful
+  | (ri < 0) && (yi > 0) = (nextDownDgt0, calcNewRemainder tA tB nextDownDgt0) -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | (ri > 0) && (pos > 0) && excessLengthBy3 = (yi, adjustedRemainder3) -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
   | (ri > 0) && firstRemainderBoundCheckFail = (nextUpDgt1, calcNewRemainder tA tB nextUpDgt1)
   | (ri > 0) && secondRemainderBoundCheckFail = (nextUpDgt2, calcNewRemainder tA tB nextUpDgt2)
@@ -362,11 +362,11 @@ mkIW32' i = wrd2wrd32 $ reverse'' (digitsUnsigned b n)
     b = fromIntegral radixW32 :: Word
     n = fromInteger i
 
-{-# INLINE [2] mkIW32''' #-}
+{-# INLINE [2] mkIW32_ #-}
 -- spit out the list as-is from digitsUnsigned which comes in reversed format. 
-mkIW32''' :: Integer -> [Word32]
-mkIW32''' 0 = [0]
-mkIW32''' i = wrd2wrd32 (digitsUnsigned b n)
+mkIW32_ :: Integer -> [Word32]
+mkIW32_ 0 = [0]
+mkIW32_ i = wrd2wrd32 (digitsUnsigned b n)
   where
     b = fromIntegral radixW32 :: Word
     n = fromInteger i
@@ -431,10 +431,13 @@ zero = FloatingX 0.0 (minBound :: Int64)
 minValue :: FloatingX
 minValue = FloatingX 1.0 0
 
+{-# INLINE [2] (!+) #-}
 (!+) :: FloatingX -> FloatingX -> FloatingX
 (!+) x y = x `add` y 
+{-# INLINE [2] (!*) #-}
 (!*) :: FloatingX -> FloatingX -> FloatingX
 (!*) x y = x `mul` y
+{-# INLINE [2] (!/) #-}
 (!/) :: FloatingX -> FloatingX -> FloatingX
 (!/) x y = x `divide` y
 
