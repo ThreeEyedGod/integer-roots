@@ -39,7 +39,7 @@ import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
 import Data.Word (Word32)
-import GHC.Exts ((<##), Double(..))
+import GHC.Exts ((<##), (*##), Double(..), Double#)
 -- *********** END NEW IMPORTS 
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -195,7 +195,7 @@ fi_ (i, dxs) = (w32Lst, yCurrArr, remInteger)
     l = length dxs
     (w32Lst, dxs') = let (head_, last_@[x]) = splitAt (l - 1) dxs in if even l then splitAt (l - 2) dxs else (head_, [x, 0 :: Word32])
     vInteger = ir dxs'
-    searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0
+    searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
     y1_ = largestNSqLTE searchFrom vInteger
     y1 = if y1_ == radixW32 then radixW32 - 1 else y1_ -- overflow
     yCurrArr = VE.singleton (fromIntegral y1)
@@ -220,12 +220,13 @@ ni_ (w32Lst, yCurrArr, iRem)
 nxtDgt_ :: (Integer, Integer) -> Integer 
 nxtDgt_ (tA, tC) 
     | tA == 0 = 0 
-    | itsOKtoUsePlainDoubleCalc = floor $ D# (tA# /## (sqrtDouble# (fmaddDouble# tC# tC# tA#) +## tC#)) -- //TODO can be chnaged to maxDouble/maxUnsafeInteger
+    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# (fmaddDouble# tC# tC# tA#)) +## nextDown# tC#))) -- //TODO can be chnaged to maxDouble/maxUnsafeInteger
     | otherwise = nxtDgtFX (tAFX, tCFX) 
  where 
-    -- rad# = fmaddDouble# tC# tC# tA#
-    -- !(D# maxDouble#) = maxDouble
-    itsOKtoUsePlainDoubleCalc = tC ^ 2 + tA <= maxSafeInteger -- || isTrue# (rad# <## maxDouble#)
+    rad# = fmaddDouble# tC# tC# tA#
+    !(D# maxDouble#) = maxDouble
+    -- itsOKtoUsePlainDoubleCalc = tC ^ 2 + tA <= maxSafeInteger || isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308)
+    itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308)
     tAFX = normalizeFX $ integer2FloatingX tA   
     tCFX = normalizeFX $ integer2FloatingX tC
     tA# = integerToDouble# tA
@@ -637,6 +638,14 @@ nextUp = NFI.nextUp
 {-# INLINE [1] nextDown #-}
 nextDown :: Double -> Double
 nextDown = NFI.nextDown
+
+{-# INLINE [1] nextUp# #-}
+nextUp# :: Double# -> Double#
+nextUp# dIn# = dOut# where !(D# dOut#) = NFI.nextUp d where d = D# dIn#
+
+{-# INLINE [1] nextDown# #-}
+nextDown# :: Double# -> Double#
+nextDown# dIn# = dOut# where !(D# dOut#) = NFI.nextDown d where d = D# dIn#
 
 
 {-# INLINE [1] nextUpFX #-}
