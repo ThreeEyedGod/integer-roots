@@ -261,11 +261,13 @@ handleRems_ (pos, yi, ri, tA, tB)
     b = radixW32
     riCurrSqrtRatio = ri `quot` currSqrt
     noExcessLength = riCurrSqrtRatio < 2 -- quick escape all good
-    excessLengthBy3 = lenCurrRemainder >= lenCurrSqrt + 3
+    {-  excessLengthBy3 = lenCurrRemainder >= lenCurrSqrt + 3
+        lenCurrRemainder = 1 + integerLogBase' b ri
+        lenCurrSqrt = 1 + integerLogBase' b yi
+     -}
+    excessLengthBy3 = integerLogBase' b (ri `div` yi) >= 3
     firstRemainderBoundCheckFail = not (isValidRemainder1 ri currSqrt pos)
     secondRemainderBoundCheckFail = not (isValidRemainder2 ri currSqrt pos)
-    lenCurrRemainder = 1 + integerLogBase' b ri -- //TODO THIS TAKES UP A CHUNK OF TIME length (digits (fromIntegral b) ri) makes little diff
-    lenCurrSqrt = 1 + integerLogBase' b yi
     currSqrt = tB * radixW32 + yi -- //TODO this seems inefficient to do this
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri `mod` modulus3
