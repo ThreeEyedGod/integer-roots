@@ -34,7 +34,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
 import Data.FastDigits (digits, digitsUnsigned, undigits)
-import qualified Data.Vector as VE
+import qualified Data.Vector as VE (cons, ifoldl', empty, singleton, Vector)
 import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
@@ -197,7 +197,7 @@ fi_ (i, dxs) = (w32Lst, yCurrArr, remInteger)
     y1_ = largestNSqLTE searchFrom vInteger
     y1 = if y1_ == radixW32 then radixW32 - 1 else y1_ -- overflow
     yCurrArr = VE.singleton (fromIntegral y1)
-    remInteger_ = vInteger - y1 ^ 2
+    remInteger_ = vInteger - y1 * y1 
     remInteger = if remInteger_ == radixW32 then radixW32 - 1 else remInteger_ 
 
 ni_ :: ([Word32], VE.Vector Word32, Integer) -> Integer
@@ -232,14 +232,14 @@ nxtDgt_ (tA, tC)
 
 nxtDgtFX_ :: (FloatingX, FloatingX) -> Integer 
 nxtDgtFX_ (tAFX, tCFX) =  iyTildeOut where
-      !iyTildeOut = min iyTilde (pred radixW32) -- overflow      
-      !iyTilde = floorX (nextUpFX iyTildeFX) --
-      !iyTildeFX =  nextUpFX (numFX !/ denFX) -- 
-      !numFX = nextUpFX tAFX --
-      !denFX =  nextDownFX (sqrtDFX !+ yShiftedFX) --OK
-      !sqrtDFX = nextDownFX (sqrtFX radFX) --OK 
-      !radFX =  nextDownFX (yShiftedSqrFX !+ tAFX) --
-      !yShiftedSqrFX = nextDownFX (yShiftedFX !* yShiftedFX) -- OK
+      !iyTildeOut = min iyTilde (pred radixW32) -- overflow trap   
+      !iyTilde = floorX (nextUpFX iyTildeFX) 
+      !iyTildeFX =  nextUpFX (numFX !/ denFX) 
+      !numFX = nextUpFX tAFX 
+      !denFX =  nextDownFX (sqrtDFX !+ yShiftedFX) 
+      !sqrtDFX = nextDownFX (sqrtFX radFX) 
+      !radFX =  nextDownFX (yShiftedSqrFX !+ tAFX) 
+      !yShiftedSqrFX = nextDownFX (yShiftedFX !* yShiftedFX) 
       !yShiftedFX = tCFX -- scaled value of previous digit -- OK
 
 computeRem_ :: (Integer, Integer, Integer) -> (Integer, Int) -> (Integer, Integer)
@@ -250,8 +250,9 @@ computeRem_ (tA, tB, tC) (yTilde, pos) = result
 
 handleRems_ :: (Int, Integer, Integer, Integer, Integer) -> (Integer, Integer)
 handleRems_ (pos, yi, ri, tA, tB)
+  | ri == 0 = (yi, ri)
   | (ri < 0) && (yi > 0) = (nextDownDgt0, calcNewRemainder tA tB nextDownDgt0) -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | (ri >= 0) && noExcessLength = (yi, ri) -- all ok just continue no need for any other check if pos =0 then this check is not useful
+  | (ri > 0) && noExcessLength = (yi, ri) -- all ok just continue no need for any other check if pos =0 then this check is not useful
   | (ri > 0) && (pos > 0) && excessLengthBy3 = (yi, adjustedRemainder3) -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
   | (ri > 0) && firstRemainderBoundCheckFail = (nextUpDgt1, calcNewRemainder tA tB nextUpDgt1)
   | (ri > 0) && secondRemainderBoundCheckFail = (nextUpDgt2, calcNewRemainder tA tB nextUpDgt2)
@@ -516,6 +517,7 @@ compose (d@(D# d#), e)
         !(# m, n# #) = decodeDoubleInteger d# 
         ex = I# n# + fromIntegral e 
         
+-- | The list is "reversed" i.e. the digits are LSB --> MSB         
 integerFrom2ElemW32List :: [Word32] -> Integer
 integerFrom2ElemW32List [] = error "integerFrom2ElemW32List : Empty list"
 integerFrom2ElemW32List [_] = error "integerFrom2ElemW32List : function needs 2 elems in List"
@@ -524,6 +526,7 @@ integerFrom2ElemW32List [l2, l1] = fromIntegral l2 * radixW32 + fromIntegral l1
 integerFrom2ElemW32List _ = error "integerFrom2ElemW32List : Invalid list with more than 2 elems"
 
 {-# INLINE [2] ir #-}
+-- | Integer from a "reversed" list of Word32 digits
 ir :: [Word32] -> Integer 
 ir [x,y] = integerFrom2ElemW32List [y,x]
 ir e = integerFrom2ElemW32List e 
@@ -549,7 +552,7 @@ integer2FloatingX :: Integer -> FloatingX
 integer2FloatingX i
   | i == 0 = zero
   | i < 0 = error "integer2FloatingX : invalid negative argument"
-  | i <= maxSafeInteger =  double2FloatingX (fromIntegral i) 
+  | i <= maxSafeInteger =  double2FloatingX (fromIntegral i) -- //TODO can this be made unsafeinteger ?
   | otherwise =  FloatingX s (fromIntegral e_)
   where
     (i_, e_) = cI2D2 i -- so that i_ is below integral maxDouble
@@ -630,7 +633,7 @@ minDouble = 4.9406564584124654e-324 -- Minimum positive normalized value for Dou
 maxSafeInteger :: Integer
 maxSafeInteger = 9007199254740991 -- 2^53 -1 this is the max integer that can be represented without losing precision
 
--- This is approximately 1.8 x 10^308
+-- This is approximately 1.8 x 10^308 representable as Double but will lose precision
 maxUnsafeInteger :: Integer
 maxUnsafeInteger = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368
 
