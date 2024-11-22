@@ -174,21 +174,22 @@ double x = x `unsafeShiftL` 1
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
---- https :// arxiv . org / abs / 2406.07751
+--- https ://arxiv.org/abs/2406.07751
 -- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 isqrtB n = fromInteger . ni_ . fi_ . dgts_ . fromIntegral $ n
 
-dgts_ :: Integer -> (Integer, [Word32])
-dgts_ n = (n, mkIW32_ n)
+dgts_ :: Integer -> [Word32]
+dgts_ n | n < 0 = error "dgts_: Invalid negative argument"
+dgts_ n = mkIW32_ n
 
-fi_ :: (Integer, [Word32]) -> ([Word32], VE.Vector Word32, Integer)
-fi_ (i, _) | i < 0 = error "fi: invalid negative argument"
-fi_ (0, _) = ([], VE.empty, 0) -- safety
-fi_ (_, []) = ([], VE.empty, 0) -- safety 
-fi_ (i, dxs) = (w32Lst, yCurrArr, remInteger)
+-- | First Iteration
+fi_ :: [Word32] -> ([Word32], VE.Vector Word32, Integer)
+fi_ [0] = ([], VE.empty, 0) -- safety
+fi_ [] = ([], VE.empty, 0) -- safety //TODO fix 
+fi_ dxs = (w32Lst, yCurrArr, remInteger)
   where
     l = length dxs
     (w32Lst, dxs') = let (head_, last_@[x]) = splitAt (l - 1) dxs in if even l then splitAt (l - 2) dxs else (head_, [x, 0 :: Word32])
@@ -200,6 +201,7 @@ fi_ (i, dxs) = (w32Lst, yCurrArr, remInteger)
     remInteger_ = vInteger - y1 * y1 
     remInteger = if remInteger_ == radixW32 then pred radixW32 else remInteger_ 
 
+-- | Next Iterations till array empties out 
 ni_ :: ([Word32], VE.Vector Word32, Integer) -> Integer
 ni_ (w32Lst, yCurrArr, iRem)
   | null w32Lst = vectorToInteger yCurrArr 
@@ -215,6 +217,9 @@ ni_ (w32Lst, yCurrArr, iRem)
     (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
     yCurrArrUpdated = VE.cons (fromIntegral yTildeFinal) yCurrArr
 
+-- | Next Digit. In our model a 32 bit digit.    
+-- for small values we can go with the standard double# arithmetic
+-- for larger than what a double can hold, we resort to out custom "Float" - FloatingX
 nxtDgt_ :: (Integer, Integer) -> Integer 
 nxtDgt_ (tA, tC) 
     | tA == 0 = 0 
@@ -230,6 +235,7 @@ nxtDgt_ (tA, tC)
     tA# = integerToDouble# tA
     tC# = integerToDouble# tC
 
+-- | Use FLoatingX Arithmetic to throw up the next digit 
 nxtDgtFX_ :: (FloatingX, FloatingX) -> Integer 
 nxtDgtFX_ (tAFX, tCFX) =  iyTildeOut where
       !iyTildeOut = min iyTilde (pred radixW32) -- overflow trap   
@@ -242,12 +248,17 @@ nxtDgtFX_ (tAFX, tCFX) =  iyTildeOut where
       !yShiftedSqrFX = nextDownFX (yShiftedFX !* yShiftedFX) 
       !yShiftedFX = tCFX -- scaled value of previous digit -- OK
 
+-- | compute the remainder. It may be that the "digit" may need to be reworked 
+-- that happens in handleRems_      
 computeRem_ :: (Integer, Integer, Integer) -> (Integer, Int) -> (Integer, Integer)
 computeRem_ (tA, tB, tC) (yTilde, pos) = result
   where
     rTrial = tA - ((2 * tC * yTilde) + yTilde * yTilde)
     result@(yTildeFinal, remFinal) = handleRems_ (pos, yTilde, rTrial, tA, tB)
 
+-- | if the remainder is negative it's a clear sign to decrement the candidate digit
+-- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
+-- if it's positive and far larger in size then also the current digit rework 
 handleRems_ :: (Int, Integer, Integer, Integer, Integer) -> (Integer, Integer)
 handleRems_ (pos, yi, ri, tA, tB)
   | ri == 0 = (yi, ri)
