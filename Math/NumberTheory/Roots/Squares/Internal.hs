@@ -64,7 +64,7 @@ import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL
 {-# SPECIALISE isqrtA :: Integer -> Integer #-}
 isqrtA :: Integral a => a -> a
 isqrtA 0 = 0
-isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n 
+isqrtA n = isqrtB n -- heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n 
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
@@ -223,7 +223,7 @@ ni_ (w32Lst, yCurrArr, iRem)
 nxtDgt_ :: (Integer, Integer) -> Integer 
 nxtDgt_ (tA, tC) 
     | tA == 0 = 0 
-    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# (fmaddDouble# tC# tC# tA#)) +## nextDown# tC#))) 
+    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
     | otherwise = nxtDgtFX_ (tAFX, tCFX) 
  where 
     rad# = fmaddDouble# tC# tC# tA#
