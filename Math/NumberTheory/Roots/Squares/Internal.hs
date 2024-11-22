@@ -361,6 +361,7 @@ mkIW32' i = wrd2wrd32 $ reverse'' (digitsUnsigned b n)
     b = fromIntegral radixW32 :: Word
     n = fromInteger i
 
+{-# INLINE [2] mkIW32''' #-}
 -- spit out the list as-is from digitsUnsigned which comes in reversed format. 
 mkIW32''' :: Integer -> [Word32]
 mkIW32''' 0 = [0]
@@ -411,11 +412,12 @@ reverse'' = toList . reversed
     
 data FloatingX = FloatingX {signif :: Double, expnnt :: Int64} deriving (Eq,Show) 
 
-{-# INLINE vectorToInteger #-}
+{-# INLINE [2] vectorToInteger #-}
 -- Function to convert a vector of Word32 values to an Integer with base 2^32 (radixw32)
 vectorToInteger :: VE.Vector Word32 -> Integer
 vectorToInteger = VE.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0 
 
+{-# INLINE [2] floorX #-}
 floorX :: FloatingX -> Integer
 floorX (FloatingX s e) = case compose (s, e) of
   Just d -> floor d --let fd = floor d in if tl == fd + 1 then tl else fd
@@ -521,6 +523,7 @@ integerFrom2ElemW32List [0, 0] = 0
 integerFrom2ElemW32List [l2, l1] = fromIntegral l2 * radixW32 + fromIntegral l1
 integerFrom2ElemW32List _ = error "integerFrom2ElemW32List : Invalid list with more than 2 elems"
 
+{-# INLINE [2] ir #-}
 ir :: [Word32] -> Integer 
 ir [x,y] = integerFrom2ElemW32List [y,x]
 ir e = integerFrom2ElemW32List e 
@@ -535,12 +538,13 @@ radixW32Squared = secndPlaceRadix
 radixW32Cubed :: Integer
 radixW32Cubed = secndPlaceRadix * radixW32
 
-
+{-# INLINE [1] double2FloatingX #-}
 double2FloatingX :: Double -> FloatingX
 double2FloatingX d = let (s, e) = split d in FloatingX s e
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991.
+{-# INLINE integer2FloatingX #-}
 integer2FloatingX :: Integer -> FloatingX
 integer2FloatingX i
   | i == 0 = zero
@@ -576,11 +580,13 @@ largestNSqLTE bot n = bbin bot (n + 1)
       where
         m = (a + b) `div` 2
 
+{-# INLINE [2] split #-}
 split :: Double -> (Double, Int64)
 split d  = (fromIntegral s, fromIntegral $ I# expInt#) where 
   !(D# d#) = d
   !(# s, expInt# #) = decodeDoubleInteger d# 
 
+{-# INLINE [1] normalize #-}
 normalize :: Double -> Double 
 normalize x
   | isNormal x = x 
@@ -605,6 +611,7 @@ normalize x
           | m' < 1 = go (m' * fromIntegral n') (e' - 1) n'
           | otherwise = (m', e')
 
+{-# INLINE normalizeFX #-}
 normalizeFX :: FloatingX -> FloatingX
 normalizeFX (FloatingX d ex) = FloatingX s (ex + e)
   where
@@ -629,24 +636,23 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
-{-# INLINE [1] nextUp #-}
+{-# INLINE [2] nextUp #-}
 nextUp :: Double -> Double
 nextUp = NFI.nextUp
 
-{-# INLINE [1] nextDown #-}
+{-# INLINE [2] nextDown #-}
 nextDown :: Double -> Double
 nextDown = NFI.nextDown
 
-{-# INLINE [1] nextUp# #-}
+{-# INLINE [2] nextUp# #-}
 nextUp# :: Double# -> Double#
 nextUp# dIn# = dOut# where !(D# dOut#) = NFI.nextUp d where d = D# dIn#
 
-{-# INLINE [1] nextDown# #-}
+{-# INLINE [2] nextDown# #-}
 nextDown# :: Double# -> Double#
 nextDown# dIn# = dOut# where !(D# dOut#) = NFI.nextDown d where d = D# dIn#
 
-
-{-# INLINE [1] nextUpFX #-}
+{-# INLINE [2] nextUpFX #-}
 nextUpFX :: FloatingX -> FloatingX
 nextUpFX (FloatingX s e)
   | s == 0.0 = minValue
@@ -654,8 +660,7 @@ nextUpFX (FloatingX s e)
   where
     interimS = nextUp s
 
-
-{-# INLINE [1] nextDownFX #-}
+{-# INLINE [2] nextDownFX #-}
 nextDownFX :: FloatingX -> FloatingX
 nextDownFX x@(FloatingX s e)
   | s == 0.0 || x == minValue = zero
