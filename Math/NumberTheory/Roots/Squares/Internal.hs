@@ -195,7 +195,7 @@ fi_ (i, dxs) = (w32Lst, yCurrArr, remInteger)
     l = length dxs
     (w32Lst, dxs') = let (head_, last_@[x]) = splitAt (l - 1) dxs in if even l then splitAt (l - 2) dxs else (head_, [x, 0 :: Word32])
     vInteger = ir dxs'
-    searchFrom = if vInteger >= radixW32 ^ 2 then radixW32 ^ 2 else 0
+    searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0
     y1_ = largestNSqLTE searchFrom vInteger
     y1 = if y1_ == radixW32 then radixW32 - 1 else y1_ -- overflow
     yCurrArr = VE.singleton (fromIntegral y1)
@@ -204,11 +204,11 @@ fi_ (i, dxs) = (w32Lst, yCurrArr, remInteger)
 
 ni_ :: ([Word32], VE.Vector Word32, Integer) -> Integer
 ni_ (w32Lst, yCurrArr, iRem)
-  | null w32Lst = vectorToInteger yCurrArr -- undigits radixW32 $ VE.toList yCurrArr -- mkW32I (reverse' yCurrListReversed) -- and exit
+  | null w32Lst = vectorToInteger yCurrArr 
   | otherwise = ni_ (residuali32Lst, yCurrArrUpdated, remFinal)
   where
     l = length w32Lst
-    position = pred $ l `quot` 2 -- last is 0
+    position = pred $ l `quot` 2 -- last pair is psition "0"
     (residuali32Lst, nxtTwoDgts) = splitAt (l - 2) w32Lst
     tAInteger = (iRem * secndPlaceRadix) + ir nxtTwoDgts
     tBInteger' = vectorToInteger yCurrArr
@@ -223,8 +223,8 @@ nxtDgt_ (tA, tC)
     | itsOKtoUsePlainDoubleCalc = floor $ D# (tA# /## (sqrtDouble# (fmaddDouble# tC# tC# tA#) +## tC#)) -- //TODO can be chnaged to maxDouble/maxUnsafeInteger
     | otherwise = nxtDgtFX (tAFX, tCFX) 
  where 
-    rad# = fmaddDouble# tC# tC# tA#
-    !(D# maxDouble#) = maxDouble
+    -- rad# = fmaddDouble# tC# tC# tA#
+    -- !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = tC ^ 2 + tA <= maxSafeInteger -- || isTrue# (rad# <## maxDouble#)
     tAFX = normalizeFX $ integer2FloatingX tA   
     tCFX = normalizeFX $ integer2FloatingX tC
@@ -260,14 +260,14 @@ handleRems (pos, yi, ri, tA, tB)
   where
     b = radixW32
     riCurrSqrtRatio = ri `quot` currSqrt
-    noExcessLength = riCurrSqrtRatio < 2 -- quick escape all good 
+    noExcessLength = riCurrSqrtRatio < 2 -- quick escape all good
     excessLengthBy3 = lenCurrRemainder >= lenCurrSqrt + 3
     firstRemainderBoundCheckFail = not (isValidRemainder1 ri currSqrt pos)
     secondRemainderBoundCheckFail = not (isValidRemainder2 ri currSqrt pos)
     lenCurrRemainder = 1 + integerLogBase' b ri -- //TODO THIS TAKES UP A CHUNK OF TIME length (digits (fromIntegral b) ri) makes little diff
-    lenCurrSqrt = 1 + integerLogBase' b yi 
-    currSqrt = tB * radixW32 + yi -- //TODO this seems inefficient something can be done here ... 
-    modulus3 = b ^ 3
+    lenCurrSqrt = 1 + integerLogBase' b yi
+    currSqrt = tB * radixW32 + yi -- //TODO this seems inefficient to do this
+    modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri `mod` modulus3
     nextDownDgt0 = findNextDigitDown (tA, tB) (yi, ri) pos yi 0 isValidRemainder0
     nextUpDgt1 = findNextDigitUp (tA, tB) (yi, ri) pos yi (radixW32 - 1) isValidRemainder1
@@ -490,7 +490,7 @@ sqrtDX d
   
 sqrtSplitDbl :: (Double,Int64) -> (Double, Int64) 
 sqrtSplitDbl (d, e) 
-  | d == 0 = (0,1) 
+  | d == 0 = (0,0) 
   | d == 1 = (1,0)
   | even e = (s, fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e) 1##) -- even 
   | otherwise = (sqrtOf2 * s, fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e-1) 1##) -- odd 
@@ -531,6 +531,11 @@ radixW32 = 2 ^ finiteBitSize (0 :: Word32)
 
 secndPlaceRadix :: Integer
 secndPlaceRadix = radixW32 * radixW32
+radixW32Squared :: Integer
+radixW32Squared = secndPlaceRadix
+radixW32Cubed :: Integer
+radixW32Cubed = secndPlaceRadix * radixW32
+
 
 double2FloatingX :: Double -> FloatingX
 double2FloatingX d = let (s, e) = split d in FloatingX s e
@@ -550,7 +555,7 @@ integer2FloatingX i
 cI2D2 :: Integer -> (Integer, Int)
 cI2D2 i | i < 0 = error "CI2D2: invalid negative argument"
 cI2D2 0 = (0, 0)
-cI2D2 i | i <= maxSafeInteger = (i, 0) -- safety 
+cI2D2 i | i <= maxSafeInteger = (i, 0) 
 cI2D2 i = go i 0
   where
     go n e
