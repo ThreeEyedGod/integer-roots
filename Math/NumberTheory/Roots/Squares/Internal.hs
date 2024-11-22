@@ -504,7 +504,8 @@ sqrtDX d
     | isInfinite d = maxDouble
     | d == 1 = 1 
     | otherwise = sqrt_fsqrt d -- actual call to "the square root" {sqrt_fsqrt, sqrt, sqrtC, or other options can be tried here}
-  
+ -- //TODO let's get LibBF in here. Might offer speed up. 
+    
 sqrtSplitDbl :: (Double,Int64) -> (Double, Int64) 
 sqrtSplitDbl (d, e) 
   | d == 0 = (0,0) 
@@ -567,7 +568,7 @@ integer2FloatingX :: Integer -> FloatingX
 integer2FloatingX i
   | i == 0 = zero
   | i < 0 = error "integer2FloatingX : invalid negative argument"
-  -- | i <= maxSafeInteger =  double2FloatingX (fromIntegral i) -- //TODO can this be made unsafeinteger ?
+  -- | i <= maxSafeInteger =  double2FloatingX (fromIntegral i) 
   | itsOKtoUsePlainDoubleCalc =  double2FloatingX (fromIntegral i) 
   | otherwise =  FloatingX s (fromIntegral e_)
   where
