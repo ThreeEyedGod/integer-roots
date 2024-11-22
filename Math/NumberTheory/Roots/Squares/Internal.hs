@@ -181,10 +181,8 @@ isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 isqrtB n = fromInteger . ni_ . fi_ . dgts_ . fromIntegral $ n
 
-
 dgts_ :: Integer -> (Integer, [Word32])
 dgts_ n = (n, mkIW32''' n)
-
 
 fi_ :: (Integer, [Word32]) -> ([Word32], VE.Vector Word32, Integer)
 fi_ (i, _) | i < 0 = error "fi: invalid negative argument"
@@ -214,27 +212,27 @@ ni_ (w32Lst, yCurrArr, iRem)
     tBInteger' = vectorToInteger yCurrArr
     tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
     yTilde = nxtDgt_ (tAInteger, tCInteger')
-    (yTildeFinal, remFinal) = computeRem (tAInteger, tBInteger', tCInteger') (yTilde, position)
+    (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
     yCurrArrUpdated = VE.cons (fromIntegral yTildeFinal) yCurrArr
 
 nxtDgt_ :: (Integer, Integer) -> Integer 
 nxtDgt_ (tA, tC) 
     | tA == 0 = 0 
     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# (fmaddDouble# tC# tC# tA#)) +## nextDown# tC#))) -- //TODO can be chnaged to maxDouble/maxUnsafeInteger
-    | otherwise = nxtDgtFX (tAFX, tCFX) 
+    | otherwise = nxtDgtFX_ (tAFX, tCFX) 
  where 
     rad# = fmaddDouble# tC# tC# tA#
     !(D# maxDouble#) = maxDouble
     -- itsOKtoUsePlainDoubleCalc = tC ^ 2 + tA <= maxSafeInteger || isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308)
-    itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308)
+    itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
     tAFX = normalizeFX $ integer2FloatingX tA   
     tCFX = normalizeFX $ integer2FloatingX tC
     tA# = integerToDouble# tA
     tC# = integerToDouble# tC
 
-nxtDgtFX :: (FloatingX, FloatingX) -> Integer 
-nxtDgtFX (tAFX, tCFX) =  iyTildeFinal where
-      !iyTildeFinal = min iyTilde (pred radixW32) -- overflow      
+nxtDgtFX_ :: (FloatingX, FloatingX) -> Integer 
+nxtDgtFX_ (tAFX, tCFX) =  iyTildeOut where
+      !iyTildeOut = min iyTilde (pred radixW32) -- overflow      
       !iyTilde = floorX (nextUpFX iyTildeFX) --
       !iyTildeFX =  nextUpFX (numFX !/ denFX) -- 
       !numFX = nextUpFX tAFX --
@@ -244,14 +242,14 @@ nxtDgtFX (tAFX, tCFX) =  iyTildeFinal where
       !yShiftedSqrFX = nextDownFX (yShiftedFX !* yShiftedFX) -- OK
       !yShiftedFX = tCFX -- scaled value of previous digit -- OK
 
-computeRem :: (Integer, Integer, Integer) -> (Integer, Int) -> (Integer, Integer)
-computeRem (tA, tB, tC) (yTilde, pos) = result
+computeRem_ :: (Integer, Integer, Integer) -> (Integer, Int) -> (Integer, Integer)
+computeRem_ (tA, tB, tC) (yTilde, pos) = result
   where
-    rTrial = tA - ((2 * tC * yTilde) + yTilde ^ (2 :: Int))
-    result@(yTildeFinal, remFinal) = handleRems (pos, yTilde, rTrial, tA, tB)
+    rTrial = tA - ((2 * tC * yTilde) + yTilde * yTilde)
+    result@(yTildeFinal, remFinal) = handleRems_ (pos, yTilde, rTrial, tA, tB)
 
-handleRems :: (Int, Integer, Integer, Integer, Integer) -> (Integer, Integer)
-handleRems (pos, yi, ri, tA, tB)
+handleRems_ :: (Int, Integer, Integer, Integer, Integer) -> (Integer, Integer)
+handleRems_ (pos, yi, ri, tA, tB)
   | (ri < 0) && (yi > 0) = (nextDownDgt0, calcNewRemainder tA tB nextDownDgt0) -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | (ri >= 0) && noExcessLength = (yi, ri) -- all ok just continue no need for any other check if pos =0 then this check is not useful
   | (ri > 0) && (pos > 0) && excessLengthBy3 = (yi, adjustedRemainder3) -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
@@ -414,7 +412,7 @@ reverse'' = toList . reversed
 data FloatingX = FloatingX {signif :: Double, expnnt :: Int64} deriving (Eq,Show) 
 
 {-# INLINE vectorToInteger #-}
--- Function to convert a vector of Word32 values to an Integer with base 2^32
+-- Function to convert a vector of Word32 values to an Integer with base 2^32 (radixw32)
 vectorToInteger :: VE.Vector Word32 -> Integer
 vectorToInteger = VE.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0 
 
