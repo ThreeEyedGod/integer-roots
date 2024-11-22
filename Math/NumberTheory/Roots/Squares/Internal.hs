@@ -12,8 +12,6 @@
 {-# LANGUAGE CApiFFI #-} -- addition
 {-# LANGUAGE UnboxedTuples #-} -- addition
 
-
-
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
   , isqrtA
@@ -183,12 +181,13 @@ isqrtB n = fromInteger . ni_ . fi_ . dgts_ . fromIntegral $ n
 
 dgts_ :: Integer -> [Word32]
 dgts_ n | n < 0 = error "dgts_: Invalid negative argument"
+dgts_ 0 = [0]
 dgts_ n = mkIW32_ n
 
 -- | First Iteration
 fi_ :: [Word32] -> ([Word32], VE.Vector Word32, Integer)
 fi_ [0] = ([], VE.empty, 0) -- safety
-fi_ [] = ([], VE.empty, 0) -- safety //TODO fix 
+fi_ [] = error "fi_: Invalid Argument null list "
 fi_ dxs = (w32Lst, yCurrArr, remInteger)
   where
     l = length dxs
@@ -223,7 +222,7 @@ ni_ (w32Lst, yCurrArr, iRem)
 nxtDgt_ :: (Integer, Integer) -> Integer 
 nxtDgt_ (tA, tC) 
     | tA == 0 = 0 
-    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# (fmaddDouble# tC# tC# tA#)) +## nextDown# tC#))) -- //TODO can be chnaged to maxDouble/maxUnsafeInteger
+    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# (fmaddDouble# tC# tC# tA#)) +## nextDown# tC#))) 
     | otherwise = nxtDgtFX_ (tAFX, tCFX) 
  where 
     rad# = fmaddDouble# tC# tC# tA#
@@ -279,7 +278,7 @@ handleRems_ (pos, yi, ri, tA, tB)
     excessLengthBy3 = integerLogBase' b (ri `div` yi) >= 3
     firstRemainderBoundCheckFail = not (isValidRemainder1 ri currSqrt pos)
     secondRemainderBoundCheckFail = not (isValidRemainder2 ri currSqrt pos)
-    currSqrt = tB * radixW32 + yi -- //TODO this seems inefficient to do this
+    currSqrt = tB * radixW32 + yi 
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri `mod` modulus3
     nextDownDgt0 = findNextDigitDown (tA, tB) (yi, ri) pos yi 0 isValidRemainder0
@@ -378,7 +377,7 @@ mkIW32' i = wrd2wrd32 $ reverse'' (digitsUnsigned b n)
 {-# INLINE [2] mkIW32_ #-}
 -- spit out the list as-is from digitsUnsigned which comes in reversed format. 
 mkIW32_ :: Integer -> [Word32]
-mkIW32_ 0 = [0]
+mkIW32_ 0 = [0] -- safety 
 mkIW32_ i = wrd2wrd32 (digitsUnsigned b n)
   where
     b = fromIntegral radixW32 :: Word
@@ -483,7 +482,7 @@ mul (FloatingX signifA expA) (FloatingX signifB expB) =
 divide :: FloatingX -> FloatingX -> FloatingX
 divide (FloatingX s1 e1) (FloatingX s2 e2)
     | s1 == 0.0 = zero
-    | s2 == 0.0 = error "divide: error divide by zero " -- //TODO FIX THIS maybe return maxDouble?
+    | s2 == 0.0 = error "divide: error divide by zero " 
     | otherwise = 
         let resExp = e1 - e2
             resSignif = s1 / s2
@@ -568,9 +567,13 @@ integer2FloatingX :: Integer -> FloatingX
 integer2FloatingX i
   | i == 0 = zero
   | i < 0 = error "integer2FloatingX : invalid negative argument"
-  | i <= maxSafeInteger =  double2FloatingX (fromIntegral i) -- //TODO can this be made unsafeinteger ?
+  -- | i <= maxSafeInteger =  double2FloatingX (fromIntegral i) -- //TODO can this be made unsafeinteger ?
+  | itsOKtoUsePlainDoubleCalc =  double2FloatingX (fromIntegral i) 
   | otherwise =  FloatingX s (fromIntegral e_)
   where
+    !(D# maxDouble#) = maxDouble
+    !(D# iDouble#) = fromIntegral i 
+    itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
     (i_, e_) = cI2D2 i -- so that i_ is below integral maxDouble
     s = fromIntegral i_
 
@@ -611,7 +614,7 @@ normalize x
   | isNormal x = x 
   | x == 0 || isNegativeZero x = minDouble 
   | isInfinite x || isNaN x = error "normalize: Infinite or NaN "
-  | isDoubleDenormalized x == 1 = x -- //TODO should this be minDouble?
+  | isDoubleDenormalized x == 1 = x 
   | isIEEE x  = x 
   | otherwise =
       let !(# m, e# #) = integerDecodeDouble# x#
