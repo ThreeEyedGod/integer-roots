@@ -305,7 +305,7 @@ calcRemainder tA tC dgt = tA - ((2 * tC * dgt) + dgt ^ (2 :: Int))
 
 findNextDigitUp :: (Integer, Integer, Integer) -> (Integer, Integer) -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer 
 findNextDigitUp (tA, tB, tC) (yi,ri) pos curr high checkFn
-      | curr >= radixW32 - 1  = radixW32 - 1 
+      | curr >= ceilNxtDgtUp  = ceilNxtDgtUp
       | curr > high = error "findNextDigitUp : no valid digit found (curr>high)"
       | curr == high = if checkFn curr yUpdated pos then curr - 1 else error "findNextDigitUp : no valid digit found (curr=high)"
       | otherwise = 
@@ -318,6 +318,7 @@ findNextDigitUp (tA, tB, tC) (yi,ri) pos curr high checkFn
              else
                 findNextDigitUp (tA, tB, tC) (yi, ri) pos (mid+1) high checkFn
     where 
+            ceilNxtDgtUp = radixW32 -1 
             yUpdated = tC + curr
             tryRange lowr highr 
               | lowr > highr = Nothing
