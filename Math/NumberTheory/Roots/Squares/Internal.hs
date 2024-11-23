@@ -217,7 +217,7 @@ ni_ (w32Lst, l, yCurrArr, iRem)
 
 -- | Next Digit. In our model a 32 bit digit.    
 -- for small values we can go with the standard double# arithmetic
--- for larger than what a double can hold, we resort to out custom "Float" - FloatingX
+-- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_ :: (Integer, Integer) -> Integer 
 nxtDgt_ (tA, tC) 
     | tA == 0 = 0 
@@ -226,7 +226,6 @@ nxtDgt_ (tA, tC)
  where 
     rad# = fmaddDouble# tC# tC# tA#
     !(D# maxDouble#) = maxDouble
-    -- itsOKtoUsePlainDoubleCalc = tC ^ 2 + tA <= maxSafeInteger || isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308)
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
     tAFX = normalizeFX $ integer2FloatingX tA   
     tCFX = normalizeFX $ integer2FloatingX tC
@@ -251,20 +250,20 @@ nxtDgtFX_ (tAFX, tCFX) =  iyTildeOut where
 computeRem_ :: (Integer, Integer, Integer) -> (Integer, Int) -> (Integer, Integer)
 computeRem_ (tA, tB, tC) (yTilde, pos) = result
   where
-    rTrial = tA - ((2 * tC * yTilde) + yTilde * yTilde)
-    result@(yTildeFinal, remFinal) = handleRems_ (pos, yTilde, rTrial, tA, tB)
+    rTrial = calcRemainder tA tC yTilde 
+    result@(yTildeFinal, remFinal) = handleRems_ (pos, yTilde, rTrial, tA, tB, tC)
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
 -- if it's positive and far larger in size then also the current digit rework 
-handleRems_ :: (Int, Integer, Integer, Integer, Integer) -> (Integer, Integer)
-handleRems_ (pos, yi, ri, tA, tB)
+handleRems_ :: (Int, Integer, Integer, Integer, Integer, Integer) -> (Integer, Integer)
+handleRems_ (pos, yi, ri, tA, tB, tC)
   | ri == 0 = (yi, ri)
   | (ri > 0) && noExcessLength = (yi, ri) -- all ok just continue no need for any other check if pos =0 then this check is not useful
-  | (ri < 0) && (yi > 0) = (nextDownDgt0, calcNewRemainder tA tB nextDownDgt0) -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | (ri < 0) && (yi > 0) = (nextDownDgt0, calcRemainder tA tC nextDownDgt0) -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | (ri > 0) && (pos > 0) && excessLengthBy3 = (yi, adjustedRemainder3) -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
-  | (ri > 0) && firstRemainderBoundCheckFail = (nextUpDgt1, calcNewRemainder tA tB nextUpDgt1)
-  | (ri > 0) && secondRemainderBoundCheckFail = (nextUpDgt2, calcNewRemainder tA tB nextUpDgt2)
+  | (ri > 0) && firstRemainderBoundCheckFail = (nextUpDgt1, calcRemainder tA tC nextUpDgt1)
+  | (ri > 0) && secondRemainderBoundCheckFail = (nextUpDgt2, calcRemainder tA tC nextUpDgt2)
   | otherwise = (yi, ri)
   where
     b = radixW32
@@ -280,9 +279,9 @@ handleRems_ (pos, yi, ri, tA, tB)
     currSqrt = tB * radixW32 + yi 
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri `mod` modulus3
-    nextDownDgt0 = findNextDigitDown (tA, tB) (yi, ri) pos yi 0 isValidRemainder0
-    nextUpDgt1 = findNextDigitUp (tA, tB) (yi, ri) pos yi (radixW32 - 1) isValidRemainder1
-    nextUpDgt2 = findNextDigitUp (tA, tB) (yi, ri) pos yi (radixW32 - 1) isValidRemainder2
+    nextDownDgt0 = findNextDigitDown (tA, tB, tC) (yi, ri) pos yi 0 isValidRemainder0
+    nextUpDgt1 = findNextDigitUp (tA, tB, tC) (yi, ri) pos yi (radixW32 - 1) isValidRemainder1
+    nextUpDgt2 = findNextDigitUp (tA, tB, tC) (yi, ri) pos yi (radixW32 - 1) isValidRemainder2
 
 -- Helper function to calculate remainder bounds
 calcMaxAllowed :: Integer -> Int -> Integer
@@ -300,62 +299,60 @@ isValidRemainder1 rem1 currentroot pos = rem1 < calcMaxAllowed currentroot pos
 isValidRemainder2 :: Integer -> Integer -> Int -> Bool
 isValidRemainder2 rem2 currentroot pos = rem2 < altBoundAllowed currentroot pos
 
--- Calculate new remainder after trying a digit
-calcNewRemainder :: Integer -> Integer -> Integer -> Integer
-calcNewRemainder tA tB dgt = tA - ((2 * tB * radixW32 * dgt) + dgt ^ (2 :: Int))
+-- Calculate remainder accompanying a 'digit'
+calcRemainder :: Integer -> Integer -> Integer -> Integer
+calcRemainder tA tC dgt = tA - ((2 * tC * dgt) + dgt ^ (2 :: Int))
 
-findNextDigitUp :: (Integer, Integer) -> (Integer, Integer) -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer 
-findNextDigitUp (tA, tB) (yi,ri) pos curr high checkFn
+findNextDigitUp :: (Integer, Integer, Integer) -> (Integer, Integer) -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer 
+findNextDigitUp (tA, tB, tC) (yi,ri) pos curr high checkFn
       | curr >= radixW32 - 1  = radixW32 - 1 
       | curr > high = error "findNextDigitUp : no valid digit found (curr>high)"
       | curr == high = if checkFn curr yUpdated pos then curr - 1 else error "findNextDigitUp : no valid digit found (curr=high)"
       | otherwise = 
           let mid = (curr + high) `div` 2 
-              testRem = calcNewRemainder tA tB mid 
-              testRoot = tBradixW32 + mid 
+              testRem = calcRemainder tA tC mid 
+              testRoot = tC + mid 
           in if checkFn testRem testRoot pos then 
               let validLower = tryRange curr (mid-1)
               in fromMaybe mid validLower 
              else
-                findNextDigitUp (tA, tB) (yi, ri) pos (mid+1) high checkFn
+                findNextDigitUp (tA, tB, tC) (yi, ri) pos (mid+1) high checkFn
     where 
-            tBradixW32 = tB*radixW32
-            yUpdated = tBradixW32 + curr
+            yUpdated = tC + curr
             tryRange lowr highr 
               | lowr > highr = Nothing
               | otherwise = 
                   let mid = (lowr + highr) `div` 2
-                      testRm = calcNewRemainder tA tB mid
-                      testRt =tBradixW32 + mid
+                      testRm = calcRemainder tA tC mid
+                      testRt = tC + mid
                   in if checkFn testRm testRt pos 
                     then Just mid
                     else tryRange (mid+1) highr
 
 
-findNextDigitDown :: (Integer, Integer) -> (Integer, Integer) -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer
-findNextDigitDown (tA, tB) (yi, ri) pos curr low checkFn
+findNextDigitDown :: (Integer, Integer, Integer) -> (Integer, Integer) -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer
+findNextDigitDown (tA, tB, tC) (yi, ri) pos curr low checkFn
   | curr < low = error "findNextDigitDown : no valid digit found (curr<low) "
   | curr == low = if checkFn curr yUpdated pos then curr else error "findNextDigitDown : no valid digit found (curr=low) "
-  | curr == yi = if checkFn (yi-1) yUpdated pos then yi-1 else findNextDigitDown (tA, tB) (yi, ri) pos (yi - 2) low checkFn
+  | curr == yi = if checkFn (yi-1) yUpdated pos then yi-1 else findNextDigitDown (tA, tB, tC) (yi, ri) pos (yi - 2) low checkFn
   | otherwise =
       let mid = (low + curr ) `div` 2
-          testRem = calcNewRemainder tA tB mid
-          testRoot = tBradixW32 + mid 
+          testRem = calcRemainder tA tC mid
+          testRoot = tC + mid 
        in if checkFn testRem testRoot pos
             then
               let validHigher = tryRange (mid + 1) curr
                in fromMaybe mid validHigher
             else
-              findNextDigitDown (tA, tB) (yi, ri) pos (mid - 1) low checkFn
+              findNextDigitDown (tA, tB, tC) (yi, ri) pos (mid - 1) low checkFn
   where
-    tBradixW32 = tB * radixW32
-    yUpdated = tBradixW32 + curr 
+    yUpdated = tC + curr 
     tryRange lowr highr
       | lowr > highr = Nothing
       | otherwise =
           let mid = (lowr + highr) `div` 2
-              testRm = calcNewRemainder tA tB mid
-              testRt = tBradixW32 + mid 
+              testRm = calcRemainder tA tC mid
+              testRt = tC + mid 
            in if checkFn testRm testRt pos
                 then Just mid
                 else tryRange lowr (mid - 1) 
