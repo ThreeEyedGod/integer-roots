@@ -185,13 +185,13 @@ dgts_ 0 = [0]
 dgts_ n = mkIW32_ n
 
 -- | First Iteration
-fi_ :: [Word32] -> ([Word32], VE.Vector Word32, Integer)
-fi_ [0] = ([], VE.empty, 0) -- safety
+fi_ :: [Word32] -> ([Word32], Int, VE.Vector Word32, Integer)
+fi_ [0] = ([], 0, VE.empty, 0) -- safety
 fi_ [] = error "fi_: Invalid Argument null list "
-fi_ dxs = (w32Lst, yCurrArr, remInteger)
+fi_ dxs = (w32Lst, l', yCurrArr, remInteger)
   where
     l = length dxs
-    (w32Lst, dxs') = let (head_, last_@[x]) = splitAt (l - 1) dxs in if even l then splitAt (l - 2) dxs else (head_, [x, 0 :: Word32])
+    ((w32Lst, dxs'), l') = let (head_, last_@[x]) = splitAt (l - 1) dxs in if even l then (splitAt (l - 2) dxs, l-2) else ((head_, [x, 0 :: Word32]), l-1)
     vInteger = intgrFromRvsrdLst dxs'
     searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
     y1_ = largestNSqLTE searchFrom vInteger
@@ -201,12 +201,11 @@ fi_ dxs = (w32Lst, yCurrArr, remInteger)
     remInteger = if remInteger_ == radixW32 then pred radixW32 else remInteger_ 
 
 -- | Next Iterations till array empties out 
-ni_ :: ([Word32], VE.Vector Word32, Integer) -> Integer
-ni_ (w32Lst, yCurrArr, iRem)
+ni_ :: ([Word32], Int, VE.Vector Word32, Integer) -> Integer
+ni_ (w32Lst, l, yCurrArr, iRem)
   | null w32Lst = vectorToInteger yCurrArr 
-  | otherwise = ni_ (residuali32Lst, yCurrArrUpdated, remFinal)
+  | otherwise = ni_ (residuali32Lst, l-2, yCurrArrUpdated, remFinal)
   where
-    l = length w32Lst
     position = pred $ l `quot` 2 -- last pair is psition "0"
     (residuali32Lst, nxtTwoDgts) = splitAt (l - 2) w32Lst
     tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst nxtTwoDgts
@@ -433,7 +432,7 @@ vectorToInteger = VE.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0
 {-# INLINE [2] floorX #-}
 floorX :: FloatingX -> Integer
 floorX (FloatingX s e) = case compose (s, e) of
-  Just d -> floor d --let fd = floor d in if tl == fd + 1 then tl else fd
+  Just d -> floor d 
   _ -> tl
   where
     tl = fromIntegral $ toLong s (fromIntegral e)
@@ -503,7 +502,7 @@ sqrtDX d
     | isNaN d = 0 
     | isInfinite d = maxDouble
     | d == 1 = 1 
-    | otherwise = sqrt d -- actual call to "the square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF or other }
+    | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF or other }
     
 sqrtSplitDbl :: (Double,Int64) -> (Double, Int64) 
 sqrtSplitDbl (d, e) 
