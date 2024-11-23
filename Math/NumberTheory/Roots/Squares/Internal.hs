@@ -18,7 +18,6 @@ module Math.NumberTheory.Roots.Squares.Internal
   ) where
 
 -- *********** BEGIN NEW IMPORTS   
-import Control.Parallel (par, pseq)
 import GHC.Prim (fmaddDouble#, (/##), (+##))
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
@@ -210,9 +209,6 @@ ni_ (w32Lst, l, yCurrArr, iRem)
     position = pred $ l `quot` 2 -- last pair is psition "0"
     (residuali32Lst, nxtTwoDgts) = splitAt (l - 2) w32Lst
     tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst nxtTwoDgts
-    -- tAInteger = let  x1 = iRem * secndPlaceRadix 
-    --                  x2 = intgrFromRvsrdLst nxtTwoDgts
-    --   in x1 `par` x2 `pseq` x1 + x2 
     tBInteger' = vectorToInteger yCurrArr
     tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
     yTilde = nxtDgt_ (tAInteger, tCInteger')
@@ -252,10 +248,10 @@ nxtDgtFX_ (tAFX, tCFX) =  iyTildeOut where
 -- | compute the remainder. It may be that the "digit" may need to be reworked 
 -- that happens in handleRems_      
 computeRem_ :: (Integer, Integer, Integer) -> (Integer, Int) -> (Integer, Integer)
-computeRem_ (tA, tB, tC) (yTilde, pos) = result
+computeRem_ (tA, tB, tC) (yTilde, pos) = (yTildeFinal, remFinal)
   where
     rTrial = calcRemainder tA tC yTilde 
-    result@(yTildeFinal, remFinal) = handleRems_ (pos, yTilde, rTrial, tA, tB, tC)
+    (yTildeFinal, remFinal) = handleRems_ (pos, yTilde, rTrial, tA, tB, tC)
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
