@@ -18,7 +18,6 @@ module Math.NumberTheory.Roots.Squares.Internal
   ) where
 
 -- *********** BEGIN NEW IMPORTS   
-import LibBF
 import GHC.Prim (fmaddDouble#, (/##), (+##))
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
@@ -504,7 +503,7 @@ sqrtDX d
     | isNaN d = 0 
     | isInfinite d = maxDouble
     | d == 1 = 1 
-    | otherwise = sqrtLibBF d -- actual call to "the square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF or other }
+    | otherwise = sqrt d -- actual call to "the square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF or other }
     
 sqrtSplitDbl :: (Double,Int64) -> (Double, Int64) 
 sqrtSplitDbl (d, e) 
@@ -690,77 +689,6 @@ nextDownFX x@(FloatingX s e)
   | otherwise = if interimS < 1.0 then FloatingX (interimS * 2) (e - 1) else FloatingX interimS e
   where
     interimS = nextDown s
-
---- ***********libBF
--- | Precision 23, exponent 9
-float649 :: RoundMode -> BFOpts
-float649 r = rnd r <> precBits 53 <> expBits 9
-
--- | Precision 22, exponent 10
-float6410 :: RoundMode -> BFOpts
-float6410 r = rnd r <> precBits 52 <> expBits 10
-
-float8011 :: RoundMode -> BFOpts
-float8011 r = rnd r <> precBits 69 <> expBits 11
-
-float8015 :: RoundMode -> BFOpts
-float8015 r = rnd r <> precBits 65 <> expBits 15
-
-fixOpts :: Integer -> BFOpts
-fixOpts i = preset ToZero
-  where
-    stdPresets = [(5, float16, 16), (8, float32, 32), (9, float649, 64), (10, float6410, 64), (11, float64, 53), (11, float8011, 80), (15, float8015, 80), (15, float128, 128), (19, float256, 256)] :: [(Int, RoundMode -> BFOpts, Int)]
-    exp10Min = integerLog10' i :: Int
-    expSizeMinBits = 2 + fromIntegral (toInteger $ integerLog2' (fromIntegral exp10Min))
-    fstdP = filter (\(x, y, z) -> x > expSizeMinBits) stdPresets
-    minPrec@(r, _, t) = head fstdP
-    gstdP = last $ filter (\(x, y, z) -> x == r) fstdP
-    (e, preset, p) = gstdP
-
-isqrtD' :: Integer -> Integer
-isqrtD' r = case (sRt, sCon) of
-  (Ok, Ok) -> floor x
-  (InvalidOp, _) -> error "Invalid Op: Square Root"
-  (_, InvalidOp) -> error "Invalid Op: Conversion"
-  (DivideByZero, _) -> error "DivideByZero"
-  (Overflow, _) -> error "Overflow: Square Root"
-  (_, Overflow) -> error "Overflow: Conversion"
-  (Underflow, _) -> error "Underflow: Square Root"
-  (_, Underflow) -> error "Underflow: Conversion"
-  (Inexact, Inexact) -> error "Inexact: Both "
-  (Inexact, Ok) -> error "Inexact: Square Root"
-  (Ok, Inexact) -> error "Inexact: Conversion"
-  (MemError, _) -> error "Memerror: Square Root"
-  (_, MemError) -> error "Memerror: Conversion"
-  _ -> error "other errors"
-  where
-    opts = fixOpts r
-    rBigFloat = bfFromInteger r
-    (rRootBigFLoat, sRt) = bfSqrt opts rBigFloat
-    (x, sCon) = bfToDouble NearEven rRootBigFLoat
-
-sqrtLibBF :: Double -> Double 
-sqrtLibBF d = case (sRt, sCon) of
-  (Ok, Ok) -> x
-  (InvalidOp, _) -> error "Invalid Op: Square Root"
-  (_, InvalidOp) -> error "Invalid Op: Conversion"
-  (DivideByZero, _) -> error "DivideByZero"
-  (Overflow, _) -> error "Overflow: Square Root"
-  (_, Overflow) -> error "Overflow: Conversion"
-  (Underflow, _) -> error "Underflow: Square Root"
-  (_, Underflow) -> error "Underflow: Conversion"
-  (Inexact, Inexact) -> x --error "Inexact: Both "
-  (Inexact, Ok) -> x --error "Inexact: Square Root"
-  (Ok, Inexact) -> x --error "Inexact: Conversion"
-  (MemError, _) -> error "Memerror: Square Root"
-  (_, MemError) -> error "Memerror: Conversion"
-  _ -> error "other errors"
-  where
-    opts = float64 NearEven
-    rBigFloat = bfFromDouble d
-    (rRootBigFLoat, sRt) = bfSqrt opts rBigFloat
-    (x, sCon) = bfToDouble NearEven rRootBigFLoat
-
 
 -- End isqrtB ****************************************************************
 -- End isqrtB ****************************************************************
