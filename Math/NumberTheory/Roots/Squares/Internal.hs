@@ -192,7 +192,7 @@ fi_ dxs = (w32Lst, yCurrArr, remInteger)
   where
     l = length dxs
     (w32Lst, dxs') = let (head_, last_@[x]) = splitAt (l - 1) dxs in if even l then splitAt (l - 2) dxs else (head_, [x, 0 :: Word32])
-    vInteger = ir dxs'
+    vInteger = intgrFromRvsrdLst dxs'
     searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
     y1_ = largestNSqLTE searchFrom vInteger
     y1 = if y1_ == radixW32 then pred radixW32 else y1_ -- overflow trap 
@@ -209,7 +209,7 @@ ni_ (w32Lst, yCurrArr, iRem)
     l = length w32Lst
     position = pred $ l `quot` 2 -- last pair is psition "0"
     (residuali32Lst, nxtTwoDgts) = splitAt (l - 2) w32Lst
-    tAInteger = (iRem * secndPlaceRadix) + ir nxtTwoDgts
+    tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst nxtTwoDgts
     tBInteger' = vectorToInteger yCurrArr
     tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
     yTilde = nxtDgt_ (tAInteger, tCInteger')
@@ -540,11 +540,11 @@ integerFrom2ElemW32List [0, 0] = 0
 integerFrom2ElemW32List [l2, l1] = fromIntegral l2 * radixW32 + fromIntegral l1
 integerFrom2ElemW32List _ = error "integerFrom2ElemW32List : Invalid list with more than 2 elems"
 
-{-# INLINE [2] ir #-}
+{-# INLINE [2] intgrFromRvsrdLst #-}
 -- | Integer from a "reversed" list of Word32 digits
-ir :: [Word32] -> Integer 
-ir [x,y] = integerFrom2ElemW32List [y,x]
-ir e = integerFrom2ElemW32List e 
+intgrFromRvsrdLst :: [Word32] -> Integer 
+intgrFromRvsrdLst [x,y] = integerFrom2ElemW32List [y,x]
+intgrFromRvsrdLst e = integerFrom2ElemW32List e 
 
 radixW32 :: Integer
 radixW32 = 2 ^ finiteBitSize (0 :: Word32)
