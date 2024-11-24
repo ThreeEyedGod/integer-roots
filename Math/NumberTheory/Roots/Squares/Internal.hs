@@ -239,8 +239,7 @@ nxtDgt_ (tA, tC)
 
 -- | Use FLoatingX Arithmetic to throw up the next digit 
 nxtDgtFX_ :: (FloatingX, FloatingX) -> Integer 
-nxtDgtFX_ (tAFX, yShiftedFX@tCFX) =  iyTildeOut where
-      !iyTildeOut = min iyTilde (pred radixW32) -- overflow trap   
+nxtDgtFX_ (tAFX, yShiftedFX@tCFX) =  min iyTilde (pred radixW32) where --the right side is overflow trap
       !iyTilde = floorX (nextUpFX iyTildeFX) 
       !iyTildeFX =  nextUpFX (numFX !/ denFX) 
       !numFX = nextUpFX tAFX 
@@ -333,7 +332,6 @@ findNextDigitUp (tA, tB, tC) (yi,ri) pos curr high checkFn
                   in if checkFn testRm testRt pos 
                     then Just mid
                     else tryRange (mid+1) highr
-
 
 findNextDigitDown :: (Integer, Integer, Integer) -> (Integer, Integer) -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer
 findNextDigitDown (tA, tB, tC) (yi, ri) pos curr low checkFn
@@ -434,11 +432,9 @@ vectorToInteger = VE.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0
 {-# INLINE [2] floorX #-}
 floorX :: FloatingX -> Integer
 floorX (FloatingX s e) = case compose (s, e) of
-  Just d -> floor d 
-  _ -> tl
-  where
-    tl = fromIntegral $ toLong s (fromIntegral e)
-        
+  Just d -> floor d
+  _ -> fromIntegral $ toLong s (fromIntegral e)
+
 zero :: FloatingX
 zero = FloatingX 0.0 (minBound :: Int64)
 minValue :: FloatingX
@@ -446,10 +442,12 @@ minValue = FloatingX 1.0 0
 
 {-# INLINE [2] (!+) #-}
 (!+) :: FloatingX -> FloatingX -> FloatingX
-(!+) x y = x `add` y 
+(!+) x y = x `add` y
+
 {-# INLINE [2] (!*) #-}
 (!*) :: FloatingX -> FloatingX -> FloatingX
 (!*) x y = x `mul` y
+
 {-# INLINE [2] (!/) #-}
 (!/) :: FloatingX -> FloatingX -> FloatingX
 (!/) x y = x `divide` y
@@ -546,10 +544,12 @@ integerFrom2ElemW32List [l2, l1] = fromIntegral l2 * radixW32 + fromIntegral l1
 integerFrom2ElemW32List _ = error "integerFrom2ElemW32List : Invalid list with more than 2 elems"
 
 {-# INLINE [2] intgrFromRvsrdLst #-}
+
 -- | Integer from a "reversed" list of Word32 digits
-intgrFromRvsrdLst :: [Word32] -> Integer 
-intgrFromRvsrdLst [x,y] = integerFrom2ElemW32List [y,x]
-intgrFromRvsrdLst e = integerFrom2ElemW32List e 
+intgrFromRvsrdLst :: [Word32] -> Integer
+intgrFromRvsrdLst [x, y] = integerFrom2ElemW32List [y, x]
+intgrFromRvsrdLst e = integerFrom2ElemW32List e
+
 
 radixW32 :: Integer
 radixW32 = 2 ^ finiteBitSize (0 :: Word32)
