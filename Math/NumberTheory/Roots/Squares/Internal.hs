@@ -18,6 +18,11 @@ module Math.NumberTheory.Roots.Squares.Internal
   ) where
 
 -- *********** BEGIN NEW IMPORTS   
+-- import Control.Monad.ST (runST)
+-- import Data.Number.MPFR (RoundMode)
+-- import qualified Data.Number.MPFR as M
+-- import Data.Number.MPFR.Instances.Up ()
+-- import qualified Data.Number.MPFR.Mutable as MM
 import GHC.Prim (fmaddDouble#, (/##), (+##))
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
@@ -234,7 +239,7 @@ nxtDgt_ (tA, tC)
 
 -- | Use FLoatingX Arithmetic to throw up the next digit 
 nxtDgtFX_ :: (FloatingX, FloatingX) -> Integer 
-nxtDgtFX_ (tAFX, tCFX) =  iyTildeOut where
+nxtDgtFX_ (tAFX, yShiftedFX@tCFX) =  iyTildeOut where
       !iyTildeOut = min iyTilde (pred radixW32) -- overflow trap   
       !iyTilde = floorX (nextUpFX iyTildeFX) 
       !iyTildeFX =  nextUpFX (numFX !/ denFX) 
@@ -243,7 +248,6 @@ nxtDgtFX_ (tAFX, tCFX) =  iyTildeOut where
       !sqrtDFX = nextDownFX (sqrtFX radFX) 
       !radFX =  nextDownFX (yShiftedSqrFX !+ tAFX) 
       !yShiftedSqrFX = nextDownFX (yShiftedFX !* yShiftedFX) 
-      !yShiftedFX = tCFX -- scaled value of previous digit -- OK
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked 
 -- that happens in handleRems_      
@@ -496,11 +500,15 @@ sqrtFX (FloatingX s e)  = FloatingX sX eX where
 
 sqrtDX :: Double -> Double
 sqrtDX d 
-    | d ==0 = 0 
+    | d == 0 = 0 
     | isNaN d = 0 
     | isInfinite d = maxDouble
     | d == 1 = 1 
     | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF or other }
+
+-- sqrtDouble :: Double -> M.MPFR
+-- sqrtDouble d = M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
+
     
 sqrtSplitDbl :: (Double,Int64) -> (Double, Int64) 
 sqrtSplitDbl (d, e) 
@@ -564,14 +572,13 @@ integer2FloatingX :: Integer -> FloatingX
 integer2FloatingX i
   | i == 0 = zero
   | i < 0 = error "integer2FloatingX : invalid negative argument"
-  -- | i <= maxSafeInteger =  double2FloatingX (fromIntegral i) 
   | itsOKtoUsePlainDoubleCalc =  double2FloatingX (fromIntegral i) 
   | otherwise =  FloatingX s (fromIntegral e_)
   where
     !(D# maxDouble#) = maxDouble
     !(D# iDouble#) = fromIntegral i 
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
-    (i_, e_) = cI2D2 i -- so that i_ is below integral maxDouble
+    (i_, e_) = cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
     s = fromIntegral i_
 
 cI2D2 :: Integer -> (Integer, Int)
