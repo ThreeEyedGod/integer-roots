@@ -38,7 +38,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
 import Data.FastDigits (digits, digitsUnsigned, undigits)
-import qualified Data.Vector.Unboxed as VU (Vector, cons, empty, ifoldl', singleton)
+import qualified Data.Vector.Unboxed as VU (Vector, cons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList)
 import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
@@ -60,6 +60,7 @@ import GHC.Integer.Logarithms (integerLog2#)
 import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#)
 import GHC.Num.BigNat (bigNatSize#)
 import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
+import qualified Data.Monoid as VU
 #endif
 
 -- Find approximation to square root in 'Integer', then
@@ -183,12 +184,42 @@ double x = x `unsafeShiftL` 1
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
-isqrtB n = fromInteger . ni_ . fi_ . dgts_ . fromIntegral $ n
+--isqrtB n = fromInteger . ni_ . fi_ . dgts_ . fromIntegral $ n
+isqrtB n = fromInteger . ni__ . fi__ . dgts__ . fromIntegral $ n
 
 dgts_ :: Integer -> [Word32]
 dgts_ n | n < 0 = error "dgts_: Invalid negative argument"
 dgts_ 0 = [0]
 dgts_ n = mkIW32_ n
+
+dgts__ :: Integer -> VU.Vector Word32
+dgts__ n | n < 0 = error "dgts_: Invalid negative argument"
+dgts__ 0 = VU.singleton 0 
+dgts__ n = mkIW32__ n
+
+-- | First Iteration
+fi__ :: VU.Vector Word32 -> (VU.Vector Word32, Int, VU.Vector Word32, Integer)
+fi__ vec 
+  | VU.length vec == 1 && VU.head vec == 0 = (VU.empty, 0, VU.empty, 0)
+  | VU.null vec = error "fi_: Invalid Argument null vector "
+  | otherwise = (w32Lst, l', yCurrArr, remInteger)
+    where
+      ((w32Lst, dxs'), l') =
+        let !l = VU.length vec 
+            (headVec1, lastVec1) = VU.splitAt (l - 1) vec
+            (head_1, last_1) = (headVec1, VU.toList lastVec1)
+            x = head last_1
+            (headVec2, lastVec2) = VU.splitAt (l - 2) vec
+            (head_2, last_2) = (headVec2, VU.toList lastVec2)
+        in if even l then ((head_2,last_2), l - 2) else ((head_1, [x, 0 :: Word32]), l - 1)
+      vInteger = intgrFromRvsrdLst dxs'
+      y1 =
+        let !searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
+        in min (largestNSqLTE searchFrom vInteger) (pred radixW32) -- overflow trap
+      yCurrArr = VU.singleton (fromIntegral y1)
+      remInteger =
+        let !remInteger_ = vInteger - y1 * y1
+        in if remInteger_ == radixW32 then pred radixW32 else remInteger_
 
 -- | First Iteration
 fi_ :: [Word32] -> ([Word32], Int, VU.Vector Word32, Integer)
@@ -208,6 +239,21 @@ fi_ dxs = (w32Lst, l', yCurrArr, remInteger)
     remInteger =
       let !remInteger_ = vInteger - y1 * y1
        in if remInteger_ == radixW32 then pred radixW32 else remInteger_
+
+-- | Next Iterations till array empties out
+ni__ :: (VU.Vector Word32, Int, VU.Vector Word32, Integer) -> Integer
+ni__ (w32Vec, l, yCurrArr, iRem)
+  | VU.null w32Vec = vectorToInteger yCurrArr
+  | otherwise = ni__ (residuali32Vec, l - 2, yCurrArrUpdated, remFinal)
+  where
+    position = pred $ l `quot` 2 -- last pair is psition "0"
+    (residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
+    tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst (VU.toList nxtTwoDgtsVec) 
+    tBInteger' = vectorToInteger yCurrArr
+    tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
+    yTilde = nxtDgt_ (tAInteger, tCInteger')
+    (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
+    yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
 
 -- | Next Iterations till array empties out 
 ni_ :: ([Word32], Int, VU.Vector Word32, Integer) -> Integer
@@ -370,6 +416,16 @@ mkIW32_ i = wrd2wrd32 (digitsUnsigned b n)
   where
     b = fromIntegral radixW32 :: Word
     n = fromInteger i
+
+{-# INLINE mkIW32__ #-}
+-- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
+mkIW32__ :: Integer -> VU.Vector Word32
+mkIW32__ 0 = VU.singleton 0 -- safety
+mkIW32__ i = VU.fromList $ wrd2wrd32 (digitsUnsigned b n)
+  where
+    b = fromIntegral radixW32 :: Word
+    n = fromInteger i
+
 
 {-# INLINE int2wrd32 #-}
 int2wrd32 :: [Int] -> [Word32]
