@@ -197,16 +197,16 @@ fi_ [] = error "fi_: Invalid Argument null list "
 fi_ dxs = (w32Lst, l', yCurrArr, remInteger)
   where
     ((w32Lst, dxs'), l') =
-      let l = length dxs
+      let !l = length dxs
           (head_, last_@[x]) = splitAt (l - 1) dxs
        in if even l then (splitAt (l - 2) dxs, l - 2) else ((head_, [x, 0 :: Word32]), l - 1)
     vInteger = intgrFromRvsrdLst dxs'
     y1 =
-      let searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
+      let !searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
        in min (largestNSqLTE searchFrom vInteger) (pred radixW32) -- overflow trap
     yCurrArr = VU.singleton (fromIntegral y1)
     remInteger =
-      let remInteger_ = vInteger - y1 * y1
+      let !remInteger_ = vInteger - y1 * y1
        in if remInteger_ == radixW32 then pred radixW32 else remInteger_
 
 -- | Next Iterations till array empties out 
@@ -231,24 +231,25 @@ nxtDgt_ :: (Integer, Integer) -> Integer
 nxtDgt_ (tA, tC) 
     | tA == 0 = 0 
     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
-    | otherwise = min (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX)))) (pred radixW32)
+    | otherwise = let  
+          !tAFX = normalizeFX $ integer2FloatingX tA   
+          !tCFX = normalizeFX $ integer2FloatingX tC
+          !radFX = tCFX !* tCFX !+ tAFX
+        in
+          min (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX)))) (pred radixW32)
  where 
     tA# = integerToDouble# tA
     tC# = integerToDouble# tC
     rad# = fmaddDouble# tC# tC# tA#
     !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
-    tAFX = normalizeFX $ integer2FloatingX tA   
-    tCFX = normalizeFX $ integer2FloatingX tC
-    radFX = tCFX !* tCFX !+ tAFX
 
--- | compute the remainder. It may be that the "digit" may need to be reworked 
--- that happens in handleRems_      
+-- | compute the remainder. It may be that the "digit" may need to be reworked
+-- that happens in handleRems_
 computeRem_ :: (Integer, Integer, Integer) -> (Integer, Int) -> (Integer, Integer)
-computeRem_ (tA, tB, tC) (yTilde, pos) = (yTildeFinal, remFinal)
-  where
-    rTrial = calcRemainder tA tC yTilde 
-    (yTildeFinal, remFinal) = handleRems_ (pos, yTilde, rTrial, tA, tB, tC)
+computeRem_ (tA, tB, tC) (yTilde, pos) =
+  let rTrial = calcRemainder tA tC yTilde
+   in handleRems_ (pos, yTilde, rTrial, tA, tB, tC)
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
@@ -315,8 +316,8 @@ findNextDigitUp (tA, tB, tC) (yi,ri) pos curr high checkFn
              else
                 findNextDigitUp (tA, tB, tC) (yi, ri) pos (mid+1) high checkFn
     where 
-            ceilNxtDgtUp = radixW32 -1 
-            yUpdated = tC + curr
+            ceilNxtDgtUp = pred radixW32
+            !yUpdated = tC + curr
 
 findNextDigitDown :: (Integer, Integer, Integer) -> (Integer, Integer) -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer
 findNextDigitDown (tA, tB, tC) (yi, ri) pos curr low checkFn
@@ -324,24 +325,24 @@ findNextDigitDown (tA, tB, tC) (yi, ri) pos curr low checkFn
   | curr == low = if checkFn curr yUpdated pos then curr else error "findNextDigitDown : no valid digit found (curr=low) "
   | curr == yi = if checkFn (yi-1) yUpdated pos then yi-1 else findNextDigitDown (tA, tB, tC) (yi, ri) pos (yi - 2) low checkFn
   | otherwise =
-      let mid = (low + curr ) `div` 2
+      let !mid = (low + curr ) `div` 2
           testRem = calcRemainder tA tC mid
           testRoot = tC + mid 
        in if checkFn testRem testRoot pos
             then
-              let validHigher = tryRange Lower (tA, tB, pos) (mid+1) curr checkFn 
+              let !validHigher = tryRange Lower (tA, tB, pos) (mid+1) curr checkFn 
                in fromMaybe mid validHigher
             else
               findNextDigitDown (tA, tB, tC) (yi, ri) pos (mid - 1) low checkFn
   where
-    yUpdated = tC + curr 
+    !yUpdated = tC + curr 
 
 data RangeSearch =  Lower | Higher deriving Eq 
 tryRange :: RangeSearch -> (Integer, Integer, Int)-> Integer -> Integer -> (Integer -> Integer -> Int -> Bool )  -> Maybe Integer     
 tryRange rS set@(tA, tC, pos) lowr highr checkFn 
       | lowr > highr = Nothing
       | otherwise =
-          let mid = (lowr + highr) `div` 2
+          let !mid = (lowr + highr) `div` 2
               testRm = calcRemainder tA tC mid
               testRt = tC + mid 
            in if checkFn testRm testRt pos
