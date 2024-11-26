@@ -221,25 +221,6 @@ fi__ vec
         let !remInteger_ = vInteger - y1 * y1
         in if remInteger_ == radixW32 then pred radixW32 else remInteger_
 
--- | First Iteration
-fi_ :: [Word32] -> ([Word32], Int, VU.Vector Word32, Integer)
-fi_ [0] = ([], 0, VU.empty, 0) -- safety
-fi_ [] = error "fi_: Invalid Argument null list "
-fi_ dxs = (w32Lst, l', yCurrArr, remInteger)
-  where
-    ((w32Lst, dxs'), l') =
-      let !l = length dxs
-          (head_, last_@[x]) = splitAt (l - 1) dxs
-       in if even l then (splitAt (l - 2) dxs, l - 2) else ((head_, [x, 0 :: Word32]), l - 1)
-    vInteger = intgrFromRvsrdLst dxs'
-    y1 =
-      let !searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
-       in min (largestNSqLTE searchFrom vInteger) (pred radixW32) -- overflow trap
-    yCurrArr = VU.singleton (fromIntegral y1)
-    remInteger =
-      let !remInteger_ = vInteger - y1 * y1
-       in if remInteger_ == radixW32 then pred radixW32 else remInteger_
-
 -- | Next Iterations till array empties out
 ni__ :: (VU.Vector Word32, Int, VU.Vector Word32, Integer) -> Integer
 ni__ (w32Vec, l, yCurrArr, iRem)
@@ -249,21 +230,6 @@ ni__ (w32Vec, l, yCurrArr, iRem)
     position = pred $ l `quot` 2 -- last pair is psition "0"
     (residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
     tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst (VU.toList nxtTwoDgtsVec) 
-    tBInteger' = vectorToInteger yCurrArr
-    tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
-    yTilde = nxtDgt_ (tAInteger, tCInteger')
-    (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
-    yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
-
--- | Next Iterations till array empties out 
-ni_ :: ([Word32], Int, VU.Vector Word32, Integer) -> Integer
-ni_ (w32Lst, l, yCurrArr, iRem)
-  | null w32Lst = vectorToInteger yCurrArr 
-  | otherwise = ni_ (residuali32Lst, l-2, yCurrArrUpdated, remFinal)
-  where
-    position = pred $ l `quot` 2 -- last pair is psition "0"
-    (residuali32Lst, nxtTwoDgts) = splitAt (l - 2) w32Lst
-    tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst nxtTwoDgts
     tBInteger' = vectorToInteger yCurrArr
     tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
     yTilde = nxtDgt_ (tAInteger, tCInteger')
@@ -294,7 +260,7 @@ nxtDgt_ (tA, tC)
 -- that happens in handleRems_
 computeRem_ :: (Integer, Integer, Integer) -> (Integer, Int) -> (Integer, Integer)
 computeRem_ (tA, tB, tC) (yTilde, pos) =
-  let rTrial = calcRemainder tA tC yTilde
+  let !rTrial = calcRemainder tA tC yTilde
    in handleRems_ (pos, yTilde, rTrial, tA, tB, tC)
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
