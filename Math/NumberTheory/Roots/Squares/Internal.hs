@@ -453,9 +453,9 @@ add a@(FloatingX signifA expA) b@(FloatingX signifB expB)
   | otherwise = FloatingX (signifA + signifB) expA
   where
     combine big@(FloatingX signifBig expBig) little@(FloatingX signifLittle expLittle) =
-      let scale = expLittle - expBig
-          scaledLittle = signifLittle * 2 ^^ scale
-          resSignif = signifBig + scaledLittle
+      let !scale = expLittle - expBig
+          !scaledLittle = signifLittle * 2 ^^ scale
+          !resSignif = signifBig + scaledLittle
        in if resSignif >= 2.0
             then FloatingX (resSignif / 2.0) (expBig + 1)
             else FloatingX resSignif expBig
@@ -465,8 +465,8 @@ mul :: FloatingX -> FloatingX -> FloatingX
 mul (FloatingX 0.0 _) _ = zero
 mul _ (FloatingX 0.0 _) = zero
 mul (FloatingX signifA expA) (FloatingX signifB expB) =
-  let resExp = expA + expB
-      resSignif = signifA * signifB
+  let !resExp = expA + expB
+      !resSignif = signifA * signifB
    in if resSignif >= 2.0
         then FloatingX (resSignif / 2.0) (resExp + 1)
         else FloatingX resSignif resExp
@@ -477,8 +477,8 @@ divide (FloatingX s1 e1) (FloatingX s2 e2)
     | s1 == 0.0 = zero
     | s2 == 0.0 = error "divide: error divide by zero " 
     | otherwise = 
-        let resExp = e1 - e2
-            resSignif = s1 / s2
+        let !resExp = e1 - e2
+            !resSignif = s1 / s2
             (finalSignif, finalExp) = if resSignif < 1.0
                                       then (resSignif * 2.0, resExp - 1)
                                       else (resSignif, resExp)
@@ -510,7 +510,7 @@ sqrtSplitDbl (d, e)
   | even e = (s, fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e) 1##) -- even 
   | otherwise = (sqrtOf2 * s, fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e-1) 1##) -- odd 
  where 
-    s = sqrtDX d 
+    !s = sqrtDX d 
 
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrt_fsqrt" sqrt_fsqrt :: Double -> Double
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
@@ -567,13 +567,14 @@ integer2FloatingX i
   | i == 0 = zero
   | i < 0 = error "integer2FloatingX : invalid negative argument"
   | itsOKtoUsePlainDoubleCalc =  double2FloatingX (fromIntegral i) 
-  | otherwise =  FloatingX s (fromIntegral e_)
+  | otherwise =  let 
+      !(i_, e_) = cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+      s = fromIntegral i_
+    in FloatingX s (fromIntegral e_)
   where
     !(D# maxDouble#) = maxDouble
     !(D# iDouble#) = fromIntegral i 
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
-    (i_, e_) = cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-    s = fromIntegral i_
 
 {-# INLINE cI2D2 #-}
 cI2D2 :: Integer -> (Integer, Int)
