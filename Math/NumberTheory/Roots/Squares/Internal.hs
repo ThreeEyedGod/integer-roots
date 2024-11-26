@@ -12,6 +12,7 @@
 {-# LANGUAGE CApiFFI #-} -- addition
 {-# LANGUAGE UnboxedTuples #-} -- addition
 
+
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
   , isqrtA
@@ -37,7 +38,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
 import Data.FastDigits (digits, digitsUnsigned, undigits)
-import qualified Data.Vector as VE (cons, ifoldl', empty, singleton, Vector)
+import qualified Data.Vector.Unboxed as VU (Vector, cons, empty, ifoldl', singleton)
 import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
@@ -190,23 +191,26 @@ dgts_ 0 = [0]
 dgts_ n = mkIW32_ n
 
 -- | First Iteration
-fi_ :: [Word32] -> ([Word32], Int, VE.Vector Word32, Integer)
-fi_ [0] = ([], 0, VE.empty, 0) -- safety
+fi_ :: [Word32] -> ([Word32], Int, VU.Vector Word32, Integer)
+fi_ [0] = ([], 0, VU.empty, 0) -- safety
 fi_ [] = error "fi_: Invalid Argument null list "
 fi_ dxs = (w32Lst, l', yCurrArr, remInteger)
   where
-    l = length dxs
-    ((w32Lst, dxs'), l') = let (head_, last_@[x]) = splitAt (l - 1) dxs in if even l then (splitAt (l - 2) dxs, l-2) else ((head_, [x, 0 :: Word32]), l-1)
+    ((w32Lst, dxs'), l') =
+      let l = length dxs
+          (head_, last_@[x]) = splitAt (l - 1) dxs
+       in if even l then (splitAt (l - 2) dxs, l - 2) else ((head_, [x, 0 :: Word32]), l - 1)
     vInteger = intgrFromRvsrdLst dxs'
-    searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
-    y1_ = largestNSqLTE searchFrom vInteger
-    y1 = if y1_ == radixW32 then pred radixW32 else y1_ -- overflow trap 
-    yCurrArr = VE.singleton (fromIntegral y1) -- //TODO use mutable arrays?
-    remInteger_ = vInteger - y1 * y1 
-    remInteger = if remInteger_ == radixW32 then pred radixW32 else remInteger_ 
+    y1 =
+      let searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
+       in min (largestNSqLTE searchFrom vInteger) (pred radixW32) -- overflow trap
+    yCurrArr = VU.singleton (fromIntegral y1)
+    remInteger =
+      let remInteger_ = vInteger - y1 * y1
+       in if remInteger_ == radixW32 then pred radixW32 else remInteger_
 
 -- | Next Iterations till array empties out 
-ni_ :: ([Word32], Int, VE.Vector Word32, Integer) -> Integer
+ni_ :: ([Word32], Int, VU.Vector Word32, Integer) -> Integer
 ni_ (w32Lst, l, yCurrArr, iRem)
   | null w32Lst = vectorToInteger yCurrArr 
   | otherwise = ni_ (residuali32Lst, l-2, yCurrArrUpdated, remFinal)
@@ -218,35 +222,25 @@ ni_ (w32Lst, l, yCurrArr, iRem)
     tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
     yTilde = nxtDgt_ (tAInteger, tCInteger')
     (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
-    yCurrArrUpdated = VE.cons (fromIntegral yTildeFinal) yCurrArr
+    yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
 
--- | Next Digit. In our model a 32 bit digit.    
+-- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_ :: (Integer, Integer) -> Integer 
 nxtDgt_ (tA, tC) 
     | tA == 0 = 0 
     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
-    | otherwise = nxtDgtFX_ (tAFX, tCFX) 
+    | otherwise = min (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX)))) (pred radixW32)
  where 
+    tA# = integerToDouble# tA
+    tC# = integerToDouble# tC
     rad# = fmaddDouble# tC# tC# tA#
     !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
     tAFX = normalizeFX $ integer2FloatingX tA   
     tCFX = normalizeFX $ integer2FloatingX tC
-    tA# = integerToDouble# tA
-    tC# = integerToDouble# tC
-
--- | Use FLoatingX Arithmetic to throw up the next digit 
-nxtDgtFX_ :: (FloatingX, FloatingX) -> Integer 
-nxtDgtFX_ (tAFX, yShiftedFX@tCFX) =  min iyTilde (pred radixW32) where --the right side is overflow trap
-      !iyTilde = floorX (nextUpFX iyTildeFX) 
-      !iyTildeFX =  nextUpFX (numFX !/ denFX) 
-      !numFX = nextUpFX tAFX 
-      !denFX =  nextDownFX (sqrtDFX !+ yShiftedFX) 
-      !sqrtDFX = nextDownFX (sqrtFX radFX) 
-      !radFX =  nextDownFX (yShiftedSqrFX !+ tAFX) 
-      !yShiftedSqrFX = nextDownFX (yShiftedFX !* yShiftedFX) 
+    radFX = tCFX !* tCFX !+ tAFX
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked 
 -- that happens in handleRems_      
@@ -279,7 +273,7 @@ handleRems_ (pos, yi, ri, tA, tB, tC)
     excessLengthBy3 = integerLogBase' b (ri `div` yi) >= 3
     firstRemainderBoundCheckFail = not (isValidRemainder1 ri currSqrt pos)
     secondRemainderBoundCheckFail = not (isValidRemainder2 ri currSqrt pos)
-    currSqrt = tB * radixW32 + yi 
+    currSqrt = tC + yi 
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri `mod` modulus3
     nextDownDgt0 = findNextDigitDown (tA, tB, tC) (yi, ri) pos yi 0 isValidRemainder0
@@ -422,8 +416,8 @@ data FloatingX = FloatingX {signif :: Double, expnnt :: Int64} deriving (Eq,Show
 
 {-# INLINE vectorToInteger #-}
 -- Function to convert a vector of Word32 values to an Integer with base 2^32 (radixw32)
-vectorToInteger :: VE.Vector Word32 -> Integer
-vectorToInteger = VE.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0 
+vectorToInteger :: VU.Vector Word32 -> Integer
+vectorToInteger = VU.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0 
 
 {-# INLINE floorX #-}
 floorX :: FloatingX -> Integer
