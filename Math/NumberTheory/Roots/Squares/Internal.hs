@@ -38,7 +38,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
 import Data.FastDigits (digits, digitsUnsigned, undigits)
-import qualified Data.Vector.Unboxed as VU (Vector, cons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList)
+import qualified Data.Vector.Unboxed as VU (Vector, cons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList, force)
 import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
@@ -196,15 +196,15 @@ fi__ :: VU.Vector Word32 -> (VU.Vector Word32, Int, VU.Vector Word32, Integer)
 fi__ vec 
   | VU.length vec == 1 && VU.head vec == 0 = (VU.empty, 0, VU.empty, 0)
   | VU.null vec = error "fi_: Invalid Argument null vector "
-  | otherwise = (w32Lst, l', yCurrArr, remInteger)
+  | otherwise = (w32Vec, l', yCurrArr, remInteger)
     where
-      ((w32Lst, dxs'), l') =
+      ((w32Vec, dxs'), l') =
         let !l = VU.length vec 
             (headVec1, lastVec1) = VU.splitAt (l - 1) vec
             (head_1, last_1@[x]) = (headVec1, VU.toList lastVec1)
             (headVec2, lastVec2) = VU.splitAt (l - 2) vec
             (head_2, last_2) = (headVec2, VU.toList lastVec2)
-        in if even l then ((head_2,last_2), l - 2) else ((head_1, [x, 0 :: Word32]), l - 1)
+        in if even l then ((VU.force head_2,last_2), l - 2) else ((VU.force head_1, [x, 0 :: Word32]), l - 1)
       vInteger = intgrFromRvsrdLst dxs'
       y1 =
         let !searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
@@ -221,13 +221,13 @@ ni__ (w32Vec, l, yCurrArr, iRem)
   | otherwise =
       let position = pred $ l `quot` 2 -- last pair is position "0"
           !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
-          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst (VU.toList nxtTwoDgtsVec)
+          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst (VU.toList $ VU.force nxtTwoDgtsVec)
           !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
           yTilde = nxtDgt_ (tAInteger, tCInteger')
           (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
           yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
-       in ni__ (residuali32Vec, l - 2, yCurrArrUpdated, remFinal)
+       in ni__ (VU.force residuali32Vec, l - 2, yCurrArrUpdated, remFinal)
   
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
