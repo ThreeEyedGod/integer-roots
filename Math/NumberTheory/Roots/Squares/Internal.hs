@@ -544,7 +544,7 @@ cI2D2  = cI2D2'
               | n <= maxUnsafeInteger = (n, e)
               | otherwise = go (e + shiftAmount) (n `unsafeShiftR` shiftAmount) 
               where
-                exPlus = integerLog10' n - 308 `quot` 10 -- would be dynamic (100-10)
+                exPlus = integerLog10' n - 308 `quot` 100 -- would be dynamic (100-10)
                 shiftAmount = max 1 exPlus
 
 -- cI2D2 :: Integer -> (Integer, Int)
@@ -589,7 +589,7 @@ normalize x
   | isIEEE x  = x 
   | otherwise =
       let !(# m, e# #) = integerDecodeDouble# x#
-          n = floatRadix x
+          !n = floatRadix x
           (mantissa, expo) =  normalizeIter (abs (fromIntegral m)) (fromIntegral (I# e#)) n
        in 
             case compose (mantissa, expo) of 
@@ -639,27 +639,35 @@ nextDown = NFI.nextDown
 
 {-# INLINE nextUp# #-}
 nextUp# :: Double# -> Double#
-nextUp# dIn# = dOut# where !(D# dOut#) = NFI.nextUp d where d = D# dIn#
+nextUp# dIn# = let 
+    !d = D# dIn#
+    !(D# dOut#) = NFI.nextUp d
+  in dOut# 
 
 {-# INLINE nextDown# #-}
 nextDown# :: Double# -> Double#
-nextDown# dIn# = dOut# where !(D# dOut#) = NFI.nextDown d where d = D# dIn#
+nextDown# dIn# = let 
+        !d = D# dIn#
+        !(D# dOut#) = NFI.nextDown d 
+    in dOut# 
 
 {-# INLINE nextUpFX #-}
 nextUpFX :: FloatingX -> FloatingX
 nextUpFX (FloatingX s e)
   | s == 0.0 = minValue
-  | otherwise = if interimS >= 2.0 then FloatingX (interimS / 2) (e + 1) else FloatingX interimS e
-  where
-    interimS = nextUp s
+  | otherwise = let 
+     !interimS = nextUp s
+    in
+      if interimS >= 2.0 then FloatingX (interimS / 2) (e + 1) else FloatingX interimS e
 
 {-# INLINE nextDownFX #-}
 nextDownFX :: FloatingX -> FloatingX
 nextDownFX x@(FloatingX s e)
   | s == 0.0 || x == minValue = zero
-  | otherwise = if interimS < 1.0 then FloatingX (interimS * 2) (e - 1) else FloatingX interimS e
-  where
-    interimS = nextDown s
+  | otherwise = let 
+      !interimS = nextDown s
+     in 
+        if interimS < 1.0 then FloatingX (interimS * 2) (e - 1) else FloatingX interimS e
 
 -- End isqrtB ****************************************************************
 -- End isqrtB ****************************************************************
