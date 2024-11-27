@@ -422,8 +422,8 @@ add a@(FloatingX signifA expA) b@(FloatingX signifB expB)
 mul :: FloatingX -> FloatingX -> FloatingX
 mul (FloatingX 0.0 _) _ = zero
 mul _ (FloatingX 0.0 _) = zero
--- mul (FloatingX 1.0 0) b = b
--- mul a (FloatingX 1.0 0) = a
+mul (FloatingX 1.0 0) b = b
+mul a (FloatingX 1.0 0) = a
 mul (FloatingX signifA expA) (FloatingX signifB expB) =
   let !resExp = expA + expB
       !resSignif = signifA * signifB
@@ -433,8 +433,8 @@ mul (FloatingX signifA expA) (FloatingX signifB expB) =
 
 {-# INLINE divide #-}
 divide :: FloatingX -> FloatingX -> FloatingX
--- divide (FloatingX s1 e1) (FloatingX 1 0) = FloatingX s1 e1
-divide (FloatingX s1 e1) (FloatingX s2 e2)
+divide n@(FloatingX s1 e1) d@(FloatingX s2 e2)
+    | d == FloatingX 1.0 0 = n 
     | s1 == 0.0 = zero
     | s2 == 0.0 = error "divide: error divide by zero " 
     | otherwise = 
