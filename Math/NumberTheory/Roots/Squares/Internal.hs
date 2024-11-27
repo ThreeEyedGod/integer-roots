@@ -184,13 +184,7 @@ double x = x `unsafeShiftL` 1
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
---isqrtB n = fromInteger . ni_ . fi_ . dgts_ . fromIntegral $ n
 isqrtB n = fromInteger . ni__ . fi__ . dgts__ . fromIntegral $ n
-
-dgts_ :: Integer -> [Word32]
-dgts_ n | n < 0 = error "dgts_: Invalid negative argument"
-dgts_ 0 = [0]
-dgts_ n = mkIW32_ n
 
 dgts__ :: Integer -> VU.Vector Word32
 dgts__ n | n < 0 = error "dgts_: Invalid negative argument"
@@ -207,8 +201,7 @@ fi__ vec
       ((w32Lst, dxs'), l') =
         let !l = VU.length vec 
             (headVec1, lastVec1) = VU.splitAt (l - 1) vec
-            (head_1, last_1) = (headVec1, VU.toList lastVec1)
-            x = head last_1
+            (head_1, last_1@[x]) = (headVec1, VU.toList lastVec1)
             (headVec2, lastVec2) = VU.splitAt (l - 2) vec
             (head_2, last_2) = (headVec2, VU.toList lastVec2)
         in if even l then ((head_2,last_2), l - 2) else ((head_1, [x, 0 :: Word32]), l - 1)
@@ -225,16 +218,17 @@ fi__ vec
 ni__ :: (VU.Vector Word32, Int, VU.Vector Word32, Integer) -> Integer
 ni__ (w32Vec, l, yCurrArr, iRem)
   | VU.null w32Vec = vectorToInteger yCurrArr
-  | otherwise = ni__ (residuali32Vec, l - 2, yCurrArrUpdated, remFinal)
-  where
-    position = pred $ l `quot` 2 -- last pair is psition "0"
-    (residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
-    tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst (VU.toList nxtTwoDgtsVec) 
-    tBInteger' = vectorToInteger yCurrArr
-    tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
-    yTilde = nxtDgt_ (tAInteger, tCInteger')
-    (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
-    yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
+  | otherwise =
+      let position = pred $ l `quot` 2 -- last pair is position "0"
+          !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
+          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst (VU.toList nxtTwoDgtsVec)
+          !tBInteger' = vectorToInteger yCurrArr
+          !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
+          yTilde = nxtDgt_ (tAInteger, tCInteger')
+          (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
+          yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
+       in ni__ (residuali32Vec, l - 2, yCurrArrUpdated, remFinal)
+  
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
@@ -250,9 +244,9 @@ nxtDgt_ (tA, tC)
         in
           min (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX)))) (pred radixW32)
  where 
-    tA# = integerToDouble# tA
-    tC# = integerToDouble# tC
-    rad# = fmaddDouble# tC# tC# tA#
+    !tA# = integerToDouble# tA
+    !tC# = integerToDouble# tC
+    !rad# = fmaddDouble# tC# tC# tA#
     !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
@@ -363,25 +357,6 @@ tryRange rS set@(tA, tC, pos) lowr highr checkFn
 
 -- | helper functions
 
-mkIW32 :: Integer -> [Word32]
-mkIW32 0 = [0]
-mkIW32 i = int2wrd32 $ reverse' (digits (fromIntegral radixW32) i)
-
-mkIW32' :: Integer -> [Word32]
-mkIW32' 0 = [0]
-mkIW32' i = wrd2wrd32 $ reverse'' (digitsUnsigned b n)
-  where
-    b = fromIntegral radixW32 :: Word
-    n = fromInteger i
-
-{-# INLINE mkIW32_ #-}
--- spit out the list as-is from digitsUnsigned which comes in reversed format. 
-mkIW32_ :: Integer -> [Word32]
-mkIW32_ 0 = [0] -- safety 
-mkIW32_ i = wrd2wrd32 (digitsUnsigned b n)
-  where
-    b = fromIntegral radixW32 :: Word
-    n = fromInteger i
 
 {-# INLINE mkIW32__ #-}
 -- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
@@ -392,48 +367,9 @@ mkIW32__ i = VU.fromList $ wrd2wrd32 (digitsUnsigned b n)
     b = fromIntegral radixW32 :: Word
     n = fromInteger i
 
-
-{-# INLINE int2wrd32 #-}
-int2wrd32 :: [Int] -> [Word32]
-int2wrd32 xs = fromIntegral <$> xs
-
 {-# INLINE wrd2wrd32 #-}
 wrd2wrd32 :: [Word] -> [Word32]
 wrd2wrd32 xs = fromIntegral <$> xs
-
-mkW32I :: [Word32] -> Integer
-mkW32I xs = undigits radixW32 (reverse' xs)
-
--- https :// blog . poisson . chat / posts / 2019 - 09 - 13 - reverse . html
-
-reverse' :: [a] -> [a]
-reverse' xs = revApp xs []
-
--- revApp xs ys = reverse xs ++ ys
-revApp :: [a] -> [a] -> [a]
-revApp [] acc = acc
-revApp (x : xs) acc = revApp xs (x : acc)
-
-type DList a = [a] -> [a]
-
-empty :: DList a
-empty = id
-
-singleton :: a -> DList a
-singleton y = (y :)
-
-(++.) :: DList a -> DList a -> DList a
-(++.) = (.)
-
-toList :: DList a -> [a]
-toList ys = ys []
--- reverse, where the result is a difference list
-reversed :: [a] -> DList a
-reversed [] = empty
-reversed (x : xs) = reversed xs ++. singleton x
-
-reverse'' :: [a] -> [a]
-reverse'' = toList . reversed
     
 data FloatingX = FloatingX {signif :: Double, expnnt :: Int64} deriving (Eq,Show) 
 
@@ -486,6 +422,8 @@ add a@(FloatingX signifA expA) b@(FloatingX signifB expB)
 mul :: FloatingX -> FloatingX -> FloatingX
 mul (FloatingX 0.0 _) _ = zero
 mul _ (FloatingX 0.0 _) = zero
+-- mul (FloatingX 1.0 0) b = b
+-- mul a (FloatingX 1.0 0) = a
 mul (FloatingX signifA expA) (FloatingX signifB expB) =
   let !resExp = expA + expB
       !resSignif = signifA * signifB
@@ -495,6 +433,7 @@ mul (FloatingX signifA expA) (FloatingX signifB expB) =
 
 {-# INLINE divide #-}
 divide :: FloatingX -> FloatingX -> FloatingX
+-- divide (FloatingX s1 e1) (FloatingX 1 0) = FloatingX s1 e1
 divide (FloatingX s1 e1) (FloatingX s2 e2)
     | s1 == 0.0 = zero
     | s2 == 0.0 = error "divide: error divide by zero " 
@@ -550,7 +489,7 @@ compose (d@(D# d#), e)
            in if isInfinite result || isNaN result then Nothing else Just result 
     where 
         !(# m, n# #) = decodeDoubleInteger d# 
-        ex = I# n# + fromIntegral e 
+        !ex = I# n# + fromIntegral e 
         
 -- | The list is "reversed" i.e. the digits are LSB --> MSB         
 integerFrom2ElemW32List :: [Word32] -> Integer
