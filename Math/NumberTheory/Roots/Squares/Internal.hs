@@ -38,7 +38,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
 import Data.FastDigits (digits, digitsUnsigned, undigits)
-import qualified Data.Vector.Unboxed as VU (Vector, cons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList, force)
+import qualified Data.Vector.Unboxed as VU (Vector, cons, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList, force)
 import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
@@ -198,14 +198,12 @@ fi__ vec
   | VU.null vec = error "fi_: Invalid Argument null vector "
   | otherwise = (w32Vec, l', yCurrArr, remInteger)
     where
-      ((w32Vec, dxs'), l') =
+      ((w32Vec, dxsVec'), l') =
         let !l = VU.length vec 
-            (headVec1, lastVec1) = VU.splitAt (l - 1) vec
-            (head_1, last_1@[x]) = (headVec1, VU.toList lastVec1)
-            (headVec2, lastVec2) = VU.splitAt (l - 2) vec
-            (head_2, last_2) = (headVec2, VU.toList lastVec2)
-        in if even l then ((VU.force head_2,last_2), l - 2) else ((VU.force head_1, [x, 0 :: Word32]), l - 1)
-      vInteger = intgrFromRvsrdLst dxs'
+            !(headVec1, lastVec1) = VU.splitAt (l - 1) vec
+            !(headVec2, lastVec2) = VU.splitAt (l - 2) vec
+        in if even l then ((VU.force headVec2,VU.force lastVec2), l - 2) else ((VU.force headVec1, VU.force $ VU.snoc lastVec1 0), l - 1)
+      vInteger = intgrFromRvsrd2ElemVec dxsVec'
       y1 =
         let !searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
         in min (largestNSqLTE searchFrom vInteger) (pred radixW32) -- overflow trap
@@ -221,7 +219,7 @@ ni__ (w32Vec, l, yCurrArr, iRem)
   | otherwise =
       let position = pred $ l `quot` 2 -- last pair is position "0"
           !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
-          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdLst (VU.toList $ VU.force nxtTwoDgtsVec)
+          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
           !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
           yTilde = nxtDgt_ (tAInteger, tCInteger')
@@ -460,6 +458,7 @@ sqrtDX d
     | d == 1 = 1 
     | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF or other }
 
+-- //TODO get a mpfr based sqry incorporated here     
 -- sqrtDouble :: Double -> M.MPFR
 -- sqrtDouble d = M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
 
@@ -491,20 +490,16 @@ compose (d@(D# d#), e)
         !(# m, n# #) = decodeDoubleInteger d# 
         !ex = I# n# + fromIntegral e 
         
--- | The list is "reversed" i.e. the digits are LSB --> MSB         
-integerFrom2ElemW32List :: [Word32] -> Integer
-integerFrom2ElemW32List [] = error "integerFrom2ElemW32List : Empty list"
-integerFrom2ElemW32List [_] = error "integerFrom2ElemW32List : function needs 2 elems in List"
-integerFrom2ElemW32List [0, 0] = 0
-integerFrom2ElemW32List [l2, l1] = fromIntegral l2 * radixW32 + fromIntegral l1
-integerFrom2ElemW32List _ = error "integerFrom2ElemW32List : Invalid list with more than 2 elems"
-
-{-# INLINE intgrFromRvsrdLst #-}
+{-# INLINE intgrFromRvsrd2ElemVec #-}
 -- | Integer from a "reversed" list of Word32 digits
-intgrFromRvsrdLst :: [Word32] -> Integer
-intgrFromRvsrdLst [x, y] = integerFrom2ElemW32List [y, x]
-intgrFromRvsrdLst e = integerFrom2ElemW32List e
-
+intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer
+intgrFromRvsrd2ElemVec v2ElemW32s = let
+      (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of 
+          (Nothing, _) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
+          (_, Nothing) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
+          (Just u, Just v) -> (fst u, snd v)
+        in 
+          fromIntegral l2 * radixW32 + fromIntegral l1
 
 radixW32 :: Integer
 radixW32 = 2 ^ finiteBitSize (0 :: Word32)
