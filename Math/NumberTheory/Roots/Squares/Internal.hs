@@ -16,6 +16,10 @@
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
   , isqrtA
+  ,initSqRootVec
+  ,updtSqRootVec
+  ,vectorToInteger
+  ,mkIW32__
   ) where
 
 -- *********** BEGIN NEW IMPORTS   
@@ -24,6 +28,7 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import qualified Data.Number.MPFR as M
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
+import Debug.Trace 
 import GHC.Prim (fmaddDouble#, (/##), (+##))
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
@@ -38,7 +43,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
 import Data.FastDigits (digits, digitsUnsigned, undigits)
-import qualified Data.Vector.Unboxed as VU (Vector, cons, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList, force)
+import qualified Data.Vector.Unboxed as VU (Vector,(//), slice, length, replicate, unsafeHead, cons, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList, force)
 import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
@@ -194,7 +199,7 @@ dgts__ n = mkIW32__ n
 -- | First Iteration
 fi__ :: VU.Vector Word32 -> (VU.Vector Word32, Int, VU.Vector Word32, Integer)
 fi__ vec 
-  | VU.length vec == 1 && VU.head vec == 0 = (VU.empty, 0, VU.empty, 0)
+  | VU.length vec == 1 && VU.unsafeHead vec == 0 = (VU.empty, 0, VU.empty, 0)
   | VU.null vec = error "fi_: Invalid Argument null vector "
   | otherwise = (w32Vec, l', yCurrArr, remInteger)
     where
@@ -207,10 +212,21 @@ fi__ vec
       y1 =
         let !searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
         in min (largestNSqLTE searchFrom vInteger) (pred radixW32) -- overflow trap
-      yCurrArr = VU.singleton (fromIntegral y1)
-      remInteger =
+      --yCurrArr = VU.singleton (fromIntegral y1)
+      yCurrArr = initSqRootVec l' y1 
+      remInteger =  
         let !remInteger_ = vInteger - y1 * y1
         in if remInteger_ == radixW32 then pred radixW32 else remInteger_
+
+initSqRootVec :: Int -> Integer -> VU.Vector Word32        
+initSqRootVec l' lsb = let 
+          !rootLength  = (l' + 2) `quot` 2 
+          !rootVec = VU.replicate rootLength 0
+        in rootVec VU.// [(rootLength - 1, fromIntegral lsb)]
+
+updtSqRootVec :: Int -> Integer -> VU.Vector Word32 -> VU.Vector Word32
+updtSqRootVec position yTildeFinal yCurrArr = yCurrArr VU.// [(position, fromIntegral yTildeFinal)]
+
 
 -- | Next Iterations till array empties out
 ni__ :: (VU.Vector Word32, Int, VU.Vector Word32, Integer) -> Integer
@@ -220,14 +236,16 @@ ni__ (w32Vec, l, yCurrArr, iRem)
       let position = pred $ l `quot` 2 -- last pair is position "0"
           !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
-          !tBInteger' = vectorToInteger yCurrArr
+          yCurrWorkingCopy  = VU.force (VU.slice (position+1) (VU.length yCurrArr - (position+1)) yCurrArr) 
+          !tBInteger' = vectorToInteger yCurrWorkingCopy
+          -- !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
           yTilde = nxtDgt_ (tAInteger, tCInteger')
           (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
-          yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
+          --yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
+          !yCurrArrUpdated =  updtSqRootVec position yTildeFinal yCurrArr
        in ni__ (VU.force residuali32Vec, l - 2, yCurrArrUpdated, remFinal)
   
-
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
@@ -462,7 +480,6 @@ sqrtDX d
 -- sqrtDouble :: Double -> M.MPFR
 -- sqrtDouble d = M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
 
-    
 sqrtSplitDbl :: (Double,Int64) -> (Double, Int64) 
 sqrtSplitDbl (d, e) 
   | d == 0 = (0,0) 
