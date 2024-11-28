@@ -218,12 +218,14 @@ fi__ vec
         let !remInteger_ = vInteger - y1 * y1
         in if remInteger_ == radixW32 then pred radixW32 else remInteger_
 
+{-# INLINE initSqRootVec #-}
 initSqRootVec :: Int -> Integer -> VU.Vector Word32        
 initSqRootVec l' lsb = let 
           !rootLength  = (l' + 2) `quot` 2 
           !rootVec = VU.replicate rootLength 0
         in rootVec VU.// [(rootLength - 1, fromIntegral lsb)]
 
+{-# INLINE updtSqRootVec #-}      
 updtSqRootVec :: Int -> Integer -> VU.Vector Word32 -> VU.Vector Word32
 updtSqRootVec position yTildeFinal yCurrArr = yCurrArr VU.// [(position, fromIntegral yTildeFinal)]
 
