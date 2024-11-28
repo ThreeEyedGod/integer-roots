@@ -43,7 +43,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
 import Data.FastDigits (digits, digitsUnsigned, undigits)
-import qualified Data.Vector.Unboxed as VU (Vector,(//), slice, length, replicate, unsafeHead, cons, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList, force)
+import qualified Data.Vector.Unboxed as VU (Vector,(//), slice, unsafeSlice,length, replicate, unsafeHead, cons, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList, force)
 import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
@@ -236,7 +236,7 @@ ni__ (w32Vec, l, yCurrArr, iRem)
       let position = pred $ l `quot` 2 -- last pair is position "0"
           !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
-          yCurrWorkingCopy  = VU.force (VU.slice (position+1) (VU.length yCurrArr - (position+1)) yCurrArr) 
+          yCurrWorkingCopy  = VU.force (VU.unsafeSlice (position+1) (VU.length yCurrArr - (position+1)) yCurrArr) 
           !tBInteger' = vectorToInteger yCurrWorkingCopy
           -- !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
