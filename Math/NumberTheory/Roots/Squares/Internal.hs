@@ -350,8 +350,8 @@ findNextDigitDown (tA, tB, tC) (yi, ri) pos curr low checkFn
   | curr == yi = if checkFn (yi-1) yUpdated pos then yi-1 else findNextDigitDown (tA, tB, tC) (yi, ri) pos (yi - 2) low checkFn
   | otherwise =
       let !mid = (low + curr ) `div` 2
-          testRem = calcRemainder tA tC mid
-          testRoot = tC + mid 
+          !testRem = calcRemainder tA tC mid
+          !testRoot = tC + mid 
        in if checkFn testRem testRoot pos
             then
               let !validHigher = tryRange Lower (tA, tB, pos) (mid+1) curr checkFn 
@@ -367,8 +367,8 @@ tryRange rS set@(tA, tC, pos) lowr highr checkFn
       | lowr > highr = Nothing
       | otherwise =
           let !mid = (lowr + highr) `div` 2
-              testRm = calcRemainder tA tC mid
-              testRt = tC + mid 
+              !testRm = calcRemainder tA tC mid
+              !testRt = tC + mid 
            in if checkFn testRm testRt pos
                 then Just mid
                 else if rS == Lower then tryRange Lower set lowr (mid - 1) checkFn else tryRange Higher set (mid + 1) highr checkFn
@@ -389,7 +389,7 @@ mkIW32__ i = VU.fromList $ wrd2wrd32 (digitsUnsigned b n)
 wrd2wrd32 :: [Word] -> [Word32]
 wrd2wrd32 xs = fromIntegral <$> xs
     
-data FloatingX = FloatingX {signif :: Double, expnnt :: Int64} deriving (Eq,Show) 
+data FloatingX = FloatingX {signif :: !Double, expnnt :: !Int64} deriving (Eq,Show) -- ! for strict data type 
 
 {-# INLINE vectorToInteger #-}
 -- Function to convert a vector of Word32 values to an Integer with base 2^32 (radixw32)
@@ -458,7 +458,7 @@ divide n@(FloatingX s1 e1) d@(FloatingX s2 e2)
     | otherwise = 
         let !resExp = e1 - e2
             !resSignif = s1 / s2
-            (finalSignif, finalExp) = if resSignif < 1.0
+            !(finalSignif, finalExp) = if resSignif < 1.0
                                       then (resSignif * 2.0, resExp - 1)
                                       else (resSignif, resExp)
         in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Int64))
@@ -503,7 +503,7 @@ compose (d@(D# d#), e)
     | otherwise = 
         let result# = encodeDoubleInteger m ex# 
             !(I# ex#) = ex
-            result = D# result#
+            !result = D# result#
            in if isInfinite result || isNaN result then Nothing else Just result 
     where 
         !(# m, n# #) = decodeDoubleInteger d# 
@@ -544,7 +544,7 @@ integer2FloatingX i
   | itsOKtoUsePlainDoubleCalc =  double2FloatingX (fromIntegral i) 
   | otherwise =  let 
       !(i_, e_) = cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-      s = fromIntegral i_
+      !s = fromIntegral i_
     in FloatingX s (fromIntegral e_)
   where
     !(D# maxDouble#) = maxDouble
@@ -609,7 +609,7 @@ normalize x
   | otherwise =
       let !(# m, e# #) = integerDecodeDouble# x#
           !n = floatRadix x
-          (mantissa, expo) =  normalizeIter (abs (fromIntegral m)) (fromIntegral (I# e#)) n
+          !(mantissa, expo) =  normalizeIter (abs (fromIntegral m)) (fromIntegral (I# e#)) n
        in 
             case compose (mantissa, expo) of 
                 Just result -> result -- normalized 

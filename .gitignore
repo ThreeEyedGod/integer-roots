@@ -5,3 +5,6 @@ dist
 dist-newstyle
 .ghc.environment*
 .tasty-rerun-log
+*.prof
+*.project.local
+
