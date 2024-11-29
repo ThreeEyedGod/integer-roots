@@ -298,7 +298,7 @@ handleRems_ (pos, yi, ri, tA, tB, tC)
     excessLengthBy3 = integerLogBase' b (ri `div` yi) >= 3
     firstRemainderBoundCheckFail = not (isValidRemainder1 ri currSqrt pos)
     secondRemainderBoundCheckFail = not (isValidRemainder2 ri currSqrt pos)
-    currSqrt = tC + yi 
+    !currSqrt = tC + yi 
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri `mod` modulus3
     nextDownDgt0 = findNextDigitDown (tA, tB, tC) (yi, ri) pos yi 0 isValidRemainder0
@@ -331,9 +331,9 @@ findNextDigitUp (tA, tB, tC) (yi,ri) pos curr high checkFn
       | curr > high = error "findNextDigitUp : no valid digit found (curr>high)"
       | curr == high = if checkFn curr yUpdated pos then curr - 1 else error "findNextDigitUp : no valid digit found (curr=high)"
       | otherwise = 
-          let mid = (curr + high) `div` 2 
-              testRem = calcRemainder tA tC mid 
-              testRoot = tC + mid 
+          let !mid = (curr + high) `div` 2 
+              !testRem = calcRemainder tA tC mid 
+              !testRoot = tC + mid 
           in if checkFn testRem testRoot pos then 
               let validLower = tryRange Higher (tA, tB, pos) curr (mid-1) checkFn 
               in fromMaybe mid validLower 
