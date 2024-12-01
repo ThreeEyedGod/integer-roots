@@ -16,18 +16,14 @@
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
   , isqrtA
-  ,initSqRootVec
-  ,updtSqRootVec
-  ,vectorToInteger
-  ,mkIW32__
   ) where
 
 -- *********** BEGIN NEW IMPORTS   
--- import Control.Monad.ST (runST)
--- import Data.Number.MPFR (RoundMode)
--- import qualified Data.Number.MPFR as M
--- import Data.Number.MPFR.Instances.Up ()
--- import qualified Data.Number.MPFR.Mutable as MM
+import Control.Monad.ST (runST)
+import Data.Number.MPFR (RoundMode)
+import qualified Data.Number.MPFR as M
+import Data.Number.MPFR.Instances.Up ()
+import qualified Data.Number.MPFR.Mutable as MM
 import Debug.Trace 
 import GHC.Prim (fmaddDouble#, (/##), (+##))
 import Data.Maybe (fromMaybe)
@@ -47,7 +43,7 @@ import qualified Data.Vector.Unboxed as VU (Vector,(//), slice, unsafeSlice,leng
 import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
-import Data.Word (Word32)
+import Data.Word (Word32, Word64)
 import GHC.Exts ((<##), (*##), Double(..), Double#)
 -- *********** END NEW IMPORTS 
 
@@ -242,7 +238,7 @@ ni__ (w32Vec, l, yCurrArr, iRem)
           !tBInteger' = vectorToInteger yCurrWorkingCopy
           -- !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
-          yTilde = nxtDgt_ (tAInteger, tCInteger')
+          yTilde = fromIntegral $ nxtDgt_ (tAInteger, tCInteger')
           (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
           --yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
           !yCurrArrUpdated =  updtSqRootVec position yTildeFinal yCurrArr
@@ -251,7 +247,7 @@ ni__ (w32Vec, l, yCurrArr, iRem)
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
-nxtDgt_ :: (Integer, Integer) -> Integer 
+nxtDgt_ :: (Integer, Integer) -> Int64 
 nxtDgt_ (tA, tC) 
     | tA == 0 = 0 
     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
@@ -260,7 +256,7 @@ nxtDgt_ (tA, tC)
           !tCFX = normalizeFX $ integer2FloatingX tC
           !radFX = tCFX !* tCFX !+ tAFX
         in
-          min (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX)))) (pred radixW32)
+          fromIntegral $ min (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX)))) (pred radixW32)
  where 
     !tA# = integerToDouble# tA
     !tC# = integerToDouble# tC
@@ -461,7 +457,8 @@ divide n@(FloatingX s1 e1) d@(FloatingX s2 e2)
             !(finalSignif, finalExp) = if resSignif < 1.0
                                       then (resSignif * 2.0, resExp - 1)
                                       else (resSignif, resExp)
-        in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Int64))
+        -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
+        in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp <= 0 )
            then zero
            else FloatingX finalSignif finalExp
 
@@ -476,20 +473,20 @@ sqrtDX d
     | isNaN d = 0 
     | isInfinite d = maxDouble
     | d == 1 = 1 
-    | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF or other }
+    | otherwise = sqrtC d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 
--- //TODO get a mpfr based sqry incorporated here     
--- sqrtDouble :: Double -> M.MPFR
--- sqrtDouble d = M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
+sqrtDoublehmpfr :: Double -> Double 
+sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
 
 sqrtSplitDbl :: (Double,Int64) -> (Double, Int64) 
 sqrtSplitDbl (d, e) 
   | d == 0 = (0,0) 
   | d == 1 = (1,0)
-  | even e = (s, fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e) 1##) -- even 
+  | even e = (s,fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e) 1##) -- even 
   | otherwise = (sqrtOf2 * s, fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e-1) 1##) -- odd 
  where 
     !s = sqrtDX d 
+{-# INLINEABLE sqrtSplitDbl #-}
 
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrt_fsqrt" sqrt_fsqrt :: Double -> Double
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
@@ -508,6 +505,7 @@ compose (d@(D# d#), e)
     where 
         !(# m, n# #) = decodeDoubleInteger d# 
         !ex = I# n# + fromIntegral e 
+{-# INLINEABLE compose #-}
         
 {-# INLINE intgrFromRvsrd2ElemVec #-}
 -- | Integer from a "reversed" list of Word32 digits
@@ -565,19 +563,6 @@ cI2D2  = cI2D2'
               where
                 exPlus = integerLog10' n - 308 `quot` 100 -- would be dynamic (100-10)
                 shiftAmount = max 1 exPlus
-
--- cI2D2 :: Integer -> (Integer, Int)
--- cI2D2 i | i < 0 = error "CI2D2: invalid negative argument"
--- cI2D2 0 = (0, 0)
--- cI2D2 i | i <= maxSafeInteger = (i, 0) 
--- cI2D2 i = go i 0
---   where
---     go n e
---       | n <= maxUnsafeInteger = (n, e)
---       | otherwise = go (n `unsafeShiftR` shiftAmount) (e + shiftAmount)
---       where
---         exPlus = integerLog10' n - 308 `quot` 10 -- would be dynamic (100-10)
---         shiftAmount = max 1 exPlus
 
 {-# INLINE largestNSqLTE #-}
 largestNSqLTE :: Integer -> Integer -> Integer
