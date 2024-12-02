@@ -238,68 +238,77 @@ ni__ (w32Vec, l, yCurrArr, iRem)
           !tBInteger' = vectorToInteger yCurrWorkingCopy
           -- !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
-          yTilde = fromIntegral $ nxtDgt_ (tAInteger, tCInteger')
-          (yTildeFinal, remFinal) = computeRem_ (tAInteger, tBInteger', tCInteger') (yTilde, position)
+          !inArgs = IterArgs tAInteger tBInteger' tCInteger'
+          yTilde_ = fromIntegral $ nxtDgt_ inArgs
+          IterRes yTildeFinal remFinal = computeRem_ inArgs yTilde_ position
           --yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
-          !yCurrArrUpdated =  updtSqRootVec position yTildeFinal yCurrArr
-       in ni__ (VU.force residuali32Vec, l - 2, yCurrArrUpdated, remFinal)
+          !yCurrArrUpdated = updtSqRootVec position yTildeFinal yCurrArr
+       in ni__ (VU.force residuali32Vec,l-2, yCurrArrUpdated, remFinal)
   
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
-nxtDgt_ :: (Integer, Integer) -> Int64 
-nxtDgt_ (tA, tC) 
-    | tA == 0 = 0 
+nxtDgt_ :: IterArgs -> Int64 
+nxtDgt_ inArgs
+    | tA_ == 0 = 0 
     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
     | otherwise = let  
-          !tAFX = normalizeFX $ integer2FloatingX tA   
-          !tCFX = normalizeFX $ integer2FloatingX tC
+          !tAFX = normalizeFX $ integer2FloatingX tA_
+          !tCFX = normalizeFX $ integer2FloatingX tC_
           !radFX = tCFX !* tCFX !+ tAFX
         in
           fromIntegral $ min (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX)))) (pred radixW32)
  where 
-    !tA# = integerToDouble# tA
-    !tC# = integerToDouble# tC
+    !tA_ = tA inArgs 
+    !tC_ = tC inArgs
+    !tA# = integerToDouble# tA_
+    !tC# = integerToDouble# tC_
     !rad# = fmaddDouble# tC# tC# tA#
     !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
-computeRem_ :: (Integer, Integer, Integer) -> (Integer, Int) -> (Integer, Integer)
-computeRem_ (tA, tB, tC) (yTilde, pos) =
-  let !rTrial = calcRemainder tA tC yTilde
-   in handleRems_ (pos, yTilde, rTrial, tA, tB, tC)
+computeRem_ :: IterArgs -> Integer -> Int -> IterRes
+computeRem_ inArgs yTilde_ pos =
+  let !rTrial = calcRemainder inArgs yTilde_
+   in handleRems_ pos inArgs (IterRes yTilde_ rTrial)
 
+-- //TODO REMOVE ALL TUPLES WHERE NOT NECESSARY
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
 -- if it's positive and far larger in size then also the current digit rework 
-handleRems_ :: (Int, Integer, Integer, Integer, Integer, Integer) -> (Integer, Integer)
-handleRems_ (pos, yi, ri, tA, tB, tC)
-  | ri == 0 = (yi, ri)
-  | (ri > 0) && noExcessLength = (yi, ri) -- all ok just continue no need for any other check if pos =0 then this check is not useful
-  | (ri < 0) && (yi > 0) = (nextDownDgt0, calcRemainder tA tC nextDownDgt0) -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | (ri > 0) && (pos > 0) && excessLengthBy3 = (yi, adjustedRemainder3) -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
-  | (ri > 0) && firstRemainderBoundCheckFail = (nextUpDgt1, calcRemainder tA tC nextUpDgt1)
-  | (ri > 0) && secondRemainderBoundCheckFail = (nextUpDgt2, calcRemainder tA tC nextUpDgt2)
-  | otherwise = (yi, ri)
+handleRems_ :: Int -> IterArgs -> IterRes -> IterRes
+handleRems_ pos inArgs inVals
+  | ri_ == 0 = inVals
+  | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
+  | (ri_ < 0) && (yTilde inVals > 0) = IterRes nextDownDgt0 $ calcRemainder inArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | (ri_ > 0) && (pos > 0) && excessLengthBy3 = IterRes (yTilde inVals)  adjustedRemainder3 -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
+  | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder inArgs nextUpDgt1
+  | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder inArgs nextUpDgt2
+  | otherwise = inVals
   where
     b = radixW32
-    riCurrSqrtRatio = ri `quot` currSqrt
+    riCurrSqrtRatio = ri_ `quot` currSqrt
     noExcessLength = riCurrSqrtRatio < 2 -- quick escape all good
     {-  excessLengthBy3 = lenCurrRemainder >= lenCurrSqrt + 3
         lenCurrRemainder = 1 + integerLogBase' b ri
         lenCurrSqrt = 1 + integerLogBase' b yi
      -}
-    excessLengthBy3 = integerLogBase' b (ri `div` yi) >= 3
-    firstRemainderBoundCheckFail = not (isValidRemainder1 ri currSqrt pos)
-    secondRemainderBoundCheckFail = not (isValidRemainder2 ri currSqrt pos)
-    !currSqrt = tC + yi 
+    excessLengthBy3 = integerLogBase' b (ri inVals `div` yTilde inVals) >= 3
+    firstRemainderBoundCheckFail = not (isValidRemainder1 (ri inVals) currSqrt pos)
+    secondRemainderBoundCheckFail = not (isValidRemainder2 (ri inVals) currSqrt pos)
+    !currSqrt = tC inArgs + yi
     modulus3 = radixW32Cubed -- b^3
-    adjustedRemainder3 = ri `mod` modulus3
-    nextDownDgt0 = findNextDigitDown (tA, tB, tC) (yi, ri) pos yi 0 isValidRemainder0
-    nextUpDgt1 = findNextDigitUp (tA, tB, tC) (yi, ri) pos yi (radixW32 - 1) isValidRemainder1
-    nextUpDgt2 = findNextDigitUp (tA, tB, tC) (yi, ri) pos yi (radixW32 - 1) isValidRemainder2
+    adjustedRemainder3 = ri inVals `mod` modulus3
+    !yi = yTilde inVals 
+    !ri_ = ri inVals
+    nextDownDgt0 = findNextDigitDown inArgs inVals pos yi 0 isValidRemainder0
+    nextUpDgt1 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder1
+    nextUpDgt2 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder2
+
+data IterArgs = IterArgs {tA :: Integer, tB :: Integer, tC :: Integer} deriving (Eq,Show)
+data IterRes = IterRes {yTilde :: Integer, ri :: Integer} deriving (Eq, Show) 
 
 -- Helper function to calculate remainder bounds
 calcMaxAllowed :: Integer -> Int -> Integer
@@ -318,56 +327,57 @@ isValidRemainder2 :: Integer -> Integer -> Int -> Bool
 isValidRemainder2 rem2 currentroot pos = rem2 < altBoundAllowed currentroot pos
 
 -- Calculate remainder accompanying a 'digit'
-calcRemainder :: Integer -> Integer -> Integer -> Integer
-calcRemainder tA tC dgt = tA - ((2 * tC * dgt) + dgt ^ (2 :: Int))
+calcRemainder :: IterArgs -> Integer -> Integer
+calcRemainder tArgs dgt = tA tArgs - ((2 * tC tArgs * dgt) + dgt ^ (2 :: Int))
 
-findNextDigitUp :: (Integer, Integer, Integer) -> (Integer, Integer) -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer 
-findNextDigitUp (tA, tB, tC) (yi,ri) pos curr high checkFn
+findNextDigitUp :: IterArgs -> IterRes -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer 
+findNextDigitUp inArgs inRes pos curr high checkFn
       | curr >= ceilNxtDgtUp  = ceilNxtDgtUp
       | curr > high = error "findNextDigitUp : no valid digit found (curr>high)"
       | curr == high = if checkFn curr yUpdated pos then curr - 1 else error "findNextDigitUp : no valid digit found (curr=high)"
       | otherwise = 
           let !mid = (curr + high) `div` 2 
-              !testRem = calcRemainder tA tC mid 
-              !testRoot = tC + mid 
+              !testRem = calcRemainder inArgs mid 
+              !testRoot = tC inArgs + mid 
           in if checkFn testRem testRoot pos then 
-              let validLower = tryRange Higher (tA, tB, pos) curr (mid-1) checkFn 
+              let validLower = tryRange Higher inArgs pos curr (mid-1) checkFn 
               in fromMaybe mid validLower 
              else
-                findNextDigitUp (tA, tB, tC) (yi, ri) pos (mid+1) high checkFn
+                findNextDigitUp inArgs inRes pos (mid+1) high checkFn
     where 
             ceilNxtDgtUp = pred radixW32
-            !yUpdated = tC + curr
+            !yUpdated = tC inArgs + curr
 
-findNextDigitDown :: (Integer, Integer, Integer) -> (Integer, Integer) -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer
-findNextDigitDown (tA, tB, tC) (yi, ri) pos curr low checkFn
+findNextDigitDown :: IterArgs -> IterRes -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer
+findNextDigitDown tArgs inRes pos curr low checkFn
   | curr < low = error "findNextDigitDown : no valid digit found (curr<low) "
   | curr == low = if checkFn curr yUpdated pos then curr else error "findNextDigitDown : no valid digit found (curr=low) "
-  | curr == yi = if checkFn (yi-1) yUpdated pos then yi-1 else findNextDigitDown (tA, tB, tC) (yi, ri) pos (yi - 2) low checkFn
+  | curr == yi = if checkFn (yi-1) yUpdated pos then yi-1 else findNextDigitDown tArgs inRes pos (yi - 2) low checkFn
   | otherwise =
       let !mid = (low + curr ) `div` 2
-          !testRem = calcRemainder tA tC mid
-          !testRoot = tC + mid 
+          !testRem = calcRemainder tArgs mid
+          !testRoot = tC tArgs + mid 
        in if checkFn testRem testRoot pos
             then
-              let !validHigher = tryRange Lower (tA, tB, pos) (mid+1) curr checkFn 
+              let !validHigher = tryRange Lower tArgs pos (mid+1) curr checkFn 
                in fromMaybe mid validHigher
             else
-              findNextDigitDown (tA, tB, tC) (yi, ri) pos (mid - 1) low checkFn
+              findNextDigitDown tArgs inRes pos (mid - 1) low checkFn
   where
-    !yUpdated = tC + curr 
+    !yUpdated = tC tArgs + curr 
+    !yi = yTilde inRes 
 
 data RangeSearch =  Lower | Higher deriving Eq 
-tryRange :: RangeSearch -> (Integer, Integer, Int)-> Integer -> Integer -> (Integer -> Integer -> Int -> Bool )  -> Maybe Integer     
-tryRange rS set@(tA, tC, pos) lowr highr checkFn 
+tryRange :: RangeSearch -> IterArgs -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool )  -> Maybe Integer     
+tryRange rS tArgs pos lowr highr checkFn 
       | lowr > highr = Nothing
       | otherwise =
           let !mid = (lowr + highr) `div` 2
-              !testRm = calcRemainder tA tC mid
-              !testRt = tC + mid 
+              !testRm = calcRemainder tArgs mid
+              !testRt = tC tArgs + mid 
            in if checkFn testRm testRt pos
                 then Just mid
-                else if rS == Lower then tryRange Lower set lowr (mid - 1) checkFn else tryRange Higher set (mid + 1) highr checkFn
+                else if rS == Lower then tryRange Lower tArgs pos lowr (mid - 1) checkFn else tryRange Higher tArgs pos (mid + 1) highr checkFn
 
 -- | helper functions
 
