@@ -193,11 +193,11 @@ dgts__ 0 = VU.singleton 0
 dgts__ n = mkIW32__ n
 
 -- | First Iteration
-fi__ :: VU.Vector Word32 -> (VU.Vector Word32, Int, VU.Vector Word32, Integer)
+fi__ :: VU.Vector Word32 -> Itr
 fi__ vec 
-  | VU.length vec == 1 && VU.unsafeHead vec == 0 = (VU.empty, 0, VU.empty, 0)
+  | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr VU.empty 0 VU.empty 0
   | VU.null vec = error "fi_: Invalid Argument null vector "
-  | otherwise = (w32Vec, l', yCurrArr, remInteger)
+  | otherwise = Itr w32Vec l' yCurrArr remInteger
     where
       ((w32Vec, dxsVec'), l') =
         let !l = VU.length vec 
@@ -225,13 +225,15 @@ initSqRootVec l' lsb = let
 updtSqRootVec :: Int -> Integer -> VU.Vector Word32 -> VU.Vector Word32
 updtSqRootVec position yTildeFinal yCurrArr = yCurrArr VU.// [(position, fromIntegral yTildeFinal)]
 
+data Itr = Itr {vecW32_ :: VU.Vector Word32, l_ :: Int, yCurrArr_ :: VU.Vector Word32, iRem_ :: Integer} deriving (Eq, Show)
 
 -- | Next Iterations till array empties out
-ni__ :: (VU.Vector Word32, Int, VU.Vector Word32, Integer) -> Integer
-ni__ (w32Vec, l, yCurrArr, iRem)
+ni__ :: Itr -> Integer
+ni__ loopVals
   | VU.null w32Vec = vectorToInteger yCurrArr
   | otherwise =
-      let position = pred $ l `quot` 2 -- last pair is position "0"
+      let 
+          position = pred $ l `quot` 2 -- last pair is position "0"
           !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
           yCurrWorkingCopy  = VU.force (VU.unsafeSlice (position+1) (VU.length yCurrArr - (position+1)) yCurrArr) 
@@ -243,8 +245,13 @@ ni__ (w32Vec, l, yCurrArr, iRem)
           IterRes yTildeFinal remFinal = computeRem_ inArgs yTilde_ position
           --yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
           !yCurrArrUpdated = updtSqRootVec position yTildeFinal yCurrArr
-       in ni__ (VU.force residuali32Vec,l-2, yCurrArrUpdated, remFinal)
-  
+       in ni__ $ Itr (VU.force residuali32Vec) (l-2) yCurrArrUpdated remFinal
+  where 
+          !l = l_ loopVals 
+          !iRem = iRem_ loopVals 
+          w32Vec = vecW32_ loopVals 
+          yCurrArr = yCurrArr_ loopVals
+
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
@@ -274,7 +281,6 @@ computeRem_ inArgs yTilde_ pos =
   let !rTrial = calcRemainder inArgs yTilde_
    in handleRems_ pos inArgs (IterRes yTilde_ rTrial)
 
--- //TODO REMOVE ALL TUPLES WHERE NOT NECESSARY
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
 -- if it's positive and far larger in size then also the current digit rework 
