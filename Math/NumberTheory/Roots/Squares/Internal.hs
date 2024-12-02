@@ -233,7 +233,7 @@ ni__ loopVals
   | VU.null w32Vec = vectorToInteger yCurrArr
   | otherwise =
       let 
-          position = pred $ l `quot` 2 -- last pair is position "0"
+          !position = pred $ l `quot` 2 -- last pair is position "0"
           !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
           yCurrWorkingCopy  = VU.force (VU.unsafeSlice (position+1) (VU.length yCurrArr - (position+1)) yCurrArr) 
@@ -249,8 +249,8 @@ ni__ loopVals
   where 
           !l = l_ loopVals 
           !iRem = iRem_ loopVals 
-          w32Vec = vecW32_ loopVals 
-          yCurrArr = yCurrArr_ loopVals
+          !w32Vec = vecW32_ loopVals 
+          !yCurrArr = yCurrArr_ loopVals
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
@@ -288,8 +288,8 @@ handleRems_ :: Int -> IterArgs -> IterRes -> IterRes
 handleRems_ pos inArgs inVals
   | ri_ == 0 = inVals
   | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
-  | (ri_ < 0) && (yTilde inVals > 0) = IterRes nextDownDgt0 $ calcRemainder inArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | (ri_ > 0) && (pos > 0) && excessLengthBy3 = IterRes (yTilde inVals)  adjustedRemainder3 -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
+  | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder inArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | (ri_ > 0) && (pos > 0) && excessLengthBy3 = IterRes yi adjustedRemainder3 -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
   | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder inArgs nextUpDgt1
   | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder inArgs nextUpDgt2
   | otherwise = inVals
@@ -301,12 +301,12 @@ handleRems_ pos inArgs inVals
         lenCurrRemainder = 1 + integerLogBase' b ri
         lenCurrSqrt = 1 + integerLogBase' b yi
      -}
-    excessLengthBy3 = integerLogBase' b (ri inVals `div` yTilde inVals) >= 3
-    firstRemainderBoundCheckFail = not (isValidRemainder1 (ri inVals) currSqrt pos)
-    secondRemainderBoundCheckFail = not (isValidRemainder2 (ri inVals) currSqrt pos)
+    excessLengthBy3 = integerLogBase' b (ri_`div` yi) >= 3
+    firstRemainderBoundCheckFail = not (isValidRemainder1 ri_ currSqrt pos)
+    secondRemainderBoundCheckFail = not (isValidRemainder2 ri_ currSqrt pos)
     !currSqrt = tC inArgs + yi
     modulus3 = radixW32Cubed -- b^3
-    adjustedRemainder3 = ri inVals `mod` modulus3
+    adjustedRemainder3 = ri_ `mod` modulus3
     !yi = yTilde inVals 
     !ri_ = ri inVals
     nextDownDgt0 = findNextDigitDown inArgs inVals pos yi 0 isValidRemainder0
@@ -410,7 +410,7 @@ vectorToInteger = VU.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0
 
 {-# INLINE floorX #-}
 floorX :: FloatingX -> Integer
-floorX (FloatingX s e) = case compose (s, e) of
+floorX (FloatingX s e) = case compose (CustDbl s e) of
   Just d -> floor d
   _ -> fromIntegral $ toLong s (fromIntegral e)
 
@@ -481,7 +481,7 @@ divide n@(FloatingX s1 e1) d@(FloatingX s2 e2)
 {-# INLINE sqrtFX #-}
 sqrtFX :: FloatingX -> FloatingX
 sqrtFX (FloatingX s e)  = FloatingX sX eX where 
-    (sX, eX) = sqrtSplitDbl (s, e)
+    (sX, eX) = sqrtSplitDbl (CustDbl s e) 
 
 sqrtDX :: Double -> Double
 sqrtDX d 
@@ -494,8 +494,9 @@ sqrtDX d
 sqrtDoublehmpfr :: Double -> Double 
 sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
 
-sqrtSplitDbl :: (Double,Int64) -> (Double, Int64) 
-sqrtSplitDbl (d, e) 
+data CustDbl = CustDbl {d_ :: Double, exp_ :: Int64} deriving (Eq, Show)
+sqrtSplitDbl :: CustDbl -> (Double, Int64) 
+sqrtSplitDbl (CustDbl d e) 
   | d == 0 = (0,0) 
   | d == 1 = (1,0)
   | even e = (s,fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e) 1##) -- even 
@@ -508,8 +509,8 @@ foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h s
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h toLong" toLong :: Double -> CLong -> CLong
 
-compose :: (Double, Int64) -> Maybe Double
-compose (d@(D# d#), e) 
+compose :: CustDbl -> Maybe Double
+compose (CustDbl d@(D# d#) e)
     | isNaN d = Nothing --error "Input is NaN"
     | isInfinite d = Nothing -- error "Input is Infinity"
     | ex < 0 = Just $ fromIntegral m `divideDouble` (2^(-ex)) -- this is necessary 
@@ -612,7 +613,7 @@ normalize x
           !n = floatRadix x
           !(mantissa, expo) =  normalizeIter (abs (fromIntegral m)) (fromIntegral (I# e#)) n
        in 
-            case compose (mantissa, expo) of 
+            case compose (CustDbl mantissa expo) of 
                 Just result -> result -- normalized 
                 _          -> x  -- return as-is
   where
