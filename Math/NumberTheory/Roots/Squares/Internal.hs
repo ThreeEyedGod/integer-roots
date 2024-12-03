@@ -410,7 +410,7 @@ vectorToInteger = VU.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0
 
 {-# INLINE floorX #-}
 floorX :: FloatingX -> Integer
-floorX (FloatingX s e) = case compose (CustDbl s e) of
+floorX (FloatingX s e) = case compose (FloatingX s e) of
   Just d -> floor d
   _ -> fromIntegral $ toLong s (fromIntegral e)
 
@@ -481,7 +481,7 @@ divide n@(FloatingX s1 e1) d@(FloatingX s2 e2)
 {-# INLINE sqrtFX #-}
 sqrtFX :: FloatingX -> FloatingX
 sqrtFX (FloatingX s e)  = FloatingX sX eX where 
-    (sX, eX) = sqrtSplitDbl (CustDbl s e) 
+    (sX, eX) = sqrtSplitDbl (FloatingX s e) 
 
 sqrtDX :: Double -> Double
 sqrtDX d 
@@ -494,9 +494,8 @@ sqrtDX d
 sqrtDoublehmpfr :: Double -> Double 
 sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
 
-data CustDbl = CustDbl {d_ :: Double, exp_ :: Int64} deriving (Eq, Show)
-sqrtSplitDbl :: CustDbl -> (Double, Int64) 
-sqrtSplitDbl (CustDbl d e) 
+sqrtSplitDbl :: FloatingX -> (Double, Int64) 
+sqrtSplitDbl (FloatingX d e) 
   | d == 0 = (0,0) 
   | d == 1 = (1,0)
   | even e = (s,fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e) 1##) -- even 
@@ -509,8 +508,8 @@ foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h s
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h toLong" toLong :: Double -> CLong -> CLong
 
-compose :: CustDbl -> Maybe Double
-compose (CustDbl d@(D# d#) e)
+compose :: FloatingX -> Maybe Double
+compose (FloatingX d@(D# d#) e)
     | isNaN d = Nothing --error "Input is NaN"
     | isInfinite d = Nothing -- error "Input is Infinity"
     | ex < 0 = Just $ fromIntegral m `divideDouble` (2^(-ex)) -- this is necessary 
@@ -613,7 +612,7 @@ normalize x
           !n = floatRadix x
           !(mantissa, expo) =  normalizeIter (abs (fromIntegral m)) (fromIntegral (I# e#)) n
        in 
-            case compose (CustDbl mantissa expo) of 
+            case compose (FloatingX mantissa expo) of 
                 Just result -> result -- normalized 
                 _          -> x  -- return as-is
   where
