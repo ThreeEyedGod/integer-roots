@@ -225,6 +225,7 @@ initSqRootVec l' lsb = let
 updtSqRootVec :: Int -> Integer -> VU.Vector Word32 -> VU.Vector Word32
 updtSqRootVec position yTildeFinal yCurrArr = yCurrArr VU.// [(position, fromIntegral yTildeFinal)]
 
+-- | Iteration loop data 
 data Itr = Itr {vecW32_ :: VU.Vector Word32, l_ :: Int, yCurrArr_ :: VU.Vector Word32, iRem_ :: Integer} deriving (Eq, Show)
 
 -- | Next Iterations till array empties out
@@ -351,7 +352,7 @@ findNextDigitUp inArgs inRes pos curr high checkFn
              else
                 findNextDigitUp inArgs inRes pos (mid+1) high checkFn
     where 
-            ceilNxtDgtUp = pred radixW32
+            !ceilNxtDgtUp = pred radixW32
             !yUpdated = tC inArgs + curr
 
 findNextDigitDown :: IterArgs -> IterRes -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer
@@ -394,23 +395,60 @@ mkIW32__ :: Integer -> VU.Vector Word32
 mkIW32__ 0 = VU.singleton 0 -- safety
 mkIW32__ i = VU.fromList $ wrd2wrd32 (digitsUnsigned b n)
   where
-    b = fromIntegral radixW32 :: Word
-    n = fromInteger i
+    !b = fromIntegral radixW32 :: Word
+    !n = fromInteger i
 
 {-# INLINE wrd2wrd32 #-}
 wrd2wrd32 :: [Word] -> [Word32]
 wrd2wrd32 xs = fromIntegral <$> xs
     
-data FloatingX = FloatingX {signif :: !Double, expnnt :: !Int64} deriving (Eq,Show) -- ! for strict data type 
 
 {-# INLINE vectorToInteger #-}
 -- Function to convert a vector of Word32 values to an Integer with base 2^32 (radixw32)
 vectorToInteger :: VU.Vector Word32 -> Integer
 vectorToInteger = VU.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0 
 
+{-# INLINE largestNSqLTE #-}
+largestNSqLTE :: Integer -> Integer -> Integer
+largestNSqLTE bot n = bbin bot (n + 1)
+  where
+    bbin a b
+      | a + 1 == b = a
+      | otherwise =
+          if m * m > n
+            then bbin a m
+            else bbin m b
+      where
+        m = (a + b) `div` 2
+{-# INLINE intgrFromRvsrd2ElemVec #-}
+
+-- | Integer from a "reversed" list of Word32 digits
+intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer
+intgrFromRvsrd2ElemVec v2ElemW32s =
+  let (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of
+        (Nothing, _) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
+        (_, Nothing) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
+        (Just u, Just v) -> (fst u, snd v)
+   in fromIntegral l2 * radixW32 + fromIntegral l1
+
+radixW32 :: Integer
+radixW32 = 2 ^ finiteBitSize (0 :: Word32)
+
+secndPlaceRadix :: Integer
+secndPlaceRadix = radixW32 * radixW32
+
+radixW32Squared :: Integer
+radixW32Squared = secndPlaceRadix
+
+radixW32Cubed :: Integer
+radixW32Cubed = secndPlaceRadix * radixW32
+
+-- | Custom double and its arithmetic        
+data FloatingX = FloatingX {signif :: !Double, expnnt :: !Int64} deriving (Eq, Show) -- ! for strict data type
+
 {-# INLINE floorX #-}
 floorX :: FloatingX -> Integer
-floorX (FloatingX s e) = case compose (FloatingX s e) of
+floorX (FloatingX s e) = case fx2Double (FloatingX s e) of
   Just d -> floor d
   _ -> fromIntegral $ toLong s (fromIntegral e)
 
@@ -481,18 +519,7 @@ divide n@(FloatingX s1 e1) d@(FloatingX s2 e2)
 {-# INLINE sqrtFX #-}
 sqrtFX :: FloatingX -> FloatingX
 sqrtFX (FloatingX s e)  = FloatingX sX eX where 
-    (sX, eX) = sqrtSplitDbl (FloatingX s e) 
-
-sqrtDX :: Double -> Double
-sqrtDX d 
-    | d == 0 = 0 
-    | isNaN d = 0 
-    | isInfinite d = maxDouble
-    | d == 1 = 1 
-    | otherwise = sqrtC d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
-
-sqrtDoublehmpfr :: Double -> Double 
-sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
+    !(sX, eX) = sqrtSplitDbl (FloatingX s e) 
 
 sqrtSplitDbl :: FloatingX -> (Double, Int64) 
 sqrtSplitDbl (FloatingX d e) 
@@ -504,12 +531,23 @@ sqrtSplitDbl (FloatingX d e)
     !s = sqrtDX d 
 {-# INLINEABLE sqrtSplitDbl #-}
 
+sqrtDX :: Double -> Double
+sqrtDX d
+  | d == 0 = 0
+  | isNaN d = 0
+  | isInfinite d = maxDouble
+  | d == 1 = 1
+  | otherwise = sqrtC d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
+
+sqrtDoublehmpfr :: Double -> Double
+sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
+
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrt_fsqrt" sqrt_fsqrt :: Double -> Double
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h toLong" toLong :: Double -> CLong -> CLong
 
-compose :: FloatingX -> Maybe Double
-compose (FloatingX d@(D# d#) e)
+fx2Double :: FloatingX -> Maybe Double
+fx2Double (FloatingX d@(D# d#) e)
     | isNaN d = Nothing --error "Input is NaN"
     | isInfinite d = Nothing -- error "Input is Infinity"
     | ex < 0 = Just $ fromIntegral m `divideDouble` (2^(-ex)) -- this is necessary 
@@ -521,32 +559,13 @@ compose (FloatingX d@(D# d#) e)
     where 
         !(# m, n# #) = decodeDoubleInteger d# 
         !ex = I# n# + fromIntegral e 
-{-# INLINEABLE compose #-}
-        
-{-# INLINE intgrFromRvsrd2ElemVec #-}
--- | Integer from a "reversed" list of Word32 digits
-intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer
-intgrFromRvsrd2ElemVec v2ElemW32s = let
-      (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of 
-          (Nothing, _) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
-          (_, Nothing) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
-          (Just u, Just v) -> (fst u, snd v)
-        in 
-          fromIntegral l2 * radixW32 + fromIntegral l1
-
-radixW32 :: Integer
-radixW32 = 2 ^ finiteBitSize (0 :: Word32)
-
-secndPlaceRadix :: Integer
-secndPlaceRadix = radixW32 * radixW32
-radixW32Squared :: Integer
-radixW32Squared = secndPlaceRadix
-radixW32Cubed :: Integer
-radixW32Cubed = secndPlaceRadix * radixW32
+{-# INLINEABLE fx2Double #-}
 
 {-# INLINE double2FloatingX #-}
 double2FloatingX :: Double -> FloatingX
-double2FloatingX d = let (s, e) = split d in FloatingX s e
+double2FloatingX d = let 
+   !(s, e) = split d 
+  in FloatingX s e
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991.
@@ -580,18 +599,6 @@ cI2D2  = cI2D2'
                 exPlus = integerLog10' n - 308 `quot` 100 -- would be dynamic (100-10)
                 shiftAmount = max 1 exPlus
 
-{-# INLINE largestNSqLTE #-}
-largestNSqLTE :: Integer -> Integer -> Integer
-largestNSqLTE bot n = bbin bot (n + 1)
-  where
-    bbin a b
-      | a + 1 == b = a
-      | otherwise =
-          if m * m > n
-            then bbin a m
-            else bbin m b
-      where
-        m = (a + b) `div` 2
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
@@ -599,6 +606,7 @@ split d  = (fromIntegral s, fromIntegral $ I# expInt#) where
   !(D# d#) = d
   !(# s, expInt# #) = decodeDoubleInteger d# 
 
+ -- | Normalising functions for doubles and our custom double  
 {-# INLINE normalize #-}
 normalize :: Double -> Double 
 normalize x
@@ -612,7 +620,7 @@ normalize x
           !n = floatRadix x
           !(mantissa, expo) =  normalizeIter (abs (fromIntegral m)) (fromIntegral (I# e#)) n
        in 
-            case compose (FloatingX mantissa expo) of 
+            case fx2Double (FloatingX mantissa expo) of 
                 Just result -> result -- normalized 
                 _          -> x  -- return as-is
   where
@@ -631,6 +639,7 @@ normalizeFX (FloatingX d ex) = FloatingX s (ex + e)
     nd = normalize d
     (s, e) = split nd
 
+-- | Some Constants 
 sqrtOf2 :: Double
 sqrtOf2 = 1.4142135623730950488016887242097
 
@@ -649,6 +658,7 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
+-- | Floating Point rounding/nextup funxctions 
 {-# INLINE nextUp #-}
 nextUp :: Double -> Double
 nextUp = NFI.nextUp
