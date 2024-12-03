@@ -71,7 +71,7 @@ import qualified Data.Monoid as VU
 {-# SPECIALISE isqrtA :: Integer -> Integer #-}
 isqrtA :: Integral a => a -> a
 isqrtA 0 = 0
-isqrtA n = isqrtB n -- heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n 
+isqrtA n = isqrtB n -- heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
@@ -199,20 +199,21 @@ fi__ vec
   | VU.null vec = error "fi_: Invalid Argument null vector "
   | otherwise = Itr w32Vec l' yCurrArr remInteger
     where
-      ((w32Vec, dxsVec'), l') =
+      !((w32Vec, dxsVec'), l') =
         let !l = VU.length vec 
             !(headVec1, lastVec1) = VU.splitAt (l - 1) vec
             !(headVec2, lastVec2) = VU.splitAt (l - 2) vec
         in if even l then ((VU.force headVec2,VU.force lastVec2), l - 2) else ((VU.force headVec1, VU.force $ VU.snoc lastVec1 0), l - 1)
-      vInteger = intgrFromRvsrd2ElemVec dxsVec'
-      y1 =
+      !vInteger = intgrFromRvsrd2ElemVec dxsVec'
+      !y1 =
         let !searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
-        in min (largestNSqLTE searchFrom vInteger) (pred radixW32) -- overflow trap
+        in hndlOvflwW32 (largestNSqLTE searchFrom vInteger)-- overflow trap
       --yCurrArr = VU.singleton (fromIntegral y1)
-      yCurrArr = initSqRootVec l' y1 
-      remInteger =  
-        let !remInteger_ = vInteger - y1 * y1
-        in if remInteger_ == radixW32 then pred radixW32 else remInteger_
+      !yCurrArr = initSqRootVec l' y1 
+      !remInteger =  hndlOvflwW32 $ vInteger - y1 * y1
+
+hndlOvflwW32 :: Integer -> Integer 
+hndlOvflwW32 i = if i == radixW32 then pred radixW32 else i
 
 {-# INLINE initSqRootVec #-}
 initSqRootVec :: Int -> Integer -> VU.Vector Word32        
@@ -265,7 +266,7 @@ nxtDgt_ inArgs
           !tCFX = normalizeFX $ integer2FloatingX tC_
           !radFX = tCFX !* tCFX !+ tAFX
         in
-          fromIntegral $ min (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX)))) (pred radixW32)
+          fromIntegral $ hndlOvflwW32 (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX))))
  where 
     !tA_ = tA inArgs 
     !tC_ = tC inArgs
