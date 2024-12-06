@@ -19,11 +19,11 @@ module Math.NumberTheory.Roots.Squares.Internal
   ) where
 
 -- *********** BEGIN NEW IMPORTS   
-import Control.Monad.ST (runST)
-import Data.Number.MPFR (RoundMode)
-import qualified Data.Number.MPFR as M
-import Data.Number.MPFR.Instances.Up ()
-import qualified Data.Number.MPFR.Mutable as MM
+-- import Control.Monad.ST (runST)
+-- import Data.Number.MPFR (RoundMode)
+-- import qualified Data.Number.MPFR as M
+-- import Data.Number.MPFR.Instances.Up ()
+-- import qualified Data.Number.MPFR.Mutable as MM
 import Debug.Trace 
 import GHC.Prim (fmaddDouble#, (/##), (+##))
 import Data.Maybe (fromMaybe)
@@ -212,8 +212,11 @@ fi__ vec
       !yCurrArr = initSqRootVec l' y1 
       !remInteger =  hndlOvflwW32 $ vInteger - y1 * y1
 
-hndlOvflwW32 :: Integer -> Integer 
-hndlOvflwW32 i = if i == radixW32 then pred radixW32 else i
+-- | handle overflow 
+{-# INLINE hndlOvflwW32 #-}
+{-# SPECIALIZE hndlOvflwW32 :: Int64 -> Int64 #-}
+hndlOvflwW32 :: Integral a => a -> a 
+hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = fromIntegral radixW32
 
 {-# INLINE initSqRootVec #-}
 initSqRootVec :: Int -> Integer -> VU.Vector Word32        
@@ -243,7 +246,7 @@ ni__ loopVals
           -- !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
           !inArgs = IterArgs tAInteger tBInteger' tCInteger'
-          yTilde_ = fromIntegral $ nxtDgt_ inArgs
+          yTilde_ = nxtDgt_ inArgs
           IterRes yTildeFinal remFinal = computeRem_ inArgs yTilde_ position
           --yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
           !yCurrArrUpdated = updtSqRootVec position yTildeFinal yCurrArr
@@ -266,7 +269,7 @@ nxtDgt_ inArgs
           !tCFX = normalizeFX $ integer2FloatingX tC_
           !radFX = tCFX !* tCFX !+ tAFX
         in
-          fromIntegral $ hndlOvflwW32 (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX))))
+          hndlOvflwW32 (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX))))
  where 
     !tA_ = tA inArgs 
     !tC_ = tC inArgs
@@ -278,10 +281,10 @@ nxtDgt_ inArgs
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
-computeRem_ :: IterArgs -> Integer -> Int -> IterRes
+computeRem_ :: IterArgs -> Int64 -> Int -> IterRes
 computeRem_ inArgs yTilde_ pos =
   let !rTrial = calcRemainder inArgs yTilde_
-   in handleRems_ pos inArgs (IterRes yTilde_ rTrial)
+   in handleRems_ pos inArgs (IterRes (fromIntegral yTilde_) rTrial)
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
@@ -290,10 +293,10 @@ handleRems_ :: Int -> IterArgs -> IterRes -> IterRes
 handleRems_ pos inArgs inVals
   | ri_ == 0 = inVals
   | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
-  | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder inArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder inArgs $ fromIntegral nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | (ri_ > 0) && (pos > 0) && excessLengthBy3 = IterRes yi adjustedRemainder3 -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
-  | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder inArgs nextUpDgt1
-  | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder inArgs nextUpDgt2
+  | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder inArgs $ fromIntegral nextUpDgt1
+  | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder inArgs $ fromIntegral nextUpDgt2
   | otherwise = inVals
   where
     b = radixW32
@@ -335,8 +338,8 @@ isValidRemainder2 :: Integer -> Integer -> Int -> Bool
 isValidRemainder2 rem2 currentroot pos = rem2 < altBoundAllowed currentroot pos
 
 -- Calculate remainder accompanying a 'digit'
-calcRemainder :: IterArgs -> Integer -> Integer
-calcRemainder tArgs dgt = tA tArgs - ((2 * tC tArgs * dgt) + dgt ^ (2 :: Int))
+calcRemainder :: IterArgs -> Int64 -> Integer
+calcRemainder tArgs dgt = tA tArgs - ((2 * tC tArgs * iDgt) + iDgt ^ (2 :: Int)) where iDgt = fromIntegral dgt
 
 findNextDigitUp :: IterArgs -> IterRes -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer 
 findNextDigitUp inArgs inRes pos curr high checkFn
@@ -345,7 +348,7 @@ findNextDigitUp inArgs inRes pos curr high checkFn
       | curr == high = if checkFn curr yUpdated pos then curr - 1 else error "findNextDigitUp : no valid digit found (curr=high)"
       | otherwise = 
           let !mid = (curr + high) `div` 2 
-              !testRem = calcRemainder inArgs mid 
+              !testRem = calcRemainder inArgs $ fromIntegral mid 
               !testRoot = tC inArgs + mid 
           in if checkFn testRem testRoot pos then 
               let validLower = tryRange Higher inArgs pos curr (mid-1) checkFn 
@@ -363,7 +366,7 @@ findNextDigitDown tArgs inRes pos curr low checkFn
   | curr == yi = if checkFn (yi-1) yUpdated pos then yi-1 else findNextDigitDown tArgs inRes pos (yi - 2) low checkFn
   | otherwise =
       let !mid = (low + curr ) `div` 2
-          !testRem = calcRemainder tArgs mid
+          !testRem = calcRemainder tArgs $ fromIntegral mid
           !testRoot = tC tArgs + mid 
        in if checkFn testRem testRoot pos
             then
@@ -381,7 +384,7 @@ tryRange rS tArgs pos lowr highr checkFn
       | lowr > highr = Nothing
       | otherwise =
           let !mid = (lowr + highr) `div` 2
-              !testRm = calcRemainder tArgs mid
+              !testRm = calcRemainder tArgs $ fromIntegral mid
               !testRt = tC tArgs + mid 
            in if checkFn testRm testRt pos
                 then Just mid
@@ -448,7 +451,8 @@ radixW32Cubed = secndPlaceRadix * radixW32
 data FloatingX = FloatingX {signif :: !Double, expnnt :: !Int64} deriving (Eq, Show) -- ! for strict data type
 
 {-# INLINE floorX #-}
-floorX :: FloatingX -> Integer
+{-# SPECIALIZE floorX :: FloatingX -> Integer #-}
+floorX :: Integral a => FloatingX -> a
 floorX (FloatingX s e) = case fx2Double (FloatingX s e) of
   Just d -> floor d
   _ -> fromIntegral $ toLong s (fromIntegral e)
@@ -540,8 +544,8 @@ sqrtDX d
   | d == 1 = 1
   | otherwise = sqrtC d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 
-sqrtDoublehmpfr :: Double -> Double
-sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
+-- sqrtDoublehmpfr :: Double -> Double
+-- sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
 
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrt_fsqrt" sqrt_fsqrt :: Double -> Double
 foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
