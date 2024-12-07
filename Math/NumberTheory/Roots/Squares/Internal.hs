@@ -44,7 +44,7 @@ import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
 import Data.Word (Word32, Word64)
-import GHC.Exts ((<##), (*##), Double(..), Double#)
+import GHC.Exts ((<##), (*##), Double(..), Double#, Int64#)
 -- *********** END NEW IMPORTS 
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -449,6 +449,8 @@ radixW32Cubed = secndPlaceRadix * radixW32
 
 -- | Custom double and its arithmetic        
 data FloatingX = FloatingX {signif :: !Double, expnnt :: !Int64} deriving (Eq, Show) -- ! for strict data type
+-- | Custom double "unboxed" and its arithmetic
+data FloatingX# = FloatingX# {signif# :: !Double#, expnnt# :: !Int64#} deriving (Eq, Show) -- ! for strict data type
 
 {-# INLINE floorX #-}
 {-# SPECIALIZE floorX :: FloatingX -> Integer #-}
@@ -589,6 +591,7 @@ integer2FloatingX i
     !(D# maxDouble#) = maxDouble
     !(D# iDouble#) = fromIntegral i 
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+
 
 {-# INLINE cI2D2 #-}
 cI2D2 :: Integer -> (Integer, Int)
