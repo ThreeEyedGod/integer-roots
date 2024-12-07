@@ -226,7 +226,7 @@ initSqRootVec l' lsb = let
         in rootVec VU.// [(rootLength - 1, fromIntegral lsb)]
 
 {-# INLINE updtSqRootVec #-}      
-updtSqRootVec :: Int -> Integer -> VU.Vector Word32 -> VU.Vector Word32
+updtSqRootVec :: Int -> Int64 -> VU.Vector Word32 -> VU.Vector Word32
 updtSqRootVec position yTildeFinal yCurrArr = yCurrArr VU.// [(position, fromIntegral yTildeFinal)]
 
 -- | Iteration loop data 
@@ -284,7 +284,7 @@ nxtDgt_ inArgs
 computeRem_ :: IterArgs -> Int64 -> Int -> IterRes
 computeRem_ inArgs yTilde_ pos =
   let !rTrial = calcRemainder inArgs yTilde_
-   in handleRems_ pos inArgs (IterRes (fromIntegral yTilde_) rTrial)
+   in handleRems_ pos inArgs (IterRes yTilde_ rTrial)
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
@@ -293,10 +293,10 @@ handleRems_ :: Int -> IterArgs -> IterRes -> IterRes
 handleRems_ pos inArgs inVals
   | ri_ == 0 = inVals
   | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
-  | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder inArgs $ fromIntegral nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder inArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | (ri_ > 0) && (pos > 0) && excessLengthBy3 = IterRes yi adjustedRemainder3 -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
-  | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder inArgs $ fromIntegral nextUpDgt1
-  | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder inArgs $ fromIntegral nextUpDgt2
+  | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder inArgs nextUpDgt1
+  | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder inArgs nextUpDgt2
   | otherwise = inVals
   where
     b = radixW32
@@ -306,20 +306,20 @@ handleRems_ pos inArgs inVals
         lenCurrRemainder = 1 + integerLogBase' b ri
         lenCurrSqrt = 1 + integerLogBase' b yi
      -}
-    excessLengthBy3 = integerLogBase' b (ri_`div` yi) >= 3
+    excessLengthBy3 = integerLogBase' b (ri_`div` fromIntegral yi) >= 3
     firstRemainderBoundCheckFail = not (isValidRemainder1 ri_ currSqrt pos)
     secondRemainderBoundCheckFail = not (isValidRemainder2 ri_ currSqrt pos)
-    !currSqrt = tC inArgs + yi
+    !currSqrt = tC inArgs + fromIntegral yi
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri_ `mod` modulus3
     !yi = yTilde inVals 
     !ri_ = ri inVals
     nextDownDgt0 = findNextDigitDown inArgs inVals pos yi 0 isValidRemainder0
-    nextUpDgt1 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder1
-    nextUpDgt2 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder2
+    nextUpDgt1 = findNextDigitUp inArgs inVals pos yi (fromIntegral radixW32 - 1) isValidRemainder1
+    nextUpDgt2 = findNextDigitUp inArgs inVals pos yi (fromIntegral radixW32 - 1) isValidRemainder2
 
 data IterArgs = IterArgs {tA :: Integer, tB :: Integer, tC :: Integer} deriving (Eq,Show)
-data IterRes = IterRes {yTilde :: Integer, ri :: Integer} deriving (Eq, Show) 
+data IterRes = IterRes {yTilde :: Int64, ri :: Integer} deriving (Eq, Show) 
 
 -- Helper function to calculate remainder bounds
 calcMaxAllowed :: Integer -> Int -> Integer
@@ -341,45 +341,45 @@ isValidRemainder2 rem2 currentroot pos = rem2 < altBoundAllowed currentroot pos
 calcRemainder :: IterArgs -> Int64 -> Integer
 calcRemainder tArgs dgt = tA tArgs - ((2 * tC tArgs * iDgt) + iDgt ^ (2 :: Int)) where iDgt = fromIntegral dgt
 
-findNextDigitUp :: IterArgs -> IterRes -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer 
+findNextDigitUp :: IterArgs -> IterRes -> Int -> Int64 -> Int64 -> (Integer -> Integer -> Int -> Bool) -> Int64 
 findNextDigitUp inArgs inRes pos curr high checkFn
       | curr >= ceilNxtDgtUp  = ceilNxtDgtUp
       | curr > high = error "findNextDigitUp : no valid digit found (curr>high)"
-      | curr == high = if checkFn curr yUpdated pos then curr - 1 else error "findNextDigitUp : no valid digit found (curr=high)"
+      | curr == high = if checkFn (fromIntegral curr) yUpdated pos then curr - 1 else error "findNextDigitUp : no valid digit found (curr=high)"
       | otherwise = 
           let !mid = (curr + high) `div` 2 
-              !testRem = calcRemainder inArgs $ fromIntegral mid 
-              !testRoot = tC inArgs + mid 
+              !testRem = calcRemainder inArgs mid 
+              !testRoot = tC inArgs + fromIntegral mid
           in if checkFn testRem testRoot pos then 
-              let validLower = tryRange Higher inArgs pos curr (mid-1) checkFn 
-              in fromMaybe mid validLower 
+              let validLower = tryRange Higher inArgs pos (fromIntegral curr) (fromIntegral mid-1) checkFn 
+              in  fromMaybe (fromIntegral mid) (fromIntegral <$> validLower) 
              else
                 findNextDigitUp inArgs inRes pos (mid+1) high checkFn
     where 
-            !ceilNxtDgtUp = pred radixW32
-            !yUpdated = tC inArgs + curr
+            !ceilNxtDgtUp = fromIntegral (pred radixW32) 
+            !yUpdated = tC inArgs + fromIntegral curr
 
-findNextDigitDown :: IterArgs -> IterRes -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool) -> Integer
+findNextDigitDown :: IterArgs -> IterRes -> Int -> Int64 -> Int64 -> (Integer -> Integer -> Int -> Bool) -> Int64
 findNextDigitDown tArgs inRes pos curr low checkFn
   | curr < low = error "findNextDigitDown : no valid digit found (curr<low) "
-  | curr == low = if checkFn curr yUpdated pos then curr else error "findNextDigitDown : no valid digit found (curr=low) "
-  | curr == yi = if checkFn (yi-1) yUpdated pos then yi-1 else findNextDigitDown tArgs inRes pos (yi - 2) low checkFn
+  | curr == low = if checkFn (fromIntegral curr) yUpdated pos then curr else error "findNextDigitDown : no valid digit found (curr=low) "
+  | curr == yi = if checkFn (fromIntegral yi-1) yUpdated pos then yi-1 else findNextDigitDown tArgs inRes pos (yi - 2) low checkFn
   | otherwise =
       let !mid = (low + curr ) `div` 2
-          !testRem = calcRemainder tArgs $ fromIntegral mid
-          !testRoot = tC tArgs + mid 
+          !testRem = calcRemainder tArgs mid
+          !testRoot = tC tArgs + fromIntegral mid 
        in if checkFn testRem testRoot pos
             then
-              let !validHigher = tryRange Lower tArgs pos (mid+1) curr checkFn 
-               in fromMaybe mid validHigher
+              let !validHigher = tryRange Lower tArgs pos (fromIntegral mid+1) (fromIntegral curr) checkFn 
+               in fromMaybe mid validHigher 
             else
               findNextDigitDown tArgs inRes pos (mid - 1) low checkFn
   where
-    !yUpdated = tC tArgs + curr 
+    !yUpdated = tC tArgs + fromIntegral curr 
     !yi = yTilde inRes 
 
 data RangeSearch =  Lower | Higher deriving Eq 
-tryRange :: RangeSearch -> IterArgs -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool )  -> Maybe Integer     
+tryRange :: RangeSearch -> IterArgs -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool )  -> Maybe Int64     
 tryRange rS tArgs pos lowr highr checkFn 
       | lowr > highr = Nothing
       | otherwise =
@@ -387,7 +387,7 @@ tryRange rS tArgs pos lowr highr checkFn
               !testRm = calcRemainder tArgs $ fromIntegral mid
               !testRt = tC tArgs + mid 
            in if checkFn testRm testRt pos
-                then Just mid
+                then Just (fromIntegral mid) 
                 else if rS == Lower then tryRange Lower tArgs pos lowr (mid - 1) checkFn else tryRange Higher tArgs pos (mid + 1) highr checkFn
 
 -- | helper functions
@@ -397,10 +397,10 @@ tryRange rS tArgs pos lowr highr checkFn
 -- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
 mkIW32__ :: Integer -> VU.Vector Word32
 mkIW32__ 0 = VU.singleton 0 -- safety
-mkIW32__ i = VU.fromList $ wrd2wrd32 (digitsUnsigned b n)
-  where
+mkIW32__ i = let
     !b = fromIntegral radixW32 :: Word
-    !n = fromInteger i
+    !n = fromInteger i  
+   in VU.fromList $ wrd2wrd32 (digitsUnsigned b n)
 
 {-# INLINE wrd2wrd32 #-}
 wrd2wrd32 :: [Word] -> [Word32]
