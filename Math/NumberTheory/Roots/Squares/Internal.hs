@@ -315,8 +315,8 @@ handleRems_ pos inArgs inVals
     !yi = yTilde inVals 
     !ri_ = ri inVals
     nextDownDgt0 = findNextDigitDown inArgs inVals pos yi 0 isValidRemainder0
-    nextUpDgt1 = findNextDigitUp inArgs inVals pos yi (fromIntegral radixW32 - 1) isValidRemainder1
-    nextUpDgt2 = findNextDigitUp inArgs inVals pos yi (fromIntegral radixW32 - 1) isValidRemainder2
+    nextUpDgt1 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder1
+    nextUpDgt2 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder2
 
 data IterArgs = IterArgs {tA :: Integer, tB :: Integer, tC :: Integer} deriving (Eq,Show)
 data IterRes = IterRes {yTilde :: Int64, ri :: Integer} deriving (Eq, Show) 
@@ -351,12 +351,12 @@ findNextDigitUp inArgs inRes pos curr high checkFn
               !testRem = calcRemainder inArgs mid 
               !testRoot = tC inArgs + fromIntegral mid
           in if checkFn testRem testRoot pos then 
-              let validLower = tryRange Higher inArgs pos (fromIntegral curr) (fromIntegral mid-1) checkFn 
-              in  fromMaybe (fromIntegral mid) (fromIntegral <$> validLower) 
+              let validLower = tryRange Higher inArgs pos curr (mid-1) checkFn 
+              in  fromMaybe mid validLower 
              else
                 findNextDigitUp inArgs inRes pos (mid+1) high checkFn
     where 
-            !ceilNxtDgtUp = fromIntegral (pred radixW32) 
+            !ceilNxtDgtUp =  pred radixW32
             !yUpdated = tC inArgs + fromIntegral curr
 
 findNextDigitDown :: IterArgs -> IterRes -> Int -> Int64 -> Int64 -> (Integer -> Integer -> Int -> Bool) -> Int64
@@ -370,7 +370,7 @@ findNextDigitDown tArgs inRes pos curr low checkFn
           !testRoot = tC tArgs + fromIntegral mid 
        in if checkFn testRem testRoot pos
             then
-              let !validHigher = tryRange Lower tArgs pos (fromIntegral mid+1) (fromIntegral curr) checkFn 
+              let !validHigher = tryRange Lower tArgs pos (mid+1) curr checkFn 
                in fromMaybe mid validHigher 
             else
               findNextDigitDown tArgs inRes pos (mid - 1) low checkFn
@@ -379,15 +379,15 @@ findNextDigitDown tArgs inRes pos curr low checkFn
     !yi = yTilde inRes 
 
 data RangeSearch =  Lower | Higher deriving Eq 
-tryRange :: RangeSearch -> IterArgs -> Int -> Integer -> Integer -> (Integer -> Integer -> Int -> Bool )  -> Maybe Int64     
+tryRange :: RangeSearch -> IterArgs -> Int -> Int64 -> Int64 -> (Integer -> Integer -> Int -> Bool )  -> Maybe Int64     
 tryRange rS tArgs pos lowr highr checkFn 
       | lowr > highr = Nothing
       | otherwise =
           let !mid = (lowr + highr) `div` 2
-              !testRm = calcRemainder tArgs $ fromIntegral mid
-              !testRt = tC tArgs + mid 
+              !testRm = calcRemainder tArgs mid
+              !testRt = tC tArgs + fromIntegral mid 
            in if checkFn testRm testRt pos
-                then Just (fromIntegral mid) 
+                then Just mid 
                 else if rS == Lower then tryRange Lower tArgs pos lowr (mid - 1) checkFn else tryRange Higher tArgs pos (mid + 1) highr checkFn
 
 -- | helper functions
@@ -398,7 +398,7 @@ tryRange rS tArgs pos lowr highr checkFn
 mkIW32__ :: Integer -> VU.Vector Word32
 mkIW32__ 0 = VU.singleton 0 -- safety
 mkIW32__ i = let
-    !b = fromIntegral radixW32 :: Word
+    !b = radixW32 :: Word
     !n = fromInteger i  
    in VU.fromList $ wrd2wrd32 (digitsUnsigned b n)
 
@@ -435,7 +435,7 @@ intgrFromRvsrd2ElemVec v2ElemW32s =
         (Just u, Just v) -> (fst u, snd v)
    in fromIntegral l2 * radixW32 + fromIntegral l1
 
-radixW32 :: Integer
+radixW32 :: Integral a => a 
 radixW32 = 2 ^ finiteBitSize (0 :: Word32)
 
 secndPlaceRadix :: Integer
