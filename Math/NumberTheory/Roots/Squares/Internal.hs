@@ -25,7 +25,7 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
 import Debug.Trace 
-import GHC.Prim (fmaddDouble#, (/##), (+##))
+import GHC.Prim (fmaddDouble#, (/##), (+##), (>=##),(**##))
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
@@ -478,18 +478,19 @@ minValue = FloatingX 1.0 0
 add :: FloatingX -> FloatingX -> FloatingX
 add (FloatingX 0.0 _) x = x
 add x (FloatingX 0.0 _) = x
-add a@(FloatingX signifA expA) b@(FloatingX signifB expB)
+add a@(FloatingX signifA@(D# sA#) expA) b@(FloatingX signifB@(D# sB#) expB)
   | expA > expB = combine a b
   | expA < expB = combine b a
-  | otherwise = FloatingX (signifA + signifB) expA
+  | otherwise = FloatingX (D# (sA# +## sB#)) expA --FloatingX (signifA + signifB) expA
   where
-    combine big@(FloatingX signifBig expBig) little@(FloatingX signifLittle expLittle) =
+    combine big@(FloatingX signifBig@(D# sBig#) expBig) little@(FloatingX signifLittle@(D# sLittle#) expLittle) =
       let !scale = expLittle - expBig
-          !scaledLittle = signifLittle * 2 ^^ scale
-          !resSignif = signifBig + scaledLittle
-       in if resSignif >= 2.0
-            then FloatingX (resSignif / 2.0) (expBig + 1)
-            else FloatingX resSignif expBig
+          !scaleD@(D# scaleD#) = fromIntegral scale :: Double
+          !scaledLittle# = sLittle# *## (2.00## **## scaleD#)
+          !resSignif# = sBig# +## scaledLittle#
+       in if isTrue# (resSignif# >=## 2.0##) 
+            then FloatingX (D# (resSignif# /## 2.0##)) (expBig + 1)
+            else FloatingX (D# resSignif#) expBig
 
 {-# INLINE mul #-}
 mul :: FloatingX -> FloatingX -> FloatingX
@@ -497,27 +498,27 @@ mul (FloatingX 0.0 _) _ = zero
 mul _ (FloatingX 0.0 _) = zero
 mul (FloatingX 1.0 0) b = b
 mul a (FloatingX 1.0 0) = a
-mul (FloatingX signifA expA) (FloatingX signifB expB) =
+mul (FloatingX signifA@(D# sA#) expA) (FloatingX signifB@(D# sB#) expB) =
   let !resExp = expA + expB
-      !resSignif = signifA * signifB
-   in if resSignif >= 2.0
-        then FloatingX (resSignif / 2.0) (resExp + 1)
-        else FloatingX resSignif resExp
+      !resSignif# = sA# *## sB#
+   in if isTrue# (resSignif# >=## 2.0##)
+        then FloatingX (D# (resSignif# /## 2.0##)) (resExp + 1)
+        else FloatingX (D# resSignif#) resExp
 
 {-# INLINE divide #-}
 divide :: FloatingX -> FloatingX -> FloatingX
-divide n@(FloatingX s1 e1) d@(FloatingX s2 e2)
+divide n@(FloatingX s1@(D# s1#) e1) d@(FloatingX s2@(D# s2#) e2)
     | d == FloatingX 1.0 0 = n 
     | s1 == 0.0 = zero
     | s2 == 0.0 = error "divide: error divide by zero " 
     | otherwise = 
         let !resExp = e1 - e2
-            !resSignif = s1 / s2
-            !(finalSignif, finalExp) = if resSignif < 1.0
-                                      then (resSignif * 2.0, resExp - 1)
-                                      else (resSignif, resExp)
+            !resSignif# = s1# /## s2#
+            !(finalSignif, finalExp) = if isTrue# (resSignif# <## 1.0##)
+                                      then (D# $ resSignif# *## 2.0##, resExp - 1)
+                                      else (D# resSignif#, resExp)
         -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
-        in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp <= 0 )
+        in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (isTrue# (resSignif# <## 1.0##) && resExp <= 0 )
            then zero
            else FloatingX finalSignif finalExp
 
