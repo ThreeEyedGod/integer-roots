@@ -289,9 +289,9 @@ nxtDgt_# inArgs
     | otherwise = let  
           !tAFX# = normalizeFX# $ integer2FloatingX# tA_
           !tCFX# = normalizeFX# $ integer2FloatingX# tC_
-          !radFX# = tCFX# `mul#` tCFX# `add#` tAFX#
+          !radFX# = tCFX# !*## tCFX# !+## tAFX#
         in
-          hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# `divide#` nextDownFX# (sqrtFX# (nextDownFX# radFX#) `add#` nextDownFX# tCFX#))))
+          hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
  where 
     !tA_ = tA inArgs 
     !tC_ = tC inArgs
@@ -516,6 +516,19 @@ minValue# = FloatingX# 1.0## zero64#
 {-# INLINE (!/) #-}
 (!/) :: FloatingX -> FloatingX -> FloatingX
 (!/) x y = x `divide` y
+
+{-# INLINE (!+##) #-}
+(!+##) :: FloatingX# -> FloatingX# -> FloatingX#
+(!+##) x y = x `add#` y
+
+{-# INLINE (!*##) #-}
+(!*##) :: FloatingX# -> FloatingX# -> FloatingX#
+(!*##) x y = x `mul#` y
+
+{-# INLINE (!/##) #-}
+(!/##) :: FloatingX# -> FloatingX# -> FloatingX#
+(!/##) x y = x `divide#` y
+
 
 {-# INLINE add #-}
 add :: FloatingX -> FloatingX -> FloatingX
