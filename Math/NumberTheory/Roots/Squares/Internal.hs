@@ -246,7 +246,7 @@ ni__ loopVals
           -- !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
           !inArgs = IterArgs tAInteger tBInteger' tCInteger'
-          yTilde_ = nxtDgt_ inArgs
+          yTilde_ = nxtDgt_# inArgs
           IterRes yTildeFinal remFinal = computeRem_ inArgs yTilde_ position
           --yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
           !yCurrArrUpdated = updtSqRootVec position yTildeFinal yCurrArr
@@ -609,15 +609,15 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
     | otherwise = 
         let !resExp# = e1# `subInt64#` e2#
             !resSignif# = s1# /## s2#
-            !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
-            !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
+            -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
+            -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
             !(# finalSignif#, finalExp# #) = if isTrue# (resSignif# <## 1.0##)
                                       then (# resSignif# *## 2.0##, resExp# `subInt64#` intToInt64# 1# #)
                                       else (# resSignif#, resExp# #)
         -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
           -- //TODO fix this next line
         -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
-        in if (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
+        in if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) 
            then zero#
            else FloatingX# finalSignif# finalExp#
 
