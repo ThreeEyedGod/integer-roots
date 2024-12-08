@@ -25,7 +25,7 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
 import Debug.Trace 
-import GHC.Prim (int64ToWord64#, fmaddDouble#, (/##), (+##), (>=##),(**##), plusInt64#, (>##), (==##), subInt64#, gtInt64#, ltInt64#,xor64#,and64#, not64#, leInt64#, Word64#)
+import GHC.Prim (Word32#, int64ToWord64#, fmaddDouble#, (/##), (+##), (>=##),(**##), plusInt64#, (>##), (==##), subInt64#, gtInt64#, ltInt64#,xor64#,and64#, not64#, leInt64#, Word64#)
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
@@ -209,20 +209,20 @@ fi__ vec
         let !searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
         in hndlOvflwW32 (largestNSqLTE searchFrom vInteger)-- overflow trap
       --yCurrArr = VU.singleton (fromIntegral y1)
-      !yCurrArr = initSqRootVec l' y1 
+      !yCurrArr = initSqRootVec l' (fromIntegral y1) 
       !remInteger =  hndlOvflwW32 $ vInteger - y1 * y1
 
 -- | handle overflow 
 {-# INLINE hndlOvflwW32 #-}
 {-# SPECIALIZE hndlOvflwW32 :: Int64 -> Int64 #-}
 hndlOvflwW32 :: Integral a => a -> a 
-hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = fromIntegral radixW32
+hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 {-# INLINE initSqRootVec #-}
-initSqRootVec :: Int -> Integer -> VU.Vector Word32        
+initSqRootVec :: Int -> Int64 -> VU.Vector Word32        
 initSqRootVec l' lsb = let 
           !rootLength  = (l' + 2) `quot` 2 
-          !rootVec = VU.replicate rootLength 0
+          !rootVec = VU.replicate rootLength 0 
         in rootVec VU.// [(rootLength - 1, fromIntegral lsb)]
 
 {-# INLINE updtSqRootVec #-}      
