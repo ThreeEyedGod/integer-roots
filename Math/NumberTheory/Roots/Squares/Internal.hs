@@ -25,7 +25,7 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
 import Debug.Trace 
-import GHC.Prim (fmaddDouble#, (/##), (+##), (>=##),(**##))
+import GHC.Prim (int64ToWord64#, fmaddDouble#, (/##), (+##), (>=##),(**##), plusInt64#, (>##), (==##), subInt64#, gtInt64#, ltInt64#,xor64#,and64#, not64#, leInt64#, Word64#)
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
@@ -44,7 +44,7 @@ import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
 import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
 import Data.Word (Word32, Word64)
-import GHC.Exts ((<##), (*##), Double(..), Double#, Int64#)
+import GHC.Exts ((<##), (*##), Double(..), Double#, Int64#, intToInt64#, int64ToInt#)
 -- *********** END NEW IMPORTS 
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -279,6 +279,28 @@ nxtDgt_ inArgs
     !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
+-- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
+-- for small values we can go with the standard double# arithmetic
+-- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
+nxtDgt_# :: IterArgs -> Int64 
+nxtDgt_# inArgs
+    | tA_ == 0 = 0 
+    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
+    | otherwise = let  
+          !tAFX# = normalizeFX# $ integer2FloatingX# tA_
+          !tCFX# = normalizeFX# $ integer2FloatingX# tC_
+          !radFX# = tCFX# `mul#` tCFX# `add#` tAFX#
+        in
+          hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# `divide#` nextDownFX# (sqrtFX# (nextDownFX# radFX#) `add#` nextDownFX# tCFX#))))
+ where 
+    !tA_ = tA inArgs 
+    !tC_ = tC inArgs
+    !tA# = integerToDouble# tA_
+    !tC# = integerToDouble# tC_
+    !rad# = fmaddDouble# tC# tC# tA#
+    !(D# maxDouble#) = maxDouble
+    itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
 computeRem_ :: IterArgs -> Int64 -> Int -> IterRes
@@ -459,10 +481,29 @@ floorX (FloatingX s e) = case fx2Double (FloatingX s e) of
   Just d -> floor d
   _ -> fromIntegral $ toLong s (fromIntegral e)
 
+{-# INLINE floorX# #-}
+{-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}
+floorX# :: (Integral a) => FloatingX# -> a
+floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) e) of
+    Just d -> floor d
+    _ -> fromIntegral $ toLong (D# s#) (fromIntegral e)
+  where 
+    e = fromIntegral (I# $ int64ToInt# e#)
+
 zero :: FloatingX
 zero = FloatingX 0.0 (minBound :: Int64)
 minValue :: FloatingX
 minValue = FloatingX 1.0 0
+zero# :: FloatingX#
+zero# = FloatingX# 0.0## minBound64# 
+    where 
+        !(I# minBoundInt#) = fromIntegral (minBound :: Int64) 
+        !minBound64# = intToInt64# minBoundInt#
+minValue# :: FloatingX#
+minValue# = FloatingX# 1.0## zero64#
+    where 
+        !(I# zeroInt#) = fromIntegral (0 :: Int64) 
+        !zero64# = intToInt64# zeroInt#
 
 {-# INLINE (!+) #-}
 (!+) :: FloatingX -> FloatingX -> FloatingX
@@ -494,6 +535,25 @@ add a@(FloatingX signifA@(D# sA#) expA) b@(FloatingX signifB@(D# sB#) expB)
             then FloatingX (D# (resSignif# /## 2.0##)) (expBig + 1)
             else FloatingX (D# resSignif#) expBig
 
+{-# INLINE add# #-}
+add# :: FloatingX# -> FloatingX# -> FloatingX#
+add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
+  | a == zero# = b
+  | b == zero# = a 
+  | isTrue# (expA# `gtInt64#` expB#) = combine a b
+  | isTrue# (expA# `ltInt64#` expB#) = combine b a
+  | otherwise = FloatingX# (sA# +## sB#) expA# --FloatingX (signifA + signifB) expA
+  where
+    combine big@(FloatingX# sBig# expBig#) little@(FloatingX# sLittle# expLittle#) =
+      let !scale# = expLittle# `subInt64#` expBig#
+          scaleD# = int2Double# (int64ToInt# scale#) 
+          !scaledLittle# = sLittle# *## (2.00## **## scaleD#)
+          !resSignif# = sBig# +## scaledLittle#
+       in if isTrue# (resSignif# >=## 2.0##) 
+            then FloatingX# (resSignif# /## 2.0##) (expBig# `plusInt64#` intToInt64# 1#)
+            else FloatingX# resSignif# expBig#
+
+
 {-# INLINE mul #-}
 mul :: FloatingX -> FloatingX -> FloatingX
 mul (FloatingX 0.0 _) _ = zero
@@ -506,6 +566,22 @@ mul (FloatingX signifA@(D# sA#) expA) (FloatingX signifB@(D# sB#) expB) =
    in if isTrue# (resSignif# >=## 2.0##)
         then FloatingX (D# (resSignif# /## 2.0##)) (resExp + 1)
         else FloatingX (D# resSignif#) resExp
+
+{-# INLINE mul# #-}
+mul# :: FloatingX# -> FloatingX# -> FloatingX#
+-- mul# (FloatingX# 1.0## 0#) b = b
+-- mul# a (FloatingX# 1.0 0) = a
+mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) 
+    | isTrue# (sA# ==## 0.00##) = zero#
+    | isTrue# (sB# ==## 0.00##) = zero#
+    | isTrue# (sA# ==## 1.00##) = b
+    | isTrue# (sB# ==## 1.00##) = a
+    | otherwise = 
+          let !resExp# = expA# `plusInt64#` expB#
+              !resSignif# = sA# *## sB#
+          in if isTrue# (resSignif# >=## 2.0##)
+                then FloatingX# (resSignif# /## 2.0##) (resExp# `plusInt64#` intToInt64# 1#)
+                else FloatingX# resSignif# resExp#
 
 {-# INLINE divide #-}
 divide :: FloatingX -> FloatingX -> FloatingX
@@ -524,10 +600,38 @@ divide n@(FloatingX s1@(D# s1#) e1) d@(FloatingX s2@(D# s2#) e2)
            then zero
            else FloatingX finalSignif finalExp
 
+{-# INLINE divide# #-}
+divide# :: FloatingX# -> FloatingX# -> FloatingX#
+divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
+    | d == FloatingX# 1.0## (intToInt64# 0#) = n 
+    | isTrue# (s1# ==## 0.0##) = zero#
+    | isTrue# (s2# ==## 0.0##) = error "divide: error divide by zero " 
+    | otherwise = 
+        let !resExp# = e1# `subInt64#` e2#
+            !resSignif# = s1# /## s2#
+            !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
+            !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
+            !(# finalSignif#, finalExp# #) = if isTrue# (resSignif# <## 1.0##)
+                                      then (# resSignif# *## 2.0##, resExp# `subInt64#` intToInt64# 1# #)
+                                      else (# resSignif#, resExp# #)
+        -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
+          -- //TODO fix this next line
+        -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
+        in if (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
+           then zero#
+           else FloatingX# finalSignif# finalExp#
+
 {-# INLINE sqrtFX #-}
 sqrtFX :: FloatingX -> FloatingX
 sqrtFX (FloatingX s e)  = FloatingX sX eX where 
     !(sX, eX) = sqrtSplitDbl (FloatingX s e) 
+
+{-# INLINE sqrtFX# #-}
+sqrtFX# :: FloatingX# -> FloatingX#
+sqrtFX# (FloatingX# s# e#)  = FloatingX# sX# (intToInt64# eX#) 
+  where 
+    !(D# sX#, eX) = sqrtSplitDbl (FloatingX (D# s#) (fromIntegral (I# (int64ToInt# e#)))) 
+    !(I# eX#) = fromIntegral eX
 
 sqrtSplitDbl :: FloatingX -> (Double, Int64) 
 sqrtSplitDbl (FloatingX d e) 
@@ -569,11 +673,20 @@ fx2Double (FloatingX d@(D# d#) e)
         !ex = I# n# + fromIntegral e 
 {-# INLINEABLE fx2Double #-}
 
+    
 {-# INLINE double2FloatingX #-}
 double2FloatingX :: Double -> FloatingX
 double2FloatingX d = let 
    !(s, e) = split d 
   in FloatingX s e
+
+{-# INLINE double2FloatingX# #-}
+double2FloatingX# :: Double -> FloatingX#
+double2FloatingX# d = let 
+   !(D# s#, e) = split d 
+   !(I# eInt#) = fromIntegral e 
+   !e# = intToInt64# eInt#
+  in FloatingX# s# e#
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991.
@@ -587,6 +700,22 @@ integer2FloatingX i
       !(i_, e_) = cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
       !s = fromIntegral i_
     in FloatingX s (fromIntegral e_)
+  where
+    !(D# maxDouble#) = maxDouble
+    !(D# iDouble#) = fromIntegral i 
+    itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+
+{-# INLINE integer2FloatingX# #-}
+integer2FloatingX# :: Integer -> FloatingX#
+integer2FloatingX# i
+  | i == 0 = zero#
+  | i < 0 = error "integer2FloatingX : invalid negative argument"
+  | itsOKtoUsePlainDoubleCalc =  double2FloatingX# (fromIntegral i) 
+  | otherwise =  let 
+      !(i_, e_) = cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+      !(D# s#) = fromIntegral i_
+      !(I# e_#) = e_
+    in FloatingX# s# (intToInt64# e_#)
   where
     !(D# maxDouble#) = maxDouble
     !(D# iDouble#) = fromIntegral i 
@@ -614,6 +743,14 @@ split :: Double -> (Double, Int64)
 split d  = (fromIntegral s, fromIntegral $ I# expInt#) where 
   !(D# d#) = d
   !(# s, expInt# #) = decodeDoubleInteger d# 
+
+{-# INLINE split# #-}
+split# :: Double# -> (# Double#, Int64# #) 
+split# d#  = (# s#, ex# #) 
+  where 
+        !(# s, expInt# #) = decodeDoubleInteger d# 
+        !(D# s#) = fromIntegral s 
+        !ex# = intToInt64# expInt#
 
  -- | Normalising functions for doubles and our custom double  
 {-# INLINE normalize #-}
@@ -647,6 +784,14 @@ normalizeFX (FloatingX d ex) = FloatingX s (ex + e)
   where
     nd = normalize d
     (s, e) = split nd
+
+{-# INLINE normalizeFX# #-}
+normalizeFX# :: FloatingX# -> FloatingX#
+normalizeFX# (FloatingX# d# ex#) = FloatingX# s# expF#
+  where
+    !(D# nd#) = normalize (D# d#)
+    !(# s#, e# #) = split# nd#
+    !expF# = ex# `plusInt64#` e#
 
 -- | Some Constants 
 sqrtOf2 :: Double
@@ -699,6 +844,15 @@ nextUpFX (FloatingX s e)
     in
       if interimS >= 2.0 then FloatingX (interimS / 2) (e + 1) else FloatingX interimS e
 
+{-# INLINE nextUpFX# #-}
+nextUpFX# :: FloatingX# -> FloatingX#
+nextUpFX# (FloatingX# s# e#)
+  | isTrue# (s# ==## 0.0##) = minValue#
+  | otherwise = let 
+     !interimS# = nextUp# s#
+    in
+      if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` intToInt64# 1#) else FloatingX# interimS# e#
+
 {-# INLINE nextDownFX #-}
 nextDownFX :: FloatingX -> FloatingX
 nextDownFX x@(FloatingX s e)
@@ -707,6 +861,15 @@ nextDownFX x@(FloatingX s e)
       !interimS = nextDown s
      in 
         if interimS < 1.0 then FloatingX (interimS * 2) (e - 1) else FloatingX interimS e
+
+{-# INLINE nextDownFX# #-}
+nextDownFX# :: FloatingX# -> FloatingX#
+nextDownFX# x@(FloatingX# s# e#)
+  | isTrue# (s# ==## 0.0##) || x == minValue# = zero#
+  | otherwise = let 
+      !interimS# = nextDown# s#
+     in 
+        if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` intToInt64# 1#) else FloatingX# interimS# e#
 
 -- End isqrtB ****************************************************************
 -- End isqrtB ****************************************************************
