@@ -246,7 +246,7 @@ ni__ loopVals
           -- !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
           !inArgs = IterArgs tAInteger tBInteger' tCInteger'
-          yTilde_ = nxtDgt_# inArgs
+          !yTilde_ = nxtDgt_# inArgs
           IterRes yTildeFinal remFinal = computeRem_ inArgs yTilde_ position
           --yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
           !yCurrArrUpdated = updtSqRootVec position yTildeFinal yCurrArr
@@ -341,7 +341,7 @@ handleRems_ pos inArgs inVals
     nextUpDgt2 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder2
 
 data IterArgs = IterArgs {tA :: Integer, tB :: Integer, tC :: Integer} deriving (Eq,Show)
-data IterRes = IterRes {yTilde :: Int64, ri :: Integer} deriving (Eq, Show) 
+data IterRes = IterRes {yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq, Show) 
 
 -- Helper function to calculate remainder bounds
 calcMaxAllowed :: Integer -> Int -> Integer
