@@ -230,7 +230,7 @@ updtSqRootVec :: Int -> Int64 -> VU.Vector Word32 -> VU.Vector Word32
 updtSqRootVec position yTildeFinal yCurrArr = yCurrArr VU.// [(position, fromIntegral yTildeFinal)]
 
 -- | Iteration loop data 
-data Itr = Itr {vecW32_ :: VU.Vector Word32, l_ :: Int, yCurrArr_ :: VU.Vector Word32, iRem_ :: Integer} deriving (Eq, Show)
+data Itr = Itr {vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer} deriving (Eq, Show)
 
 -- | Next Iterations till array empties out
 ni__ :: Itr -> Integer
@@ -261,7 +261,7 @@ ni__ loopVals
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_ :: IterArgs -> Int64 
-nxtDgt_ inArgs
+nxtDgt_ inArgs@(IterArgs tA_ tB_ tC_)
     | tA_ == 0 = 0 
     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
     | otherwise = let  
@@ -271,8 +271,6 @@ nxtDgt_ inArgs
         in
           hndlOvflwW32 (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX))))
  where 
-    !tA_ = tA inArgs 
-    !tC_ = tC inArgs
     !tA# = integerToDouble# tA_
     !tC# = integerToDouble# tC_
     !rad# = fmaddDouble# tC# tC# tA#
@@ -283,23 +281,21 @@ nxtDgt_ inArgs
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_# :: IterArgs -> Int64 
-nxtDgt_# inArgs
-    | tA_ == 0 = 0 
+nxtDgt_# inArgs@(IterArgs 0 _ _) = 0 
+nxtDgt_# inArgs@(IterArgs tA_ tB_ tC_)
     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
     | otherwise = let  
-          !tAFX# = normalizeFX# $ integer2FloatingX# tA_
-          !tCFX# = normalizeFX# $ integer2FloatingX# tC_
+          [tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
           !radFX# = tCFX# !*## tCFX# !+## tAFX#
         in
           hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
  where 
-    !tA_ = tA inArgs 
-    !tC_ = tC inArgs
     !tA# = integerToDouble# tA_
     !tC# = integerToDouble# tC_
     !rad# = fmaddDouble# tC# tC# tA#
     !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
@@ -312,7 +308,7 @@ computeRem_ inArgs yTilde_ pos =
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
 -- if it's positive and far larger in size then also the current digit rework 
 handleRems_ :: Int -> IterArgs -> IterRes -> IterRes
-handleRems_ pos inArgs inVals
+handleRems_ pos inArgs inVals@(IterRes yi ri_)
   | ri_ == 0 = inVals
   | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
   | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder inArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
@@ -334,8 +330,6 @@ handleRems_ pos inArgs inVals
     !currSqrt = tC inArgs + fromIntegral yi
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri_ `mod` modulus3
-    !yi = yTilde inVals 
-    !ri_ = ri inVals
     nextDownDgt0 = findNextDigitDown inArgs inVals pos yi 0 isValidRemainder0
     nextUpDgt1 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder1
     nextUpDgt2 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder2
@@ -445,7 +439,7 @@ largestNSqLTE bot n = bbin bot (n + 1)
             then bbin a m
             else bbin m b
       where
-        m = (a + b) `div` 2
+        !m = (a + b) `div` 2
 {-# INLINE intgrFromRvsrd2ElemVec #-}
 
 -- | Integer from a "reversed" list of Word32 digits
@@ -470,9 +464,9 @@ radixW32Cubed :: Integer
 radixW32Cubed = secndPlaceRadix * radixW32
 
 -- | Custom double and its arithmetic        
-data FloatingX = FloatingX {signif :: !Double, expnnt :: !Int64} deriving (Eq, Show) -- ! for strict data type
+data FloatingX = FloatingX {signif :: {-# UNPACK #-}!Double, expnnt :: {-# UNPACK #-}!Int64} deriving (Eq, Show) -- ! for strict data type
 -- | Custom double "unboxed" and its arithmetic
-data FloatingX# = FloatingX# {signif# :: !Double#, expnnt# :: !Int64#} deriving (Eq, Show) -- ! for strict data type
+data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-}!Double#, expnnt# :: {-# UNPACK #-}!Int64#} deriving (Eq, Show) -- ! for strict data type
 
 {-# INLINE floorX #-}
 {-# SPECIALIZE floorX :: FloatingX -> Integer #-}
