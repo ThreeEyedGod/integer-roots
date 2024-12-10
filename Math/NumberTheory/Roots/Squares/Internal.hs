@@ -280,12 +280,12 @@ nxtDgt_ inArgs@(IterArgs tA_ tB_ tC_)
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
-nxtDgt_# :: IterArgs -> Int64 
+nxtDgt_# :: IterArgs -> Int64
 nxtDgt_# inArgs@(IterArgs 0 _ _) = 0 
 nxtDgt_# inArgs@(IterArgs tA_ tB_ tC_)
     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
     | otherwise = let  
-          [tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
+          ![tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
           !radFX# = tCFX# !*## tCFX# !+## tAFX#
         in
           hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
