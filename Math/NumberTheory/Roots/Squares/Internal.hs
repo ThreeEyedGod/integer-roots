@@ -436,10 +436,11 @@ largestNSqLTE bot n = bbin bot (n + 1)
 intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer
 intgrFromRvsrd2ElemVec v2ElemW32s =
   let (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of
-        (Nothing, _) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
-        (_, Nothing) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
         (Just u, Just v) -> (fst u, snd v)
-   in fromIntegral l2 * radixW32 + fromIntegral l1
+        (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector"
+        -- (Nothing, _) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
+        -- (_, Nothing) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
+      in fromIntegral l2 * radixW32 + fromIntegral l1
 
 radixW32 :: Integral a => a 
 radixW32 = 2 ^ finiteBitSize (0 :: Word32)
@@ -543,7 +544,7 @@ add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
   where
     combine big@(FloatingX# sBig# expBig#) little@(FloatingX# sLittle# expLittle#) =
       let !scale# = expLittle# `subInt64#` expBig#
-          scaleD# = int2Double# (int64ToInt# scale#) 
+          !scaleD# = int2Double# (int64ToInt# scale#) 
           !scaledLittle# = sLittle# *## (2.00## **## scaleD#)
           !resSignif# = sBig# +## scaledLittle#
        in if isTrue# (resSignif# >=## 2.0##) 
