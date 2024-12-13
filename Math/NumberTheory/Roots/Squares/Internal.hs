@@ -254,7 +254,7 @@ ni__ loopVals
           !w32Vec = vecW32_ loopVals 
           !yCurrArr = yCurrArr_ loopVals
 
-data LoopArgs = LoopArgs {position :: Int, inArgs :: IterArgs, residuali32Vec :: VU.Vector Word32} deriving (Eq, Show)          
+data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int, inArgs :: IterArgs, residuali32Vec :: VU.Vector Word32} deriving (Eq, Show)          
 prepArgs :: Int -> Integer -> VU.Vector Word32 -> VU.Vector Word32 -> LoopArgs
 prepArgs l iRem w32Vec yCurrArr = let           
           !position = pred $ l `quot` 2 -- last pair is position "0"
@@ -286,11 +286,6 @@ nxtDgt_# inArgs@(IterArgs tA_ tB_ tC_)
     !den# = fmaddDouble# (sqrtDouble# (nextDown# rad#)) 1.00## (nextDown# tC#) 
     !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
--- nxtDgt_# inArgs@(IterArgs tA_ tB_ tC_) = let  
---           ![tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
---           !radFX# = tCFX# !*## tCFX# !+## tAFX#
---         in
---           hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
