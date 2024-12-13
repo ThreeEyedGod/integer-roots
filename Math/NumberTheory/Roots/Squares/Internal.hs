@@ -200,7 +200,7 @@ fi__ vec
   | otherwise = let 
       !((w32Vec, dxsVec'), l') = splitVec vec 
       !vInteger = intgrFromRvsrd2ElemVec dxsVec'
-      !y1 = floorLrgstSqrtN vInteger
+      !y1 = optmzedLrgstSqrtN vInteger
       !yCurrArr = initSqRootVec l' (fromIntegral y1) 
       !remInteger =  hndlOvflwW32 $ vInteger - y1 * y1
     in Itr w32Vec l' yCurrArr remInteger
@@ -208,12 +208,12 @@ fi__ vec
 splitVec :: VU.Vector Word32 -> ((VU.Vector Word32, VU.Vector Word32), Int)
 splitVec vec = let 
             !l = VU.length vec 
-            !(headVec1, lastVec1) = VU.splitAt (l - 1) vec
-            !(headVec2, lastVec2) = VU.splitAt (l - 2) vec
+            (headVec1, lastVec1) = VU.splitAt (l - 1) vec
+            (headVec2, lastVec2) = VU.splitAt (l - 2) vec
         in if even l then ((VU.force headVec2,VU.force lastVec2), l - 2) else ((VU.force headVec1, VU.force $ VU.snoc lastVec1 0), l - 1)
 
-floorLrgstSqrtN :: Integer -> Integer 
-floorLrgstSqrtN i = let 
+optmzedLrgstSqrtN :: Integer -> Integer 
+optmzedLrgstSqrtN i = let 
           !searchFrom = if i >= radixW32Squared then radixW32Squared else 0 -- heuristic
         in hndlOvflwW32 (largestNSqLTE searchFrom i)-- overflow trap
 
@@ -243,13 +243,7 @@ ni__ loopVals
   | VU.null w32Vec = vectorToInteger yCurrArr
   | otherwise =
       let 
-          !position = pred $ l `quot` 2 -- last pair is position "0"
-          !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
-          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
-          yCurrWorkingCopy  = VU.force (VU.unsafeSlice (position+1) (VU.length yCurrArr - (position+1)) yCurrArr) 
-          !tBInteger' = vectorToInteger yCurrWorkingCopy
-          !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
-          !inArgs = IterArgs tAInteger tBInteger' tCInteger'
+          LoopArgs !position !inArgs !residuali32Vec = prepArgs l iRem w32Vec yCurrArr
           !yTilde_ = nxtDgt_# inArgs
           IterRes yTildeFinal remFinal = computeRem_ inArgs yTilde_ position
           !yCurrArrUpdated = updtSqRootVec position yTildeFinal yCurrArr
@@ -260,25 +254,17 @@ ni__ loopVals
           !w32Vec = vecW32_ loopVals 
           !yCurrArr = yCurrArr_ loopVals
 
--- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
--- for small values we can go with the standard double# arithmetic
--- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
-nxtDgt_ :: IterArgs -> Int64 
-nxtDgt_ inArgs@(IterArgs tA_ tB_ tC_)
-    | tA_ == 0 = 0 
-    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
-    | otherwise = let  
-          !tAFX = normalizeFX $ integer2FloatingX tA_
-          !tCFX = normalizeFX $ integer2FloatingX tC_
-          !radFX = tCFX !* tCFX !+ tAFX
-        in
-          hndlOvflwW32 (floorX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFX (nextDownFX radFX) !+ nextDownFX tCFX))))
- where 
-    !tA# = integerToDouble# tA_
-    !tC# = integerToDouble# tC_
-    !rad# = fmaddDouble# tC# tC# tA#
-    !(D# maxDouble#) = maxDouble
-    itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+data LoopArgs = LoopArgs {position :: Int, inArgs :: IterArgs, residuali32Vec :: VU.Vector Word32} deriving (Eq, Show)          
+prepArgs :: Int -> Integer -> VU.Vector Word32 -> VU.Vector Word32 -> LoopArgs
+prepArgs l iRem w32Vec yCurrArr = let           
+          !position = pred $ l `quot` 2 -- last pair is position "0"
+          !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
+          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
+          yCurrWorkingCopy  = VU.force (VU.unsafeSlice (position+1) (VU.length yCurrArr - (position+1)) yCurrArr) 
+          !tBInteger' = vectorToInteger yCurrWorkingCopy
+          !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
+        in 
+          LoopArgs position (IterArgs tAInteger tBInteger' tCInteger') residuali32Vec
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
