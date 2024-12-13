@@ -197,20 +197,25 @@ fi__ :: VU.Vector Word32 -> Itr
 fi__ vec 
   | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr VU.empty 0 VU.empty 0
   | VU.null vec = error "fi_: Invalid Argument null vector "
-  | otherwise = Itr w32Vec l' yCurrArr remInteger
-    where
-      !((w32Vec, dxsVec'), l') =
-        let !l = VU.length vec 
+  | otherwise = let 
+      !((w32Vec, dxsVec'), l') = splitVec vec 
+      !vInteger = intgrFromRvsrd2ElemVec dxsVec'
+      !y1 = floorLrgstSqrtN vInteger
+      !yCurrArr = initSqRootVec l' (fromIntegral y1) 
+      !remInteger =  hndlOvflwW32 $ vInteger - y1 * y1
+    in Itr w32Vec l' yCurrArr remInteger
+
+splitVec :: VU.Vector Word32 -> ((VU.Vector Word32, VU.Vector Word32), Int)
+splitVec vec = let 
+            !l = VU.length vec 
             !(headVec1, lastVec1) = VU.splitAt (l - 1) vec
             !(headVec2, lastVec2) = VU.splitAt (l - 2) vec
         in if even l then ((VU.force headVec2,VU.force lastVec2), l - 2) else ((VU.force headVec1, VU.force $ VU.snoc lastVec1 0), l - 1)
-      !vInteger = intgrFromRvsrd2ElemVec dxsVec'
-      !y1 =
-        let !searchFrom = if vInteger >= radixW32Squared then radixW32Squared else 0 -- heuristic
-        in hndlOvflwW32 (largestNSqLTE searchFrom vInteger)-- overflow trap
-      --yCurrArr = VU.singleton (fromIntegral y1)
-      !yCurrArr = initSqRootVec l' (fromIntegral y1) 
-      !remInteger =  hndlOvflwW32 $ vInteger - y1 * y1
+
+floorLrgstSqrtN :: Integer -> Integer 
+floorLrgstSqrtN i = let 
+          !searchFrom = if i >= radixW32Squared then radixW32Squared else 0 -- heuristic
+        in hndlOvflwW32 (largestNSqLTE searchFrom i)-- overflow trap
 
 -- | handle overflow 
 {-# INLINE hndlOvflwW32 #-}
@@ -243,12 +248,10 @@ ni__ loopVals
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
           yCurrWorkingCopy  = VU.force (VU.unsafeSlice (position+1) (VU.length yCurrArr - (position+1)) yCurrArr) 
           !tBInteger' = vectorToInteger yCurrWorkingCopy
-          -- !tBInteger' = vectorToInteger yCurrArr
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
           !inArgs = IterArgs tAInteger tBInteger' tCInteger'
           !yTilde_ = nxtDgt_# inArgs
           IterRes yTildeFinal remFinal = computeRem_ inArgs yTilde_ position
-          --yCurrArrUpdated = VU.cons (fromIntegral yTildeFinal) yCurrArr
           !yCurrArrUpdated = updtSqRootVec position yTildeFinal yCurrArr
        in ni__ $ Itr (VU.force residuali32Vec) (l-2) yCurrArrUpdated remFinal
   where 
@@ -283,7 +286,8 @@ nxtDgt_ inArgs@(IterArgs tA_ tB_ tC_)
 nxtDgt_# :: IterArgs -> Int64
 nxtDgt_# inArgs@(IterArgs 0 _ _) = 0 
 nxtDgt_# inArgs@(IterArgs tA_ tB_ tC_)
-    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
+    -- | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
+    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## den#)) 
     | otherwise = let  
           ![tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
           !radFX# = tCFX# !*## tCFX# !+## tAFX#
@@ -293,9 +297,14 @@ nxtDgt_# inArgs@(IterArgs tA_ tB_ tC_)
     !tA# = integerToDouble# tA_
     !tC# = integerToDouble# tC_
     !rad# = fmaddDouble# tC# tC# tA#
+    !den# = fmaddDouble# (sqrtDouble# (nextDown# rad#)) 1.00## (nextDown# tC#) 
     !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
-
+-- nxtDgt_# inArgs@(IterArgs tA_ tB_ tC_) = let  
+--           ![tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
+--           !radFX# = tCFX# !*## tCFX# !+## tAFX#
+--         in
+--           hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
