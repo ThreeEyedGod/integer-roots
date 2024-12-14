@@ -25,7 +25,7 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
 import Debug.Trace 
-import GHC.Prim (Word32#, int64ToWord64#, fmaddDouble#, (/##), (+##), (>=##),(**##), plusInt64#, (>##), (==##), subInt64#, gtInt64#, ltInt64#,xor64#,and64#, not64#, leInt64#, Word64#)
+import GHC.Prim (Word32#, int64ToWord64#, fmaddDouble#, (-#),(/##), (+##), (>=##),(**##), plusInt64#, (>##), (==##), subInt64#, gtInt64#, ltInt64#,xor64#,and64#, not64#, leInt64#, Word64#)
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
@@ -195,15 +195,15 @@ dgts__ n = mkIW32__ n
 -- | First Iteration
 fi__ :: VU.Vector Word32 -> Itr
 fi__ vec 
-  | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr VU.empty 0 VU.empty 0
+  | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr VU.empty 0# VU.empty 0
   | VU.null vec = error "fi_: Invalid Argument null vector "
   | otherwise = let 
-      !((w32Vec, dxsVec'), l') = splitVec vec 
+      !((w32Vec, dxsVec'), l'@(I# l'#)) = splitVec vec 
       !vInteger = intgrFromRvsrd2ElemVec dxsVec'
       !y1 = optmzedLrgstSqrtN vInteger
       !yCurrArr = initSqRootVec l' (fromIntegral y1) 
       !remInteger =  hndlOvflwW32 $ vInteger - y1 * y1
-    in Itr w32Vec l' yCurrArr remInteger
+    in Itr w32Vec l'# yCurrArr remInteger
 
 splitVec :: VU.Vector Word32 -> ((VU.Vector Word32, VU.Vector Word32), Int)
 splitVec vec = let 
@@ -235,7 +235,7 @@ updtSqRootVec :: Int -> Int64 -> VU.Vector Word32 -> VU.Vector Word32
 updtSqRootVec position yTildeFinal yCurrArr = yCurrArr VU.// [(position, fromIntegral yTildeFinal)]
 
 -- | Iteration loop data 
-data Itr = Itr {vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer} deriving (Eq, Show)
+data Itr = Itr {vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer} deriving (Eq, Show)
 
 -- | Next Iterations till array empties out
 ni__ :: Itr -> Integer
@@ -243,28 +243,28 @@ ni__ loopVals
   | VU.null w32Vec = vectorToInteger yCurrArr
   | otherwise =
       let 
-          !l = l_ loopVals 
+          !l# = l_ loopVals 
           !iRem = iRem_ loopVals 
-          LoopArgs !p !inA !ri32V = prepArgs l iRem w32Vec yCurrArr
+          !(LoopArgs !p# !inA !ri32V) = prepArgs l# iRem w32Vec yCurrArr
           !yTilde_ = nxtDgt_# inA
-          IterRes yTildeFinal remFinal = computeRem_ inA yTilde_ p
-          !yCurrArrUpdated = updtSqRootVec p yTildeFinal yCurrArr
-       in ni__ $ Itr (VU.force ri32V) (l-2) yCurrArrUpdated remFinal
+          IterRes yTildeFinal remFinal = computeRem_ inA yTilde_ (I# p#)
+          !yCurrArrUpdated = updtSqRootVec (I# p#) yTildeFinal yCurrArr
+       in ni__ $ Itr (VU.force ri32V) (l# -# 2#) yCurrArrUpdated remFinal
   where 
           !w32Vec = vecW32_ loopVals 
           !yCurrArr = yCurrArr_ loopVals
 
-data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int, inArgs :: IterArgs, residuali32Vec :: VU.Vector Word32} deriving (Eq, Show)          
-prepArgs :: Int -> Integer -> VU.Vector Word32 -> VU.Vector Word32 -> LoopArgs
-prepArgs l iRem w32Vec yCurrArr = let           
-          !p = pred $ l `quot` 2 -- last pair is position "0"
-          !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
+data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs :: IterArgs, residuali32Vec :: VU.Vector Word32} deriving (Eq, Show)          
+prepArgs :: Int# -> Integer -> VU.Vector Word32 -> VU.Vector Word32 -> LoopArgs
+prepArgs l# iRem w32Vec yCurrArr = let           
+          !p@(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
+          !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (I# l# - 2) w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
           yCurrWorkingCopy  = VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
           !tBInteger' = vectorToInteger yCurrWorkingCopy
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
         in 
-          LoopArgs p (IterArgs tAInteger tBInteger' tCInteger') ri32Vec
+          LoopArgs p# (IterArgs tAInteger tBInteger' tCInteger') ri32Vec
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
