@@ -243,11 +243,11 @@ ni__ loopVals
   | VU.null w32Vec = vectorToInteger yCurrArr
   | otherwise =
       let 
-          LoopArgs !position !inArgs !residuali32Vec = prepArgs l iRem w32Vec yCurrArr
-          !yTilde_ = nxtDgt_# inArgs
-          IterRes yTildeFinal remFinal = computeRem_ inArgs yTilde_ position
-          !yCurrArrUpdated = updtSqRootVec position yTildeFinal yCurrArr
-       in ni__ $ Itr (VU.force residuali32Vec) (l-2) yCurrArrUpdated remFinal
+          LoopArgs !p !inA !ri32V = prepArgs l iRem w32Vec yCurrArr
+          !yTilde_ = nxtDgt_# inA
+          IterRes yTildeFinal remFinal = computeRem_ inA yTilde_ p
+          !yCurrArrUpdated = updtSqRootVec p yTildeFinal yCurrArr
+       in ni__ $ Itr (VU.force ri32V) (l-2) yCurrArrUpdated remFinal
   where 
           !l = l_ loopVals 
           !iRem = iRem_ loopVals 
@@ -257,21 +257,21 @@ ni__ loopVals
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int, inArgs :: IterArgs, residuali32Vec :: VU.Vector Word32} deriving (Eq, Show)          
 prepArgs :: Int -> Integer -> VU.Vector Word32 -> VU.Vector Word32 -> LoopArgs
 prepArgs l iRem w32Vec yCurrArr = let           
-          !position = pred $ l `quot` 2 -- last pair is position "0"
-          !(residuali32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
+          !p = pred $ l `quot` 2 -- last pair is position "0"
+          !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (l - 2) w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
-          yCurrWorkingCopy  = VU.force (VU.unsafeSlice (position+1) (VU.length yCurrArr - (position+1)) yCurrArr) 
+          yCurrWorkingCopy  = VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
           !tBInteger' = vectorToInteger yCurrWorkingCopy
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
         in 
-          LoopArgs position (IterArgs tAInteger tBInteger' tCInteger') residuali32Vec
+          LoopArgs p (IterArgs tAInteger tBInteger' tCInteger') ri32Vec
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_# :: IterArgs -> Int64
-nxtDgt_# inArgs@(IterArgs 0 _ _) = 0 
-nxtDgt_# inArgs@(IterArgs tA_ tB_ tC_)
+nxtDgt_# (IterArgs 0 _ _) = 0 
+nxtDgt_# (IterArgs tA_ tB_ tC_)
     -- | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## den#)) 
     | otherwise = let  
@@ -290,21 +290,21 @@ nxtDgt_# inArgs@(IterArgs tA_ tB_ tC_)
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
 computeRem_ :: IterArgs -> Int64 -> Int -> IterRes
-computeRem_ inArgs yTilde_ pos =
-  let !rTrial = calcRemainder inArgs yTilde_
-   in handleRems_ pos inArgs (IterRes yTilde_ rTrial)
+computeRem_ iArgs yTilde_ pos =
+  let !rTrial = calcRemainder iArgs yTilde_
+   in handleRems_ pos iArgs (IterRes yTilde_ rTrial)
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
 -- if it's positive and far larger in size then also the current digit rework 
 handleRems_ :: Int -> IterArgs -> IterRes -> IterRes
-handleRems_ pos inArgs inVals@(IterRes yi ri_)
+handleRems_ pos iArgs inVals@(IterRes yi ri_)
   | ri_ == 0 = inVals
   | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
-  | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder inArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder iArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | (ri_ > 0) && (pos > 0) && excessLengthBy3 = IterRes yi adjustedRemainder3 -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
-  | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder inArgs nextUpDgt1
-  | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder inArgs nextUpDgt2
+  | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder iArgs nextUpDgt1
+  | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder iArgs nextUpDgt2
   | otherwise = inVals
   where
     b = radixW32
@@ -317,12 +317,12 @@ handleRems_ pos inArgs inVals@(IterRes yi ri_)
     excessLengthBy3 = integerLogBase' b (ri_`div` fromIntegral yi) >= 3
     firstRemainderBoundCheckFail = not (isValidRemainder1 ri_ currSqrt pos)
     secondRemainderBoundCheckFail = not (isValidRemainder2 ri_ currSqrt pos)
-    !currSqrt = tC inArgs + fromIntegral yi
+    !currSqrt = tC iArgs + fromIntegral yi
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri_ `mod` modulus3
-    nextDownDgt0 = findNextDigitDown inArgs inVals pos yi 0 isValidRemainder0
-    nextUpDgt1 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder1
-    nextUpDgt2 = findNextDigitUp inArgs inVals pos yi (radixW32 - 1) isValidRemainder2
+    nextDownDgt0 = findNextDigitDown iArgs inVals pos yi 0 isValidRemainder0
+    nextUpDgt1 = findNextDigitUp iArgs inVals pos yi (radixW32 - 1) isValidRemainder1
+    nextUpDgt2 = findNextDigitUp iArgs inVals pos yi (radixW32 - 1) isValidRemainder2
 
 data IterArgs = IterArgs {tA :: Integer, tB :: Integer, tC :: Integer} deriving (Eq,Show)
 data IterRes = IterRes {yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq, Show) 
