@@ -299,12 +299,14 @@ computeRem_ iArgs yTilde_ pos# =
 -- if it's positive and far larger in size then also the current digit rework 
 handleRems_ :: Int -> IterArgs -> IterRes -> IterRes
 handleRems_ pos iArgs inVals@(IterRes yi ri_)
-  | ri_ == 0 = inVals
-  | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
+  -- | ri_ == 0 = inVals
+  -- | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
   | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder iArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | (ri_ > 0) && (pos > 0) && excessLengthBy3 = IterRes yi adjustedRemainder3 -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
-  | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder iArgs nextUpDgt1
-  | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder iArgs nextUpDgt2
+  -- //TODO even the next one seems not to be required 
+  -- | (ri_ > 0) && (pos > 0) && excessLengthBy3 = IterRes yi adjustedRemainder3 -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
+  -- //TODO why is the next two not needed ?
+  -- | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder iArgs nextUpDgt1
+  -- | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder iArgs nextUpDgt2
   | otherwise = inVals
   where
     b = radixW32
@@ -317,7 +319,7 @@ handleRems_ pos iArgs inVals@(IterRes yi ri_)
     excessLengthBy3 = integerLogBase' b (ri_`div` fromIntegral yi) >= 3
     firstRemainderBoundCheckFail = not (isValidRemainder1 ri_ currSqrt pos)
     secondRemainderBoundCheckFail = not (isValidRemainder2 ri_ currSqrt pos)
-    !currSqrt = tC iArgs + fromIntegral yi
+    currSqrt = tC iArgs + fromIntegral yi
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri_ `mod` modulus3
     nextDownDgt0 = findNextDigitDown iArgs inVals pos yi 0 isValidRemainder0
