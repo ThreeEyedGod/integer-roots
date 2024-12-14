@@ -243,14 +243,14 @@ ni__ loopVals
   | VU.null w32Vec = vectorToInteger yCurrArr
   | otherwise =
       let 
+          !l = l_ loopVals 
+          !iRem = iRem_ loopVals 
           LoopArgs !p !inA !ri32V = prepArgs l iRem w32Vec yCurrArr
           !yTilde_ = nxtDgt_# inA
           IterRes yTildeFinal remFinal = computeRem_ inA yTilde_ p
           !yCurrArrUpdated = updtSqRootVec p yTildeFinal yCurrArr
        in ni__ $ Itr (VU.force ri32V) (l-2) yCurrArrUpdated remFinal
   where 
-          !l = l_ loopVals 
-          !iRem = iRem_ loopVals 
           !w32Vec = vecW32_ loopVals 
           !yCurrArr = yCurrArr_ loopVals
 
@@ -348,22 +348,22 @@ calcRemainder :: IterArgs -> Int64 -> Integer
 calcRemainder tArgs dgt = tA tArgs - ((2 * tC tArgs * iDgt) + iDgt ^ (2 :: Int)) where iDgt = fromIntegral dgt
 
 findNextDigitUp :: IterArgs -> IterRes -> Int -> Int64 -> Int64 -> (Integer -> Integer -> Int -> Bool) -> Int64 
-findNextDigitUp inArgs inRes pos curr high checkFn
+findNextDigitUp iA inRes pos curr high checkFn
       | curr >= ceilNxtDgtUp  = ceilNxtDgtUp
       | curr > high = error "findNextDigitUp : no valid digit found (curr>high)"
       | curr == high = if checkFn (fromIntegral curr) yUpdated pos then curr - 1 else error "findNextDigitUp : no valid digit found (curr=high)"
       | otherwise = 
           let !mid = (curr + high) `div` 2 
-              !testRem = calcRemainder inArgs mid 
-              !testRoot = tC inArgs + fromIntegral mid
+              !testRem = calcRemainder iA mid 
+              !testRoot = tC iA + fromIntegral mid
           in if checkFn testRem testRoot pos then 
-              let validLower = tryRange Higher inArgs pos curr (mid-1) checkFn 
+              let validLower = tryRange Higher iA pos curr (mid-1) checkFn 
               in  fromMaybe mid validLower 
              else
-                findNextDigitUp inArgs inRes pos (mid+1) high checkFn
+                findNextDigitUp iA inRes pos (mid+1) high checkFn
     where 
             !ceilNxtDgtUp =  pred radixW32
-            !yUpdated = tC inArgs + fromIntegral curr
+            !yUpdated = tC iA + fromIntegral curr
 
 findNextDigitDown :: IterArgs -> IterRes -> Int -> Int64 -> Int64 -> (Integer -> Integer -> Int -> Bool) -> Int64
 findNextDigitDown tArgs inRes pos curr low checkFn
