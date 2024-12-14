@@ -231,8 +231,8 @@ initSqRootVec l' lsb = let
         in rootVec VU.// [(rootLength - 1, fromIntegral lsb)]
 
 {-# INLINE updtSqRootVec #-}      
-updtSqRootVec :: Int -> Int64 -> VU.Vector Word32 -> VU.Vector Word32
-updtSqRootVec position yTildeFinal yCurrArr = yCurrArr VU.// [(position, fromIntegral yTildeFinal)]
+updtSqRootVec :: Int# -> Int64 -> VU.Vector Word32 -> VU.Vector Word32
+updtSqRootVec position# yTildeFinal yCurrArr = yCurrArr VU.// [(I# position#, fromIntegral yTildeFinal)]
 
 -- | Iteration loop data 
 data Itr = Itr {vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer} deriving (Eq, Show)
@@ -247,8 +247,8 @@ ni__ loopVals
           !iRem = iRem_ loopVals 
           !(LoopArgs !p# !inA !ri32V) = prepArgs l# iRem w32Vec yCurrArr
           !yTilde_ = nxtDgt_# inA
-          IterRes yTildeFinal remFinal = computeRem_ inA yTilde_ (I# p#)
-          !yCurrArrUpdated = updtSqRootVec (I# p#) yTildeFinal yCurrArr
+          IterRes yTildeFinal remFinal = computeRem_ inA yTilde_ p#
+          !yCurrArrUpdated = updtSqRootVec p# yTildeFinal yCurrArr
        in ni__ $ Itr (VU.force ri32V) (l# -# 2#) yCurrArrUpdated remFinal
   where 
           !w32Vec = vecW32_ loopVals 
@@ -289,10 +289,10 @@ nxtDgt_# (IterArgs tA_ tB_ tC_)
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
-computeRem_ :: IterArgs -> Int64 -> Int -> IterRes
-computeRem_ iArgs yTilde_ pos =
+computeRem_ :: IterArgs -> Int64 -> Int# -> IterRes
+computeRem_ iArgs yTilde_ pos# =
   let !rTrial = calcRemainder iArgs yTilde_
-   in handleRems_ pos iArgs (IterRes yTilde_ rTrial)
+   in handleRems_ (I# pos#) iArgs (IterRes yTilde_ rTrial)
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
