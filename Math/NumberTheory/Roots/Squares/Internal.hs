@@ -247,7 +247,7 @@ ni__ loopVals
           !l# = l_ loopVals 
           !iRem = iRem_ loopVals 
           !(LoopArgs !p# !inA !ri32V) = prepArgs l# iRem w32Vec yCurrArr
-          IterRes yTildeFinal remFinal = nxtDgtRem inA p# 
+          !(IterRes !yTildeFinal !remFinal) = nxtDgtRem inA p# 
           !yCurrArrUpdated = updtSqRootVec p# yTildeFinal yCurrArr
        in ni__ $ Itr (VU.force ri32V) (l# -# 2#) yCurrArrUpdated remFinal
   where 
@@ -256,7 +256,7 @@ ni__ loopVals
 
 nxtDgtRem :: IterArgs -> Int# -> IterRes 
 nxtDgtRem iterargs p# = let 
-    yTilde_ = nxtDgt_# iterargs
+    !yTilde_ = nxtDgt_# iterargs
  in computeRem_ iterargs yTilde_ p# 
 
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs :: IterArgs, residuali32Vec :: VU.Vector Word32} deriving (Eq, Show)          
@@ -276,21 +276,38 @@ prepArgs l# iRem w32Vec yCurrArr = let
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_# :: IterArgs -> Int64
 nxtDgt_# (IterArgs 0 _ _) = 0 
-nxtDgt_# (IterArgs tA_ tB_ tC_)
-    -- | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
-    | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## den#)) 
-    | otherwise = let  
-          ![tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
-          !radFX# = tCFX# !*## tCFX# !+## tAFX#
-        in
-          hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+nxtDgt_# (IterArgs tA_ tB_ tC_) | itsOKtoUsePlainDoubleCalc = let 
+    !den# = fmaddDouble# (sqrtDouble# (nextDown# rad#)) 1.00## (nextDown# tC#) 
+ in
+     floor (nextUp $ D# (nextUp# tA# /## den#)) 
  where 
     !tA# = integerToDouble# tA_
     !tC# = integerToDouble# tC_
     !rad# = fmaddDouble# tC# tC# tA#
-    !den# = fmaddDouble# (sqrtDouble# (nextDown# rad#)) 1.00## (nextDown# tC#) 
     !(D# maxDouble#) = maxDouble
     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+nxtDgt_# (IterArgs tA_ tB_ tC_) = let  
+          ![tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
+          !radFX# = tCFX# !*## tCFX# !+## tAFX#
+        in
+          hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+{-# INLINE nxtDgt_# #-}
+
+-- nxtDgt_# (IterArgs tA_ tB_ tC_)
+--     -- | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
+--     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## den#)) 
+--     | otherwise = let  
+--           ![tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
+--           !radFX# = tCFX# !*## tCFX# !+## tAFX#
+--         in
+--           hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+--  where 
+--     !tA# = integerToDouble# tA_
+--     !tC# = integerToDouble# tC_
+--     !rad# = fmaddDouble# tC# tC# tA#
+--     !den# = fmaddDouble# (sqrtDouble# (nextDown# rad#)) 1.00## (nextDown# tC#) 
+--     !(D# maxDouble#) = maxDouble
+--     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
