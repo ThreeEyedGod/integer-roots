@@ -192,25 +192,26 @@ dgts__ n | n < 0 = error "dgts_: Invalid negative argument"
 dgts__ 0 = VU.singleton 0 
 dgts__ n = mkIW32__ n
 
+data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int}
 -- | First Iteration
 fi__ :: VU.Vector Word32 -> Itr
 fi__ vec 
   | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr VU.empty 0# VU.empty 0
   | VU.null vec = error "fi_: Invalid Argument null vector "
   | otherwise = let 
-      !((w32Vec, dxsVec'), l'@(I# l'#)) = splitVec vec 
+      !(ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = splitVec vec 
       !vInteger = intgrFromRvsrd2ElemVec dxsVec'
       !y1 = optmzedLrgstSqrtN vInteger
       !yCurrArr = initSqRootVec l' (fromIntegral y1) 
       !remInteger =  hndlOvflwW32 $ vInteger - y1 * y1
     in Itr w32Vec l'# yCurrArr remInteger
 
-splitVec :: VU.Vector Word32 -> ((VU.Vector Word32, VU.Vector Word32), Int)
+splitVec :: VU.Vector Word32 -> ProcessedVec
 splitVec vec = let 
             !l = VU.length vec 
             (headVec1, lastVec1) = VU.splitAt (l - 1) vec
             (headVec2, lastVec2) = VU.splitAt (l - 2) vec
-        in if even l then ((VU.force headVec2,VU.force lastVec2), l - 2) else ((VU.force headVec1, VU.force $ VU.snoc lastVec1 0), l - 1)
+        in if even l then ProcessedVec (VU.force headVec2) (VU.force lastVec2) (l-2) else ProcessedVec (VU.force headVec1) (VU.force $ VU.snoc lastVec1 0) (l-1)
 
 optmzedLrgstSqrtN :: Integer -> Integer 
 optmzedLrgstSqrtN i = let 
@@ -246,13 +247,17 @@ ni__ loopVals
           !l# = l_ loopVals 
           !iRem = iRem_ loopVals 
           !(LoopArgs !p# !inA !ri32V) = prepArgs l# iRem w32Vec yCurrArr
-          !yTilde_ = nxtDgt_# inA
-          IterRes yTildeFinal remFinal = computeRem_ inA yTilde_ p#
+          IterRes yTildeFinal remFinal = nxtDgtRem inA p# 
           !yCurrArrUpdated = updtSqRootVec p# yTildeFinal yCurrArr
        in ni__ $ Itr (VU.force ri32V) (l# -# 2#) yCurrArrUpdated remFinal
   where 
           !w32Vec = vecW32_ loopVals 
           !yCurrArr = yCurrArr_ loopVals
+
+nxtDgtRem :: IterArgs -> Int# -> IterRes 
+nxtDgtRem iterargs p# = let 
+    yTilde_ = nxtDgt_# iterargs
+ in computeRem_ iterargs yTilde_ p# 
 
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs :: IterArgs, residuali32Vec :: VU.Vector Word32} deriving (Eq, Show)          
 prepArgs :: Int# -> Integer -> VU.Vector Word32 -> VU.Vector Word32 -> LoopArgs
@@ -300,6 +305,7 @@ computeRem_ iArgs yTilde_ pos# =
 handleRems_ :: Int -> IterArgs -> IterRes -> IterRes
 handleRems_ pos iArgs inVals@(IterRes yi ri_)
   -- | ri_ == 0 = inVals
+  -- //TODO WHY is this next one not needed ?
   -- | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
   | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder iArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   -- //TODO even the next one seems not to be required 
@@ -322,7 +328,7 @@ handleRems_ pos iArgs inVals@(IterRes yi ri_)
     currSqrt = tC iArgs + fromIntegral yi
     modulus3 = radixW32Cubed -- b^3
     adjustedRemainder3 = ri_ `mod` modulus3
-    nextDownDgt0 = findNextDigitDown iArgs inVals pos yi 0 isValidRemainder0
+    !nextDownDgt0 = findNextDigitDown iArgs inVals pos yi 0 isValidRemainder0
     nextUpDgt1 = findNextDigitUp iArgs inVals pos yi (radixW32 - 1) isValidRemainder1
     nextUpDgt2 = findNextDigitUp iArgs inVals pos yi (radixW32 - 1) isValidRemainder2
 
