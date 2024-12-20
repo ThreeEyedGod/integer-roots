@@ -24,13 +24,11 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import qualified Data.Number.MPFR as M
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
-import Debug.Trace 
 import GHC.Prim (Word32#, int64ToWord64#, fmaddDouble#, (-#),(/##), (+##), (>=##),(**##), plusInt64#, (>##), (==##), subInt64#, gtInt64#, ltInt64#,xor64#,and64#, not64#, leInt64#, Word64#)
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import Math.NumberTheory.Logarithms (integerLog10', integerLogBase', integerLog2')
-import Numeric.Floating.IEEE (isNormal)
+import Math.NumberTheory.Logarithms (integerLog10', integerLogBase')
 import GHC.Num.Integer
     ( integerDecodeDouble#, integerShiftL#, integerFromInt,integerFromWordList,
       integerFromInt#,
@@ -38,12 +36,12 @@ import GHC.Num.Integer
       integerLog2#,
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
-import Data.FastDigits (digits, digitsUnsigned, undigits)
+import Data.FastDigits (digitsUnsigned)
 import qualified Data.Vector.Unboxed as VU (Vector,(//), slice, unsafeSlice,length, replicate, unsafeHead, cons, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList, force)
 import Data.Int (Int64)
 import Foreign.C.Types ( CLong(..) )
-import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp)
-import Data.Word (Word32, Word64)
+import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp, isNormal)
+import Data.Word (Word32)
 import GHC.Exts ((<##), (*##), Double(..), Double#, Int64#, intToInt64#, int64ToInt#)
 -- *********** END NEW IMPORTS 
 
@@ -276,38 +274,19 @@ prepArgs l# iRem w32Vec yCurrArr = let
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_# :: IterArgs -> Int64
 nxtDgt_# (IterArgs 0 _ _) = 0 
-nxtDgt_# (IterArgs tA_ tB_ tC_) | itsOKtoUsePlainDoubleCalc = let 
-    !den# = fmaddDouble# (sqrtDouble# (nextDown# rad#)) 1.00## (nextDown# tC#) 
- in
-     floor (nextUp $ D# (nextUp# tA# /## den#)) 
- where 
-    !tA# = integerToDouble# tA_
-    !tC# = integerToDouble# tC_
-    !rad# = fmaddDouble# tC# tC# tA#
-    !(D# maxDouble#) = maxDouble
-    itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
-nxtDgt_# (IterArgs tA_ tB_ tC_) = let  
-          ![tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
-          !radFX# = tCFX# !*## tCFX# !+## tAFX#
+nxtDgt_# ia@(IterArgs tA_ tB_ tC_) = let  
+          !(CoreArgs tAFX# tCFX# radFX#) = preComput ia
         in
           hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE nxtDgt_# #-}
 
--- nxtDgt_# (IterArgs tA_ tB_ tC_)
---     -- | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## nextDown# (sqrtDouble# (nextDown# rad#) +## nextDown# tC#))) 
---     | itsOKtoUsePlainDoubleCalc = floor (nextUp $ D# (nextUp# tA# /## den#)) 
---     | otherwise = let  
---           ![tAFX#, tCFX#] = normalizeFX# <$> integer2FloatingX# <$> [tA_, tC_]
---           !radFX# = tCFX# !*## tCFX# !+## tAFX#
---         in
---           hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
---  where 
---     !tA# = integerToDouble# tA_
---     !tC# = integerToDouble# tC_
---     !rad# = fmaddDouble# tC# tC# tA#
---     !den# = fmaddDouble# (sqrtDouble# (nextDown# rad#)) 1.00## (nextDown# tC#) 
---     !(D# maxDouble#) = maxDouble
---     itsOKtoUsePlainDoubleCalc = isTrue# (rad# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+data CoreArgs  = CoreArgs {tA# :: FloatingX#, tC# :: FloatingX#, rad# :: FloatingX#} deriving (Eq, Show)
+preComput :: IterArgs -> CoreArgs
+preComput ia@(IterArgs tA_ tB_ tC_) = let  
+      ![tAFX#, tCFX#] = normalizeFX# . integer2FloatingX# <$> [tA_, tC_]
+      !radFX# = tCFX# !*## tCFX# !+## tAFX#
+    in CoreArgs tAFX# tCFX# radFX#
+{-# INLINE preComput #-}    
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
@@ -468,16 +447,16 @@ intgrFromRvsrd2ElemVec v2ElemW32s =
       in fromIntegral l2 * radixW32 + fromIntegral l1
 
 radixW32 :: Integral a => a 
-radixW32 = 2 ^ finiteBitSize (0 :: Word32)
+radixW32 = 4294967296 --2 ^ finiteBitSize (0 :: Word32)
 
 secndPlaceRadix :: Integer
-secndPlaceRadix = radixW32 * radixW32
+secndPlaceRadix = 18446744073709551616 --radixW32 * radixW32
 
 radixW32Squared :: Integer
-radixW32Squared = secndPlaceRadix
+radixW32Squared = 18446744073709551616 --secndPlaceRadix
 
 radixW32Cubed :: Integer
-radixW32Cubed = secndPlaceRadix * radixW32
+radixW32Cubed = 79228162514264337593543950336 --secndPlaceRadix * radixW32
 
 -- | Custom double and its arithmetic        
 data FloatingX = FloatingX {signif :: {-# UNPACK #-}!Double, expnnt :: {-# UNPACK #-}!Int64} deriving (Eq, Show) -- ! for strict data type
@@ -779,7 +758,7 @@ split# d#  = (# s#, ex# #)
 {-# INLINE normalize #-}
 normalize :: Double -> Double 
 normalize x
-  | isNormal x = x 
+  | NFI.isNormal x = x 
   | x == 0 || isNegativeZero x = minDouble 
   | isInfinite x || isNaN x = error "normalize: Infinite or NaN "
   | isDoubleDenormalized x == 1 = x 
