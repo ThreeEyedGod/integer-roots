@@ -198,11 +198,13 @@ fi__ vec
   | VU.null vec = error "fi_: Invalid Argument null vector "
   | otherwise = let 
       !(ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = splitVec vec 
-      !vInteger = intgrFromRvsrd2ElemVec dxsVec'
-      !y1 = optmzedLrgstSqrtN vInteger
-      !yCurrArr = initSqRootVec l' (fromIntegral y1) 
-      !remInteger =  hndlOvflwW32 $ vInteger - y1 * y1
+      !(IterRes !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec') 
+      !yCurrArr = initSqRootVec l' y1
     in Itr w32Vec l'# yCurrArr remInteger
+
+{-# INLINE fstDgtRem #-}
+fstDgtRem :: Integer -> IterRes
+fstDgtRem i = let y = optmzedLrgstSqrtN i in IterRes (fromIntegral y) (hndlOvflwW32 $ i - y * y)
 
 splitVec :: VU.Vector Word32 -> ProcessedVec
 splitVec vec = let 
@@ -211,10 +213,15 @@ splitVec vec = let
             (headVec2, lastVec2) = VU.splitAt (l - 2) vec
         in if even l then ProcessedVec (VU.force headVec2) (VU.force lastVec2) (l-2) else ProcessedVec (VU.force headVec1) (VU.force $ VU.snoc lastVec1 0) (l-1)
 
+{-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer 
-optmzedLrgstSqrtN i = let 
-          !searchFrom = if i >= radixW32Squared then radixW32Squared else 0 -- heuristic
-        in hndlOvflwW32 (largestNSqLTE searchFrom i)-- overflow trap
+optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (minMax i radixW32Squared 0) i)-- overflow trap
+
+{-# INLINE minMax #-}
+{-# SPECIALIZE minMax :: Int64 -> Int64 -> Int64 -> Int64 #-}
+{-# SPECIALIZE minMax :: Integer -> Integer -> Integer -> Integer #-}
+minMax :: Integral a => a -> a -> a -> a 
+minMax i mx mi = if i >= mx then mx else mi 
 
 -- | handle overflow 
 {-# INLINE hndlOvflwW32 #-}
@@ -257,13 +264,14 @@ nxtDgtRem iterargs p# = let
     !yTilde_ = nxtDgt_# iterargs
  in computeRem_ iterargs yTilde_ p# 
 
-data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs :: IterArgs, residuali32Vec :: VU.Vector Word32} deriving (Eq, Show)          
+data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs :: !IterArgs, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq, Show)          
+{-# INLINE prepArgs #-}
 prepArgs :: Int# -> Integer -> VU.Vector Word32 -> VU.Vector Word32 -> LoopArgs
 prepArgs l# iRem w32Vec yCurrArr = let           
           !p@(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
           !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (I# l# - 2) w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
-          yCurrWorkingCopy  = VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
+          yCurrWorkingCopy  = (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) --VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
           !tBInteger' = vectorToInteger yCurrWorkingCopy
           !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
         in 
