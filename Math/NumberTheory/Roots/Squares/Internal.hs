@@ -282,19 +282,20 @@ prepArgs l# iRem w32Vec yCurrArr = let
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_# :: IterArgs -> Int64
 nxtDgt_# (IterArgs 0 _ _) = 0 
-nxtDgt_# ia@(IterArgs tA_ tB_ tC_) = let  
-          !(CoreArgs tAFX# tCFX# radFX#) = preComput ia
-        in
-          hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+nxtDgt_# ia = comput (preComput ia) 
 {-# INLINE nxtDgt_# #-}
 
-data CoreArgs  = CoreArgs {tA# :: FloatingX#, tC# :: FloatingX#, rad# :: FloatingX#} deriving (Eq, Show)
+data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq, Show)
 preComput :: IterArgs -> CoreArgs
 preComput ia@(IterArgs tA_ tB_ tC_) = let  
       ![tAFX#, tCFX#] = normalizeFX# . integer2FloatingX# <$> [tA_, tC_]
       !radFX# = tCFX# !*## tCFX# !+## tAFX#
     in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}    
+
+comput :: CoreArgs -> Int64 
+comput !(CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+{-# INLINE comput #-}    
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
