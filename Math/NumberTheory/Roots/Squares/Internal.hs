@@ -28,12 +28,13 @@ import GHC.Prim (Word32#, int64ToWord64#, fmaddDouble#, (-#),(/##), (+##), (>=##
 import Data.Maybe (fromMaybe)
 import Data.Bits (Bits (xor))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import Math.NumberTheory.Logarithms (integerLog10', integerLogBase')
 import GHC.Num.Integer
     ( integerDecodeDouble#, integerShiftL#, integerFromInt,integerFromWordList,
       integerFromInt#,
       integerShiftR#,
       integerLog2#,
+      integerLogBase#,
+      integerLogBase, 
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
 import Data.FastDigits (digitsUnsigned)
@@ -327,7 +328,7 @@ handleRems_ pos iArgs inVals@(IterRes yi ri_)
         lenCurrRemainder = 1 + integerLogBase' b ri
         lenCurrSqrt = 1 + integerLogBase' b yi
      -}
-    excessLengthBy3 = integerLogBase' b (ri_`div` fromIntegral yi) >= 3
+    excessLengthBy3 = integerLogBase b (ri_`div` fromIntegral yi) >= 3
     firstRemainderBoundCheckFail = not (isValidRemainder1 ri_ currSqrt pos)
     secondRemainderBoundCheckFail = not (isValidRemainder2 ri_ currSqrt pos)
     currSqrt = tC iArgs + fromIntegral yi
@@ -745,7 +746,7 @@ cI2D2  = cI2D2'
               | n <= maxUnsafeInteger = (n, e)
               | otherwise = go (e + shiftAmount) (n `unsafeShiftR` shiftAmount) 
               where
-                exPlus = integerLog10' n - 308 `quot` 100 -- would be dynamic (100-10)
+                exPlus = fromIntegral (integerLogBase 10 n - 308 `quot` 100) -- would be dynamic (100-10)
                 shiftAmount = max 1 exPlus
 
 
@@ -836,14 +837,14 @@ nextDown = NFI.nextDown
 nextUp# :: Double# -> Double#
 nextUp# dIn# = let 
     !d = D# dIn#
-    !(D# dOut#) = NFI.nextUp d
+    !(D# dOut#) = nextUp d
   in dOut# 
 
 {-# INLINE nextDown# #-}
 nextDown# :: Double# -> Double#
 nextDown# dIn# = let 
         !d = D# dIn#
-        !(D# dOut#) = NFI.nextDown d 
+        !(D# dOut#) = nextDown d 
     in dOut# 
 
 {-# INLINE nextUpFX #-}
