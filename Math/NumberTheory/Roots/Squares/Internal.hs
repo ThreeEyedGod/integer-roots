@@ -25,7 +25,7 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
 import GHC.Prim ((-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#)
-import Data.Bits (Bits (xor))
+-- import Data.Bits (Bits (xor))
 import qualified Data.Bits.Floating as DB (nextUp, nextDown)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.Integer
@@ -193,9 +193,9 @@ dgts__ 0 = VU.singleton 0
 dgts__ n = mkIW32__ n
 
 -- | Iteration loop data 
-data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq, Show)
+data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq, Show)
 data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq,Show)
-data IterRes = IterRes {yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq, Show) 
+data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq, Show) 
 data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq, Show)
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq, Show)          
 data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq, Show)
@@ -204,20 +204,20 @@ data Propagations = Propagations {yC :: VU.Vector Word32, tb :: FloatingX# } der
 -- | First Iteration
 fi__ :: VU.Vector Word32 -> Itr
 fi__ vec 
-  | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr 1 VU.empty 0# VU.empty 0 zero#
+  | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr 1 VU.empty 0# 0 VU.empty 0 zero#
   | VU.null vec = error "fi_: Invalid Argument null vector "
   | otherwise = let 
       !(ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = splitVec vec 
-      !(IterRes !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec') 
+      !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec') 
       !(Propagations yCurrArr tb1#) = prpgate l' y1 
-    in Itr 1 w32Vec l'# yCurrArr remInteger tb1#
+    in Itr 1 w32Vec l'# yc yCurrArr remInteger tb1#
 
 prpgate :: Int -> Int64 -> Propagations
 prpgate l' y1 = Propagations (initSqRootVec l' y1) (normalizeFX# $ integer2FloatingX# (fromIntegral y1)) 
 
 {-# INLINE fstDgtRem #-}
 fstDgtRem :: Integer -> IterRes
-fstDgtRem i = let y = optmzedLrgstSqrtN i in IterRes (fromIntegral y) (hndlOvflwW32 $ i - y * y)
+fstDgtRem i = let y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
 
 splitVec :: VU.Vector Word32 -> ProcessedVec
 splitVec vec = let 
@@ -259,7 +259,7 @@ updtSqRootVec position# yTildeFinal yCurrArr = yCurrArr VU.// [(I# position#, fr
 {-# INLINE ni__ #-}
 ni__ :: Itr -> Integer
 ni__ loopVals
-  | VU.null w32Vec = vectorToInteger yCurrArr
+  | VU.null w32Vec = yCumulative loopVals--vectorToInteger yCurrArr
   | otherwise =
       let 
           !currlen = lv loopVals
@@ -267,15 +267,14 @@ ni__ loopVals
           !iRem = iRem_ loopVals 
           !tbfx# = tb# loopVals
           !(LoopArgs !p# !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
-          !(IterRes !yTildeFinal !remFinal) = nxtDgtRem l# yCurrArr inA_ 
+          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem l# yCurrArr inA_ 
           !yCurrArrUpdated = updtSqRootVec p# yTildeFinal yCurrArr
           !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
-       in ni__ $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yCurrArrUpdated remFinal tcfx_#
+       in ni__ $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc yCurrArrUpdated remFinal tcfx_#
   where 
           !w32Vec = vecW32_ loopVals 
           !yCurrArr = yCurrArr_ loopVals
        
-
 nxtDgtRem :: Int# -> VU.Vector Word32 -> IterArgs_-> IterRes 
 nxtDgtRem l# yCArr iterargs_= let 
     !yTilde_ = nxtDgt_# iterargs_
@@ -285,7 +284,7 @@ nxtDgtRem l# yCArr iterargs_= let
 {-# INLINE prepArgs #-}
 prepArgs :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
 prepArgs l# iRem w32Vec tBFX_# = let           
-          !p@(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
+          !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
           !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (I# l# - 2) w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
           !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX_# -- sqrtF previous digits being scaled right here
@@ -318,18 +317,18 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (next
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
 computeRem_ :: Int# -> VU.Vector Word32 -> IterArgs_ -> Int64 -> IterRes
-computeRem_ l# yC iArgs_ yTilde_ = let
-      !tc = getTC l# yC
+computeRem_ l# ycVec iArgs_ yTilde_ = let
+      !tc = getTC l# ycVec
       !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_
-   in handleRems_ tc (IterRes yTilde_ rTrial)
+   in handleRems_ (IterRes tc yTilde_ rTrial)
 {-# INLINE computeRem_ #-}
 
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE getTC #-}
 getTC :: Int# -> VU.Vector Word32 -> Integer 
-getTC l# yC = let 
+getTC l# yCVec = let 
       !p = pred $ I# l# `quot` 2 -- last pair is position "0"
-      !yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yC - (p+1)) yC --weirldy this makes it slowerVU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
+      !yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yCVec - (p+1)) yCVec --weirldy this makes it slower using VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
       !tBInteger' = vectorToInteger yCurrWorkingCopy
       in  
         radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
@@ -337,10 +336,10 @@ getTC l# yC = let
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
 -- if it's positive and far larger in size then also the current digit rework 
-handleRems_ :: Integer -> IterRes -> IterRes
-handleRems_ tc inVals@(IterRes yi ri_)
-  | (ri_ < 0) && (yi > 0) = IterRes (yi-1) $ fixRemainder tc ri_ (yi-1)-- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | otherwise = inVals
+handleRems_ :: IterRes -> IterRes
+handleRems_ (IterRes yc yi ri_)
+  | (ri_ < 0) && (yi > 0) = let rdr = fixRemainder yc ri_ (yi-1) in IterRes (yc+fromIntegral yi-1) (yi-1) rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | otherwise = IterRes (yc+fromIntegral yi) yi ri_
   
 -- Calculate remainder accompanying a 'digit'
 calcRemainder :: Integer -> Integer -> Int64 -> Integer
