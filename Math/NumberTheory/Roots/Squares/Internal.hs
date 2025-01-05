@@ -9,7 +9,7 @@
 {-# LANGUAGE BangPatterns     #-}
 {-# LANGUAGE CPP              #-}
 {-# LANGUAGE MagicHash        #-}
-{-# LANGUAGE CApiFFI #-} -- addition
+-- {-# LANGUAGE CApiFFI #-} -- addition
 {-# LANGUAGE UnboxedTuples #-} -- addition
 
 
@@ -24,9 +24,9 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import qualified Data.Number.MPFR as M
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
-import GHC.Prim (Word32#, int64ToWord64#, fmaddDouble#, (-#),(/##), (+##), (>=##),(**##), plusInt64#, (>##), (==##), subInt64#, gtInt64#, ltInt64#,xor64#,and64#, not64#, leInt64#, Word64#)
-import Data.Maybe (fromMaybe)
+import GHC.Prim ((-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#)
 import Data.Bits (Bits (xor))
+import qualified Data.Bits.Floating as DB (nextUp, nextDown)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.Integer
     ( integerDecodeDouble#, integerShiftL#, integerFromInt,integerFromWordList,
@@ -36,12 +36,12 @@ import GHC.Num.Integer
       integerLogBase#,
       integerLogBase, 
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
-import GHC.Float (divideDouble, isDoubleDenormalized, integerToDouble#)
+import GHC.Float (divideDouble, isDoubleDenormalized)
 import Data.FastDigits (digitsUnsigned)
-import qualified Data.Vector.Unboxed as VU (Vector,(//), slice, unsafeSlice,length, replicate, unsafeHead, cons, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, head, toList, force)
+import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force)
 import Data.Int (Int64)
-import Foreign.C.Types ( CLong(..) )
-import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp, isNormal)
+-- import Foreign.C.Types ( CLong(..) )
+--import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp, isNormal)
 import Data.Word (Word32)
 import GHC.Exts ((<##), (*##), Double(..), Double#, Int64#, intToInt64#, int64ToInt#)
 -- *********** END NEW IMPORTS 
@@ -60,7 +60,6 @@ import GHC.Integer.Logarithms (integerLog2#)
 import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#)
 import GHC.Num.BigNat (bigNatSize#)
 import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
-import qualified Data.Monoid as VU
 #endif
 
 -- Find approximation to square root in 'Integer', then
@@ -186,22 +185,35 @@ isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 isqrtB n = fromInteger . ni__ . fi__ . dgts__ . fromIntegral $ n
 
+-- //FIXME TAKES DOWN PERFORMANCE
+{-# INLINE dgts__ #-}
 dgts__ :: Integer -> VU.Vector Word32
 dgts__ n | n < 0 = error "dgts_: Invalid negative argument"
 dgts__ 0 = VU.singleton 0 
 dgts__ n = mkIW32__ n
 
-data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int}
+-- | Iteration loop data 
+data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq, Show)
+data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq,Show)
+data IterRes = IterRes {yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq, Show) 
+data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq, Show)
+data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq, Show)          
+data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq, Show)
+data Propagations = Propagations {yC :: VU.Vector Word32, tb :: FloatingX# } deriving (Eq, Show)
+
 -- | First Iteration
 fi__ :: VU.Vector Word32 -> Itr
 fi__ vec 
-  | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr VU.empty 0# VU.empty 0
+  | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr 1 VU.empty 0# VU.empty 0 zero#
   | VU.null vec = error "fi_: Invalid Argument null vector "
   | otherwise = let 
       !(ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = splitVec vec 
       !(IterRes !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec') 
-      !yCurrArr = initSqRootVec l' y1
-    in Itr w32Vec l'# yCurrArr remInteger
+      !(Propagations yCurrArr tb1#) = prpgate l' y1 
+    in Itr 1 w32Vec l'# yCurrArr remInteger tb1#
+
+prpgate :: Int -> Int64 -> Propagations
+prpgate l' y1 = Propagations (initSqRootVec l' y1) (normalizeFX# $ integer2FloatingX# (fromIntegral y1)) 
 
 {-# INLINE fstDgtRem #-}
 fstDgtRem :: Integer -> IterRes
@@ -210,13 +222,14 @@ fstDgtRem i = let y = optmzedLrgstSqrtN i in IterRes (fromIntegral y) (hndlOvflw
 splitVec :: VU.Vector Word32 -> ProcessedVec
 splitVec vec = let 
             !l = VU.length vec 
+            -- we need the next two to be lazy-evaluated. Do not ! them
             (headVec1, lastVec1) = VU.splitAt (l - 1) vec
             (headVec2, lastVec2) = VU.splitAt (l - 2) vec
         in if even l then ProcessedVec (VU.force headVec2) (VU.force lastVec2) (l-2) else ProcessedVec (VU.force headVec1) (VU.force $ VU.snoc lastVec1 0) (l-1)
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer 
-optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (minMax i radixW32Squared 0) i)-- overflow trap
+optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (minMax i radixW32Squared 0) i) -- overflow trap
 
 {-# INLINE minMax #-}
 {-# SPECIALIZE minMax :: Int64 -> Int64 -> Int64 -> Int64 #-}
@@ -241,177 +254,103 @@ initSqRootVec l' lsb = let
 updtSqRootVec :: Int# -> Int64 -> VU.Vector Word32 -> VU.Vector Word32
 updtSqRootVec position# yTildeFinal yCurrArr = yCurrArr VU.// [(I# position#, fromIntegral yTildeFinal)]
 
--- | Iteration loop data 
-data Itr = Itr {vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer} deriving (Eq, Show)
-
 -- | Next Iterations till array empties out
+-- //FIXME TAKES DOWN PERFORMANCE
+{-# INLINE ni__ #-}
 ni__ :: Itr -> Integer
 ni__ loopVals
   | VU.null w32Vec = vectorToInteger yCurrArr
   | otherwise =
       let 
+          !currlen = lv loopVals
           !l# = l_ loopVals 
           !iRem = iRem_ loopVals 
-          !(LoopArgs !p# !inA !ri32V) = prepArgs l# iRem w32Vec yCurrArr
-          !(IterRes !yTildeFinal !remFinal) = nxtDgtRem inA p# 
+          !tbfx# = tb# loopVals
+          !(LoopArgs !p# !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
+          !(IterRes !yTildeFinal !remFinal) = nxtDgtRem l# yCurrArr inA_ 
           !yCurrArrUpdated = updtSqRootVec p# yTildeFinal yCurrArr
-       in ni__ $ Itr (VU.force ri32V) (l# -# 2#) yCurrArrUpdated remFinal
+          !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
+       in ni__ $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yCurrArrUpdated remFinal tcfx_#
   where 
           !w32Vec = vecW32_ loopVals 
           !yCurrArr = yCurrArr_ loopVals
+       
 
-nxtDgtRem :: IterArgs -> Int# -> IterRes 
-nxtDgtRem iterargs p# = let 
-    !yTilde_ = nxtDgt_# iterargs
- in computeRem_ iterargs yTilde_ p# 
+nxtDgtRem :: Int# -> VU.Vector Word32 -> IterArgs_-> IterRes 
+nxtDgtRem l# yCArr iterargs_= let 
+    !yTilde_ = nxtDgt_# iterargs_
+ in computeRem_ l# yCArr iterargs_ yTilde_ 
+{-# INLINE nxtDgtRem #-}
 
-data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs :: !IterArgs, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq, Show)          
 {-# INLINE prepArgs #-}
-prepArgs :: Int# -> Integer -> VU.Vector Word32 -> VU.Vector Word32 -> LoopArgs
-prepArgs l# iRem w32Vec yCurrArr = let           
+prepArgs :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
+prepArgs l# iRem w32Vec tBFX_# = let           
           !p@(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
           !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (I# l# - 2) w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
-          yCurrWorkingCopy  = (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) --VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
-          !tBInteger' = vectorToInteger yCurrWorkingCopy
-          !tCInteger' = radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
+          !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX_# -- sqrtF previous digits being scaled right here
         in 
-          LoopArgs p# (IterArgs tAInteger tBInteger' tCInteger') ri32Vec
+          LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
+
+scaleByPower2 :: Int64# -> FloatingX# -> FloatingX#
+scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
+{-# INLINE scaleByPower2 #-}
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
-nxtDgt_# :: IterArgs -> Int64
-nxtDgt_# (IterArgs 0 _ _) = 0 
-nxtDgt_# ia = comput (preComput ia) 
+nxtDgt_# :: IterArgs_ -> Int64
+nxtDgt_# (IterArgs_ 0 _) = 0 
+nxtDgt_# iax = comput (preComput iax) 
 {-# INLINE nxtDgt_# #-}
 
-data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq, Show)
-preComput :: IterArgs -> CoreArgs
-preComput ia@(IterArgs tA_ tB_ tC_) = let  
-      ![tAFX#, tCFX#] = normalizeFX# . integer2FloatingX# <$> [tA_, tC_]
+preComput :: IterArgs_ -> CoreArgs
+preComput (IterArgs_ tA__ tCFX#) = let  
+      !tAFX# = normalizeFX# (integer2FloatingX# tA__) 
       !radFX# = tCFX# !*## tCFX# !+## tAFX#
     in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}    
 
 comput :: CoreArgs -> Int64 
-comput !(CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE comput #-}    
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
-computeRem_ :: IterArgs -> Int64 -> Int# -> IterRes
-computeRem_ iArgs yTilde_ pos# =
-  let !rTrial = calcRemainder iArgs yTilde_
-   in handleRems_ (I# pos#) iArgs (IterRes yTilde_ rTrial)
+computeRem_ :: Int# -> VU.Vector Word32 -> IterArgs_ -> Int64 -> IterRes
+computeRem_ l# yC iArgs_ yTilde_ = let
+      !tc = getTC l# yC
+      !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_
+   in handleRems_ tc (IterRes yTilde_ rTrial)
+{-# INLINE computeRem_ #-}
+
+-- //FIXME TAKES DOWN PERFORMANCE
+{-# INLINE getTC #-}
+getTC :: Int# -> VU.Vector Word32 -> Integer 
+getTC l# yC = let 
+      !p = pred $ I# l# `quot` 2 -- last pair is position "0"
+      !yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yC - (p+1)) yC --weirldy this makes it slowerVU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
+      !tBInteger' = vectorToInteger yCurrWorkingCopy
+      in  
+        radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
 -- if it's positive and far larger in size then also the current digit rework 
-handleRems_ :: Int -> IterArgs -> IterRes -> IterRes
-handleRems_ pos iArgs inVals@(IterRes yi ri_)
-  -- | ri_ == 0 = inVals
-  -- //TODO WHY is this next one not needed ?
-  -- | (ri_ > 0) && noExcessLength = inVals -- all ok just continue no need for any other check if pos =0 then this check is not useful
-  | (ri_ < 0) && (yi > 0) = IterRes nextDownDgt0 $ calcRemainder iArgs nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  -- //TODO even the next one seems not to be required 
-  -- | (ri_ > 0) && (pos > 0) && excessLengthBy3 = IterRes yi adjustedRemainder3 -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
-  -- //TODO why is the next two not needed ?
-  -- | (ri_ > 0) && firstRemainderBoundCheckFail = IterRes nextUpDgt1 $ calcRemainder iArgs nextUpDgt1
-  -- | (ri_ > 0) && secondRemainderBoundCheckFail = IterRes nextUpDgt2 $ calcRemainder iArgs nextUpDgt2
+handleRems_ :: Integer -> IterRes -> IterRes
+handleRems_ tc inVals@(IterRes yi ri_)
+  | (ri_ < 0) && (yi > 0) = IterRes (yi-1) $ fixRemainder tc ri_ (yi-1)-- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = inVals
-  where
-    b = radixW32
-    riCurrSqrtRatio = ri_ `quot` currSqrt
-    noExcessLength = riCurrSqrtRatio < 2 -- quick escape all good
-    {-  excessLengthBy3 = lenCurrRemainder >= lenCurrSqrt + 3
-        lenCurrRemainder = 1 + integerLogBase' b ri
-        lenCurrSqrt = 1 + integerLogBase' b yi
-     -}
-    excessLengthBy3 = integerLogBase b (ri_`div` fromIntegral yi) >= 3
-    firstRemainderBoundCheckFail = not (isValidRemainder1 ri_ currSqrt pos)
-    secondRemainderBoundCheckFail = not (isValidRemainder2 ri_ currSqrt pos)
-    currSqrt = tC iArgs + fromIntegral yi
-    modulus3 = radixW32Cubed -- b^3
-    adjustedRemainder3 = ri_ `mod` modulus3
-    !nextDownDgt0 = findNextDigitDown iArgs inVals pos yi 0 isValidRemainder0
-    nextUpDgt1 = findNextDigitUp iArgs inVals pos yi (radixW32 - 1) isValidRemainder1
-    nextUpDgt2 = findNextDigitUp iArgs inVals pos yi (radixW32 - 1) isValidRemainder2
-
-data IterArgs = IterArgs {tA :: Integer, tB :: Integer, tC :: Integer} deriving (Eq,Show)
-data IterRes = IterRes {yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq, Show) 
-
--- Helper function to calculate remainder bounds
-calcMaxAllowed :: Integer -> Int -> Integer
-calcMaxAllowed currentSqrt pos = 2 * currentSqrt * (radixW32 ^ pos) + radixW32 ^ (2 * pos)
-
-altBoundAllowed :: Integer -> Int -> Integer 
-altBoundAllowed currentroot pos = 2 * currentroot * radixW32^(pos+1) --radixW32^(pos+1) -- remainder < 2 ^ (p + 32)   r < 2 aB ^ (p + 1)
-
-isValidRemainder0 :: Integer -> Integer -> Int -> Bool 
-isValidRemainder0 rem0 _ _ = rem0 >= 0 
-
-isValidRemainder1 :: Integer -> Integer -> Int -> Bool 
-isValidRemainder1 rem1 currentroot pos = rem1 < calcMaxAllowed currentroot pos
-
-isValidRemainder2 :: Integer -> Integer -> Int -> Bool
-isValidRemainder2 rem2 currentroot pos = rem2 < altBoundAllowed currentroot pos
-
+  
 -- Calculate remainder accompanying a 'digit'
-calcRemainder :: IterArgs -> Int64 -> Integer
-calcRemainder tArgs dgt = tA tArgs - ((2 * tC tArgs * iDgt) + iDgt ^ (2 :: Int)) where iDgt = fromIntegral dgt
+calcRemainder :: Integer -> Integer -> Int64 -> Integer
+calcRemainder tAI tc dgt =  tAI - ((2 * fromIntegral dgt * tc) + fromIntegral dgt * fromIntegral dgt)
 
-findNextDigitUp :: IterArgs -> IterRes -> Int -> Int64 -> Int64 -> (Integer -> Integer -> Int -> Bool) -> Int64 
-findNextDigitUp iA inRes pos curr high checkFn
-      | curr >= ceilNxtDgtUp  = ceilNxtDgtUp
-      | curr > high = error "findNextDigitUp : no valid digit found (curr>high)"
-      | curr == high = if checkFn (fromIntegral curr) yUpdated pos then curr - 1 else error "findNextDigitUp : no valid digit found (curr=high)"
-      | otherwise = 
-          let !mid = (curr + high) `div` 2 
-              !testRem = calcRemainder iA mid 
-              !testRoot = tC iA + fromIntegral mid
-          in if checkFn testRem testRoot pos then 
-              let validLower = tryRange Higher iA pos curr (mid-1) checkFn 
-              in  fromMaybe mid validLower 
-             else
-                findNextDigitUp iA inRes pos (mid+1) high checkFn
-    where 
-            !ceilNxtDgtUp =  pred radixW32
-            !yUpdated = tC iA + fromIntegral curr
+-- Fix remainder accompanying a 'next downed digit'
+fixRemainder :: Integer -> Integer -> Int64 -> Integer
+fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 
-findNextDigitDown :: IterArgs -> IterRes -> Int -> Int64 -> Int64 -> (Integer -> Integer -> Int -> Bool) -> Int64
-findNextDigitDown tArgs inRes pos curr low checkFn
-  | curr < low = error "findNextDigitDown : no valid digit found (curr<low) "
-  | curr == low = if checkFn (fromIntegral curr) yUpdated pos then curr else error "findNextDigitDown : no valid digit found (curr=low) "
-  | curr == yi = if checkFn (fromIntegral yi-1) yUpdated pos then yi-1 else findNextDigitDown tArgs inRes pos (yi - 2) low checkFn
-  | otherwise =
-      let !mid = (low + curr ) `div` 2
-          !testRem = calcRemainder tArgs mid
-          !testRoot = tC tArgs + fromIntegral mid 
-       in if checkFn testRem testRoot pos
-            then
-              let !validHigher = tryRange Lower tArgs pos (mid+1) curr checkFn 
-               in fromMaybe mid validHigher 
-            else
-              findNextDigitDown tArgs inRes pos (mid - 1) low checkFn
-  where
-    !yUpdated = tC tArgs + fromIntegral curr 
-    !yi = yTilde inRes 
-
-data RangeSearch =  Lower | Higher deriving Eq 
-tryRange :: RangeSearch -> IterArgs -> Int -> Int64 -> Int64 -> (Integer -> Integer -> Int -> Bool )  -> Maybe Int64     
-tryRange rS tArgs pos lowr highr checkFn 
-      | lowr > highr = Nothing
-      | otherwise =
-          let !mid = (lowr + highr) `div` 2
-              !testRm = calcRemainder tArgs mid
-              !testRt = tC tArgs + fromIntegral mid 
-           in if checkFn testRm testRt pos
-                then Just mid 
-                else if rS == Lower then tryRange Lower tArgs pos lowr (mid - 1) checkFn else tryRange Higher tArgs pos (mid + 1) highr checkFn
-
--- | helper functions
-
+-- -- | helper functions
 
 {-# INLINE mkIW32__ #-}
 -- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
@@ -427,6 +366,9 @@ wrd2wrd32 :: [Word] -> [Word32]
 wrd2wrd32 xs = fromIntegral <$> xs
     
 
+-- | Convert a vector of Word32 values to an Integer with base 2^32 (radixW32).
+-- This function takes a vector of Word32 values, where each element represents a digit in base 2^32,
+-- and combines them to form a single Integer.
 {-# INLINE vectorToInteger #-}
 -- Function to convert a vector of Word32 values to an Integer with base 2^32 (radixw32)
 vectorToInteger :: VU.Vector Word32 -> Integer
@@ -444,16 +386,14 @@ largestNSqLTE bot n = bbin bot (n + 1)
             else bbin m b
       where
         !m = (a + b) `div` 2
-{-# INLINE intgrFromRvsrd2ElemVec #-}
 
+{-# INLINE intgrFromRvsrd2ElemVec #-}
 -- | Integer from a "reversed" list of Word32 digits
 intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer
 intgrFromRvsrd2ElemVec v2ElemW32s =
   let (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of
         (Just u, Just v) -> (fst u, snd v)
-        (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector"
-        -- (Nothing, _) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
-        -- (_, Nothing) -> error "intgrFromRvsrd2ElemVec : Empty Vector"
+        (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector" -- (Nothing, _) and (_, Nothing)
       in fromIntegral l2 * radixW32 + fromIntegral l1
 
 radixW32 :: Integral a => a 
@@ -473,26 +413,15 @@ data FloatingX = FloatingX {signif :: {-# UNPACK #-}!Double, expnnt :: {-# UNPAC
 -- | Custom double "unboxed" and its arithmetic
 data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-}!Double#, expnnt# :: {-# UNPACK #-}!Int64#} deriving (Eq, Show) -- ! for strict data type
 
-{-# INLINE floorX #-}
-{-# SPECIALIZE floorX :: FloatingX -> Integer #-}
-floorX :: Integral a => FloatingX -> a
-floorX (FloatingX s e) = case fx2Double (FloatingX s e) of
-  Just d -> floor d
-  _ -> fromIntegral $ toLong s (fromIntegral e)
-
 {-# INLINE floorX# #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}
 floorX# :: (Integral a) => FloatingX# -> a
 floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) e) of
     Just d -> floor d
-    _ -> fromIntegral $ toLong (D# s#) (fromIntegral e)
+    _ -> error "floorX#: fx2Double resulted in Nothing  " --fromIntegral $ toLong (D# s#) (fromIntegral e)
   where 
     e = fromIntegral (I# $ int64ToInt# e#)
 
-zero :: FloatingX
-zero = FloatingX 0.0 (minBound :: Int64)
-minValue :: FloatingX
-minValue = FloatingX 1.0 0
 zero# :: FloatingX#
 zero# = FloatingX# 0.0## minBound64# 
     where 
@@ -503,18 +432,6 @@ minValue# = FloatingX# 1.0## zero64#
     where 
         !(I# zeroInt#) = fromIntegral (0 :: Int64) 
         !zero64# = intToInt64# zeroInt#
-
-{-# INLINE (!+) #-}
-(!+) :: FloatingX -> FloatingX -> FloatingX
-(!+) x y = x `add` y
-
-{-# INLINE (!*) #-}
-(!*) :: FloatingX -> FloatingX -> FloatingX
-(!*) x y = x `mul` y
-
-{-# INLINE (!/) #-}
-(!/) :: FloatingX -> FloatingX -> FloatingX
-(!/) x y = x `divide` y
 
 {-# INLINE (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
@@ -527,25 +444,6 @@ minValue# = FloatingX# 1.0## zero64#
 {-# INLINE (!/##) #-}
 (!/##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!/##) x y = x `divide#` y
-
-
-{-# INLINE add #-}
-add :: FloatingX -> FloatingX -> FloatingX
-add (FloatingX 0.0 _) x = x
-add x (FloatingX 0.0 _) = x
-add a@(FloatingX signifA@(D# sA#) expA) b@(FloatingX signifB@(D# sB#) expB)
-  | expA > expB = combine a b
-  | expA < expB = combine b a
-  | otherwise = FloatingX (D# (sA# +## sB#)) expA --FloatingX (signifA + signifB) expA
-  where
-    combine big@(FloatingX signifBig@(D# sBig#) expBig) little@(FloatingX signifLittle@(D# sLittle#) expLittle) =
-      let !scale = expLittle - expBig
-          !scaleD@(D# scaleD#) = fromIntegral scale :: Double
-          !scaledLittle# = sLittle# *## (2.00## **## scaleD#)
-          !resSignif# = sBig# +## scaledLittle#
-       in if isTrue# (resSignif# >=## 2.0##) 
-            then FloatingX (D# (resSignif# /## 2.0##)) (expBig + 1)
-            else FloatingX (D# resSignif#) expBig
 
 {-# INLINE add# #-}
 add# :: FloatingX# -> FloatingX# -> FloatingX#
@@ -565,20 +463,6 @@ add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
             then FloatingX# (resSignif# /## 2.0##) (expBig# `plusInt64#` intToInt64# 1#)
             else FloatingX# resSignif# expBig#
 
-
-{-# INLINE mul #-}
-mul :: FloatingX -> FloatingX -> FloatingX
-mul (FloatingX 0.0 _) _ = zero
-mul _ (FloatingX 0.0 _) = zero
-mul (FloatingX 1.0 0) b = b
-mul a (FloatingX 1.0 0) = a
-mul (FloatingX signifA@(D# sA#) expA) (FloatingX signifB@(D# sB#) expB) =
-  let !resExp = expA + expB
-      !resSignif# = sA# *## sB#
-   in if isTrue# (resSignif# >=## 2.0##)
-        then FloatingX (D# (resSignif# /## 2.0##)) (resExp + 1)
-        else FloatingX (D# resSignif#) resExp
-
 {-# INLINE mul# #-}
 mul# :: FloatingX# -> FloatingX# -> FloatingX#
 -- mul# (FloatingX# 1.0## 0#) b = b
@@ -594,23 +478,6 @@ mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
           in if isTrue# (resSignif# >=## 2.0##)
                 then FloatingX# (resSignif# /## 2.0##) (resExp# `plusInt64#` intToInt64# 1#)
                 else FloatingX# resSignif# resExp#
-
-{-# INLINE divide #-}
-divide :: FloatingX -> FloatingX -> FloatingX
-divide n@(FloatingX s1@(D# s1#) e1) d@(FloatingX s2@(D# s2#) e2)
-    | d == FloatingX 1.0 0 = n 
-    | s1 == 0.0 = zero
-    | s2 == 0.0 = error "divide: error divide by zero " 
-    | otherwise = 
-        let !resExp = e1 - e2
-            !resSignif# = s1# /## s2#
-            !(finalSignif, finalExp) = if isTrue# (resSignif# <## 1.0##)
-                                      then (D# $ resSignif# *## 2.0##, resExp - 1)
-                                      else (D# resSignif#, resExp)
-        -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
-        in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (isTrue# (resSignif# <## 1.0##) && resExp <= 0 )
-           then zero
-           else FloatingX finalSignif finalExp
 
 {-# INLINE divide# #-}
 divide# :: FloatingX# -> FloatingX# -> FloatingX#
@@ -632,11 +499,6 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
         in if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) 
            then zero#
            else FloatingX# finalSignif# finalExp#
-
-{-# INLINE sqrtFX #-}
-sqrtFX :: FloatingX -> FloatingX
-sqrtFX (FloatingX s e)  = FloatingX sX eX where 
-    !(sX, eX) = sqrtSplitDbl (FloatingX s e) 
 
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
@@ -661,14 +523,14 @@ sqrtDX d
   | isNaN d = 0
   | isInfinite d = maxDouble
   | d == 1 = 1
-  | otherwise = sqrtC d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
+  | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 
 -- sqrtDoublehmpfr :: Double -> Double
 -- sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
 
-foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrt_fsqrt" sqrt_fsqrt :: Double -> Double
-foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
-foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h toLong" toLong :: Double -> CLong -> CLong
+-- foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrt_fsqrt" sqrt_fsqrt :: Double -> Double
+-- foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
+-- foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h toLong" toLong :: Double -> CLong -> CLong
 
 fx2Double :: FloatingX -> Maybe Double
 fx2Double (FloatingX d@(D# d#) e)
@@ -685,12 +547,6 @@ fx2Double (FloatingX d@(D# d#) e)
         !ex = I# n# + fromIntegral e 
 {-# INLINEABLE fx2Double #-}
 
-    
-{-# INLINE double2FloatingX #-}
-double2FloatingX :: Double -> FloatingX
-double2FloatingX d = let 
-   !(s, e) = split d 
-  in FloatingX s e
 
 {-# INLINE double2FloatingX# #-}
 double2FloatingX# :: Double -> FloatingX#
@@ -702,20 +558,6 @@ double2FloatingX# d = let
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991.
-{-# INLINE integer2FloatingX #-}
-integer2FloatingX :: Integer -> FloatingX
-integer2FloatingX i
-  | i == 0 = zero
-  | i < 0 = error "integer2FloatingX : invalid negative argument"
-  | itsOKtoUsePlainDoubleCalc =  double2FloatingX (fromIntegral i) 
-  | otherwise =  let 
-      !(i_, e_) = cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-      !s = fromIntegral i_
-    in FloatingX s (fromIntegral e_)
-  where
-    !(D# maxDouble#) = maxDouble
-    !(D# iDouble#) = fromIntegral i 
-    itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
 {-# INLINE integer2FloatingX# #-}
 integer2FloatingX# :: Integer -> FloatingX#
@@ -749,7 +591,6 @@ cI2D2  = cI2D2'
                 exPlus = fromIntegral (integerLogBase 10 n - 308 `quot` 100) -- would be dynamic (100-10)
                 shiftAmount = max 1 exPlus
 
-
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
 split d  = (fromIntegral s, fromIntegral $ I# expInt#) where 
@@ -768,7 +609,7 @@ split# d#  = (# s#, ex# #)
 {-# INLINE normalize #-}
 normalize :: Double -> Double 
 normalize x
-  | NFI.isNormal x = x 
+  -- | NFI.isNormal x = x 
   | x == 0 || isNegativeZero x = minDouble 
   | isInfinite x || isNaN x = error "normalize: Infinite or NaN "
   | isDoubleDenormalized x == 1 = x 
@@ -789,13 +630,6 @@ normalize x
           | m' >= fromIntegral n' = go (m' / fromIntegral n') (e' + 1) n'
           | m' < 1 = go (m' * fromIntegral n') (e' - 1) n'
           | otherwise = (m', e')
-
-{-# INLINE normalizeFX #-}
-normalizeFX :: FloatingX -> FloatingX
-normalizeFX (FloatingX d ex) = FloatingX s (ex + e)
-  where
-    nd = normalize d
-    (s, e) = split nd
 
 {-# INLINE normalizeFX# #-}
 normalizeFX# :: FloatingX# -> FloatingX#
@@ -827,11 +661,11 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 -- | Floating Point rounding/nextup funxctions 
 {-# INLINE nextUp #-}
 nextUp :: Double -> Double
-nextUp = NFI.nextUp
+nextUp = DB.nextUp --NFI.nextUp
 
 {-# INLINE nextDown #-}
 nextDown :: Double -> Double
-nextDown = NFI.nextDown
+nextDown = DB.nextDown --NFI.nextDown
 
 {-# INLINE nextUp# #-}
 nextUp# :: Double# -> Double#
@@ -847,15 +681,6 @@ nextDown# dIn# = let
         !(D# dOut#) = nextDown d 
     in dOut# 
 
-{-# INLINE nextUpFX #-}
-nextUpFX :: FloatingX -> FloatingX
-nextUpFX (FloatingX s e)
-  | s == 0.0 = minValue
-  | otherwise = let 
-     !interimS = nextUp s
-    in
-      if interimS >= 2.0 then FloatingX (interimS / 2) (e + 1) else FloatingX interimS e
-
 {-# INLINE nextUpFX# #-}
 nextUpFX# :: FloatingX# -> FloatingX#
 nextUpFX# (FloatingX# s# e#)
@@ -864,15 +689,6 @@ nextUpFX# (FloatingX# s# e#)
      !interimS# = nextUp# s#
     in
       if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` intToInt64# 1#) else FloatingX# interimS# e#
-
-{-# INLINE nextDownFX #-}
-nextDownFX :: FloatingX -> FloatingX
-nextDownFX x@(FloatingX s e)
-  | s == 0.0 || x == minValue = zero
-  | otherwise = let 
-      !interimS = nextDown s
-     in 
-        if interimS < 1.0 then FloatingX (interimS * 2) (e - 1) else FloatingX interimS e
 
 {-# INLINE nextDownFX# #-}
 nextDownFX# :: FloatingX# -> FloatingX#

@@ -23,11 +23,12 @@ source-repository head
 
 library
   build-depends:
-    base >=4.9 && <5
-   ,fp-ieee >= 0.1.0.4 
-   ,vector>=0.13.2.0
-   ,fast-digits>=0.3.2.0
-   ,ghc-prim>=0.11.0
+    base >= 4.9 && <5
+   --,fp-ieee >= 0.1.0.4 
+   ,vector >= 0.13.2.0
+   ,fast-digits >= 0.3.2.0
+   ,ghc-prim >= 0.11.0
+   ,floating-bits >= 0.3.1.0
   --  ,hmpfr
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
@@ -48,9 +49,9 @@ library
   ghc-options: -Wall -Widentities -fspec-constr -fllvm -XBangPatterns -fexcess-precision -optc-O3 -optc-ffast-math -threaded -funfolding-use-threshold=256 -O2 -fspecialise -fllvm
   -- ghc-options: -Wall -O2 -Widentities -Wcompat -mfma -optc-target -optcarm64-apple-macos14.5 -optc-mmacosx-version-min=14.5 -funfolding-use-threshold=16 -O2 -fexcess-precision -optc-O3 -optc-ffast-math -no-recomp -optc-static -optc-lamath -optc-DINTEGER32 -optc-larmpl_lp64 -threaded -optc-DAPPLE -optc-DWORST -optc-DNO_FLOAT128 -optc-DNO_OPENMP -optc-DFOO=$f -optc-DUSE_DOUBLE -optc-O3 -optc-lmpfr -optc-lgmp -optc-lm
   -- these following are additions to the fork  
-  c-sources: Math/c/fsqrt.c 
-  include-dirs:/opt/homebrew/Cellar/gcc/14.2.0/include 
-  extra-lib-dirs:/opt/homebrew/Cellar/gcc/14.2.0/lib
+  -- c-sources: Math/c/fsqrt.c 
+  -- include-dirs:/opt/homebrew/Cellar/gcc/14.2.0/include 
+  -- extra-lib-dirs:/opt/homebrew/Cellar/gcc/14.2.0/lib
 
 test-suite integer-roots-tests
   build-depends:
@@ -79,7 +80,7 @@ executable roots-exe
   main-is:             Main.hs
   build-depends:       base
                      , integer-roots
-                     , time >= 1.12.2 && < 1.13
+                    --  , time >= 1.12.2 && < 1.13
 
   default-language:    Haskell2010
   ghc-options:         -Wall
