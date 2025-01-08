@@ -12,7 +12,6 @@
 -- {-# LANGUAGE CApiFFI #-} -- addition
 {-# LANGUAGE UnboxedTuples #-} -- addition
 
-
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
   , isqrtA
@@ -24,7 +23,7 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import qualified Data.Number.MPFR as M
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
-import GHC.Prim ((-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#)
+import GHC.Prim ((+#), (-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#)
 -- import Data.Bits (Bits (xor))
 import qualified Data.Bits.Floating as DB (nextUp, nextDown)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
@@ -60,6 +59,7 @@ import GHC.Integer.Logarithms (integerLog2#)
 import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#)
 import GHC.Num.BigNat (bigNatSize#)
 import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
+import Control.Applicative (Alternative(empty))
 #endif
 
 -- Find approximation to square root in 'Integer', then
@@ -88,8 +88,9 @@ heron n a = go (step a)
 -- Find a fairly good approximation to the square root.
 -- At most one off for small Integers, about 48 bits should be correct
 -- for large Integers.
+data Switch = Switch Integer Integer deriving (Eq, Show)
 appSqrt :: Integer -> Integer
-appSqrt (IS i#) = IS (double2Int# (sqrtDouble# (int2Double# i#)))
+appSqrt n@(IS i#) = IS (double2Int# (sqrtDouble# (int2Double# i#)))
 appSqrt n@(IP bn#)
     | isTrue# ((bigNatSize# bn#) <# thresh#) =
           floor (sqrt $ fromInteger n :: Double)
@@ -190,7 +191,13 @@ isqrtB n = fromInteger . ni__ . fi__ . dgts__ . fromIntegral $ n
 dgts__ :: Integer -> VU.Vector Word32
 dgts__ n | n < 0 = error "dgts_: Invalid negative argument"
 dgts__ 0 = VU.singleton 0 
-dgts__ n = mkIW32__ n
+dgts__ n = mkIW32__ n radixW32
+
+{-# INLINE dgts10 #-}
+dgts10 :: Integer -> [Word]
+dgts10 n | n < 0 = error "dgts_: Invalid negative argument"
+dgts10 0 = [0]
+dgts10 n = digitsUnsigned 10 (fromIntegral n)
 
 -- | Iteration loop data 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq, Show)
@@ -201,6 +208,7 @@ data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs
 data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq, Show)
 data Propagations = Propagations {yC :: VU.Vector Word32, tb :: FloatingX# } deriving (Eq, Show)
 
+
 -- | First Iteration
 fi__ :: VU.Vector Word32 -> Itr
 fi__ vec 
@@ -208,8 +216,9 @@ fi__ vec
   | VU.null vec = error "fi_: Invalid Argument null vector "
   | otherwise = let 
       !(ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = splitVec vec 
-      !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec') 
+      !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
       !(Propagations yCurrArr tb1#) = prpgate l' y1 
+      _ = VU.force dxsVec' -- // TODO MAYBE THIS HELPS?
     in Itr 1 w32Vec l'# yc yCurrArr remInteger tb1#
 
 prpgate :: Int -> Int64 -> Propagations
@@ -267,18 +276,18 @@ ni__ loopVals
           !iRem = iRem_ loopVals 
           !tbfx# = tb# loopVals
           !(LoopArgs !p# !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
-          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem l# yCurrArr inA_ 
-          !yCurrArrUpdated = updtSqRootVec p# yTildeFinal yCurrArr
+          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem (yCumulative loopVals) l# yCurrArr inA_ 
+          !yCurrArrUpdated = updtSqRootVec p# yTildeFinal yCurrArr -- //FIXME not needed anymore ?
           !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
        in ni__ $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc yCurrArrUpdated remFinal tcfx_#
   where 
           !w32Vec = vecW32_ loopVals 
           !yCurrArr = yCurrArr_ loopVals
        
-nxtDgtRem :: Int# -> VU.Vector Word32 -> IterArgs_-> IterRes 
-nxtDgtRem l# yCArr iterargs_= let 
+nxtDgtRem :: Integer -> Int# -> VU.Vector Word32 -> IterArgs_-> IterRes 
+nxtDgtRem yCum l# yCArr iterargs_= let 
     !yTilde_ = nxtDgt_# iterargs_
- in computeRem_ l# yCArr iterargs_ yTilde_ 
+ in computeRem_ yCum l# yCArr iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
 
 {-# INLINE prepArgs #-}
@@ -286,7 +295,8 @@ prepArgs :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
 prepArgs l# iRem w32Vec tBFX_# = let           
           !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
           !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (I# l# - 2) w32Vec
-          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec)
+          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec) radixW32
+          _ = VU.force nxtTwoDgtsVec -- // TODO MAYBE THIS HELPS?
           !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX_# -- sqrtF previous digits being scaled right here
         in 
           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
@@ -316,20 +326,20 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (next
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
-computeRem_ :: Int# -> VU.Vector Word32 -> IterArgs_ -> Int64 -> IterRes
-computeRem_ l# ycVec iArgs_ yTilde_ = let
-      !tc = getTC l# ycVec
+computeRem_ :: Integer -> Int# -> VU.Vector Word32 -> IterArgs_ -> Int64 -> IterRes
+computeRem_ yC l# ycVec iArgs_ yTilde_ = let
+      !tc = getTC l# yC ycVec
       !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_
    in handleRems_ (IterRes tc yTilde_ rTrial)
 {-# INLINE computeRem_ #-}
 
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE getTC #-}
-getTC :: Int# -> VU.Vector Word32 -> Integer 
-getTC l# yCVec = let 
-      !p = pred $ I# l# `quot` 2 -- last pair is position "0"
-      !yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yCVec - (p+1)) yCVec --weirldy this makes it slower using VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
-      !tBInteger' = vectorToInteger yCurrWorkingCopy
+getTC :: Int# -> Integer -> VU.Vector Word32 -> Integer 
+getTC l# yC yCVec = let 
+      p = pred $ I# l# `quot` 2 -- last pair is position "0"
+      yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yCVec - (p+1)) yCVec --weirldy this makes it slower using VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
+      !tBInteger' = yC --vectorToInteger yCurrWorkingCopy
       in  
         radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
 
@@ -353,10 +363,9 @@ fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 
 {-# INLINE mkIW32__ #-}
 -- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
-mkIW32__ :: Integer -> VU.Vector Word32
-mkIW32__ 0 = VU.singleton 0 -- safety
-mkIW32__ i = let
-    !b = radixW32 :: Word
+mkIW32__ :: Integer -> Word -> VU.Vector Word32
+mkIW32__ 0 _ = VU.singleton 0 -- safety
+mkIW32__ i b = let
     !n = fromInteger i  
    in VU.fromList $ wrd2wrd32 (digitsUnsigned b n)
 
@@ -388,12 +397,12 @@ largestNSqLTE bot n = bbin bot (n + 1)
 
 {-# INLINE intgrFromRvsrd2ElemVec #-}
 -- | Integer from a "reversed" list of Word32 digits
-intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer
-intgrFromRvsrd2ElemVec v2ElemW32s =
+intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer -> Integer
+intgrFromRvsrd2ElemVec v2ElemW32s base =
   let (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of
         (Just u, Just v) -> (fst u, snd v)
         (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector" -- (Nothing, _) and (_, Nothing)
-      in fromIntegral l2 * radixW32 + fromIntegral l1
+      in fromIntegral l2 * base + fromIntegral l1
 
 radixW32 :: Integral a => a 
 radixW32 = 4294967296 --2 ^ finiteBitSize (0 :: Word32)
@@ -408,7 +417,7 @@ radixW32Cubed :: Integer
 radixW32Cubed = 79228162514264337593543950336 --secndPlaceRadix * radixW32
 
 -- | Custom double and its arithmetic        
-data FloatingX = FloatingX {signif :: {-# UNPACK #-}!Double, expnnt :: {-# UNPACK #-}!Int64} deriving (Eq, Show) -- ! for strict data type
+data FloatingX = FloatingX !Double !Int64 deriving (Eq, Show) -- ! for strict data type
 -- | Custom double "unboxed" and its arithmetic
 data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-}!Double#, expnnt# :: {-# UNPACK #-}!Int64#} deriving (Eq, Show) -- ! for strict data type
 
