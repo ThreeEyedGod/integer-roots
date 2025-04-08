@@ -5,7 +5,7 @@
 -- Maintainer:  Andrew Lelechenko <andrew.lelechenko@gmail.com>
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
-
+--{-# OPTIONS -ddump-simpl -ddump-to-file #-}
 {-# LANGUAGE BangPatterns     #-}
 {-# LANGUAGE CPP              #-}
 {-# LANGUAGE MagicHash        #-}
@@ -36,7 +36,7 @@ import GHC.Num.Integer
       integerLogBase, 
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized)
-import Data.FastDigits (digitsUnsigned)
+import Data.FastDigits (digitsUnsigned, digits, undigits)
 import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force)
 import Data.Int (Int64)
 -- import Foreign.C.Types ( CLong(..) )
@@ -60,6 +60,7 @@ import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#)
 import GHC.Num.BigNat (bigNatSize#)
 import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
 import Control.Applicative (Alternative(empty))
+import Data.Vector (create, convert)
 #endif
 
 -- Find approximation to square root in 'Integer', then
@@ -184,21 +185,21 @@ double x = x `unsafeShiftL` 1
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
-isqrtB n = fromInteger . ni__ . fi__ . dgts__ . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterations . fi__ . dgts__ . fromIntegral $ n
 
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE dgts__ #-}
 dgts__ :: Integer -> VU.Vector Word32
 dgts__ n | n < 0 = error "dgts_: Invalid negative argument"
 dgts__ 0 = VU.singleton 0 
-dgts__ n = mkIW32__ n radixW32
+dgts__ n = mkIW32Vec n radixW32
 
-{-# INLINE dgts10 #-}
-dgts10 :: Integer -> [Word]
-dgts10 n | n < 0 = error "dgts_: Invalid negative argument"
-dgts10 0 = [0]
-dgts10 n = digitsUnsigned 10 (fromIntegral n)
-
+{-# INLINE dgts___ #-}
+dgts___ :: Integer -> JITDigits
+dgts___ n | n < 0 = error "dgts_: Invalid negative argument"
+dgts___ 0 = JITDigits [0] 0 0
+dgts___ n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 radixW32 (iToWrdListBase n 10)) in JITDigits evLst n l
+      
 -- | Iteration loop data 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq, Show)
 data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq,Show)
@@ -207,20 +208,24 @@ data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !Floa
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq, Show)          
 data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq, Show)
 data Propagations = Propagations {yC :: VU.Vector Word32, tb :: FloatingX# } deriving (Eq, Show)
+data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq, Show)
 
+preFI ::  VU.Vector Word32 -> ProcessedVec
+preFI v  
+  | VU.null v = error "preFI: Invalid Argument null vector "
+  | VU.length v == 1 && VU.unsafeHead v == 0 = ProcessedVec VU.empty VU.empty 0
+  | otherwise = splitVec v
 
--- | First Iteration
-fi__ :: VU.Vector Word32 -> Itr
-fi__ vec 
-  | VU.length vec == 1 && VU.unsafeHead vec == 0 = Itr 1 VU.empty 0# 0 VU.empty 0 zero#
-  | VU.null vec = error "fi_: Invalid Argument null vector "
-  | otherwise = let 
-      !(ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = splitVec vec 
+theFI :: ProcessedVec -> Itr
+theFI (ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = let 
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
       !(Propagations yCurrArr tb1#) = prpgate l' y1 
       _ = VU.force dxsVec' -- // TODO MAYBE THIS HELPS?
     in Itr 1 w32Vec l'# yc yCurrArr remInteger tb1#
 
+fi__ :: VU.Vector Word32 -> Itr
+fi__ = theFI . preFI
+  
 prpgate :: Int -> Int64 -> Propagations
 prpgate l' y1 = Propagations (initSqRootVec l' y1) (normalizeFX# $ integer2FloatingX# (fromIntegral y1)) 
 
@@ -263,27 +268,19 @@ initSqRootVec l' lsb = let
 updtSqRootVec :: Int# -> Int64 -> VU.Vector Word32 -> VU.Vector Word32
 updtSqRootVec position# yTildeFinal yCurrArr = yCurrArr VU.// [(I# position#, fromIntegral yTildeFinal)]
 
--- | Next Iterations till array empties out
 -- //FIXME TAKES DOWN PERFORMANCE
-{-# INLINE ni__ #-}
-ni__ :: Itr -> Integer
-ni__ loopVals
-  | VU.null w32Vec = yCumulative loopVals--vectorToInteger yCurrArr
+{-# INLINE theNextIterations #-}
+theNextIterations :: Itr -> Integer
+theNextIterations (Itr currlen w32Vec l# yCumulated yCurrArr iRem tbfx#) 
+  | VU.null w32Vec = yCumulated --vectorToInteger yCurrArr
   | otherwise =
       let 
-          !currlen = lv loopVals
-          !l# = l_ loopVals 
-          !iRem = iRem_ loopVals 
-          !tbfx# = tb# loopVals
           !(LoopArgs !p# !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
-          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem (yCumulative loopVals) l# yCurrArr inA_ 
+          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated l# yCurrArr inA_ 
           !yCurrArrUpdated = updtSqRootVec p# yTildeFinal yCurrArr -- //FIXME not needed anymore ?
           !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
-       in ni__ $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc yCurrArrUpdated remFinal tcfx_#
-  where 
-          !w32Vec = vecW32_ loopVals 
-          !yCurrArr = yCurrArr_ loopVals
-       
+       in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc yCurrArrUpdated remFinal tcfx_#
+
 nxtDgtRem :: Integer -> Int# -> VU.Vector Word32 -> IterArgs_-> IterRes 
 nxtDgtRem yCum l# yCArr iterargs_= let 
     !yTilde_ = nxtDgt_# iterargs_
@@ -338,7 +335,7 @@ computeRem_ yC l# ycVec iArgs_ yTilde_ = let
 getTC :: Int# -> Integer -> VU.Vector Word32 -> Integer 
 getTC l# yC yCVec = let 
       p = pred $ I# l# `quot` 2 -- last pair is position "0"
-      yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yCVec - (p+1)) yCVec --weirldy this makes it slower using VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
+      -- yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yCVec - (p+1)) yCVec --weirldy this makes it slower using VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
       !tBInteger' = yC --vectorToInteger yCurrWorkingCopy
       in  
         radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
@@ -359,20 +356,44 @@ calcRemainder tAI tc dgt =  tAI - ((2 * fromIntegral dgt * tc) + fromIntegral dg
 fixRemainder :: Integer -> Integer -> Int64 -> Integer
 fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 
+------------------------------------------------------------------------
 -- -- | helper functions
 
-{-# INLINE mkIW32__ #-}
+{-# INLINE mkIW32Vec #-}
 -- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
-mkIW32__ :: Integer -> Word -> VU.Vector Word32
-mkIW32__ 0 _ = VU.singleton 0 -- safety
-mkIW32__ i b = let
-    !n = fromInteger i  
-   in VU.fromList $ wrd2wrd32 (digitsUnsigned b n)
+mkIW32Vec :: Integer -> Word -> VU.Vector Word32
+mkIW32Vec 0 _ = VU.singleton 0 -- safety
+mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
+
+{-# INLINE mkIW32Lst #-}
+-- spit out the Word32 List from digitsUnsigned which comes in reversed format.
+mkIW32Lst :: Integer -> Word -> [Word32]
+mkIW32Lst 0 _ = [0]-- safety
+mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b) 
 
 {-# INLINE wrd2wrd32 #-}
 wrd2wrd32 :: [Word] -> [Word32]
 wrd2wrd32 xs = fromIntegral <$> xs
     
+iToWrdListBase :: Integer -> Word -> [Word]
+iToWrdListBase 0 _ = [0]
+iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reversed format
+
+evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
+evenizeLstRvrsdDgts [] = ([0], 1)
+evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++ [0], succ l)
+
+dripFeed2DigitsW32 :: JITDigits -> Int -> Word -> JITDigits
+dripFeed2DigitsW32 (JITDigits _ 0 _) _ _ = JITDigits [0] 0 0 
+dripFeed2DigitsW32 (JITDigits dg n rl) c b = let 
+        rl_ = if rl == 0 then 1 + integerLogBase 10 n else fromIntegral rl
+        dvsor  = 10^(rl_ - fromIntegral c)
+        (i,rsdual) = n `quotRem` dvsor 
+    in JITDigits (mkIW32Lst i b) rsdual (fromIntegral rl_- 2) 
+    
+convertBase :: Word -> Word -> [Word] -> [Word]
+convertBase _ _ [] = []
+convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs) 
 
 -- | Convert a vector of Word32 values to an Integer with base 2^32 (radixW32).
 -- This function takes a vector of Word32 values, where each element represents a digit in base 2^32,
