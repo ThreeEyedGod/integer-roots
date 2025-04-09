@@ -201,7 +201,7 @@ dgts___ 0 = JITDigits [0] 0 0
 dgts___ n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 radixW32 (iToWrdListBase n 10)) in JITDigits evLst n l
       
 -- | Iteration loop data 
-data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, yCurrArr_ :: {-# UNPACK #-} !(VU.Vector Word32), iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq, Show)
+data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq, Show)
 data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq,Show)
 data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq, Show) 
 data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq, Show)
@@ -220,8 +220,8 @@ theFI :: ProcessedVec -> Itr
 theFI (ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = let 
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
       !(Propagations yCurrArr tb1#) = prpgate l' y1 
-      _ = VU.force dxsVec' -- // TODO MAYBE THIS HELPS?
-    in Itr 1 w32Vec l'# yc yCurrArr remInteger tb1#
+      --_ = VU.force dxsVec' -- // TODO MAYBE THIS HELPS?
+    in Itr 1 w32Vec l'# yc remInteger tb1#
 
 fi__ :: VU.Vector Word32 -> Itr
 fi__ = theFI . preFI
@@ -233,6 +233,7 @@ prpgate l' y1 = Propagations (initSqRootVec l' y1) (normalizeFX# $ integer2Float
 fstDgtRem :: Integer -> IterRes
 fstDgtRem i = let y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
 
+{-# INLINE splitVec #-}        
 splitVec :: VU.Vector Word32 -> ProcessedVec
 splitVec vec = let 
             !l = VU.length vec 
@@ -271,36 +272,48 @@ updtSqRootVec position# yTildeFinal yCurrArr = yCurrArr VU.// [(I# position#, fr
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE theNextIterations #-}
 theNextIterations :: Itr -> Integer
-theNextIterations (Itr currlen w32Vec l# yCumulated yCurrArr iRem tbfx#) 
+theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#) 
   | VU.null w32Vec = yCumulated --vectorToInteger yCurrArr
   | otherwise =
       let 
           !(LoopArgs !p# !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
-          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated l# yCurrArr inA_ 
-          !yCurrArrUpdated = updtSqRootVec p# yTildeFinal yCurrArr -- //FIXME not needed anymore ?
+          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated l# inA_ 
           !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
-       in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc yCurrArrUpdated remFinal tcfx_#
+       in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal tcfx_#
 
-nxtDgtRem :: Integer -> Int# -> VU.Vector Word32 -> IterArgs_-> IterRes 
-nxtDgtRem yCum l# yCArr iterargs_= let 
+nxtDgtRem :: Integer -> Int# -> IterArgs_-> IterRes 
+nxtDgtRem yCum l# iterargs_= let 
     !yTilde_ = nxtDgt_# iterargs_
- in computeRem_ yCum l# yCArr iterargs_ yTilde_ 
+ in computeRem_ yCum l# iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
+
+{-# INLINE prepA #-}
+prepA :: Int# -> VU.Vector Word32 -> (Int, (VU.Vector Word32, VU.Vector Word32))
+prepA l# w32Vec = let 
+          !p = pred $ I# l# `quot` 2 -- last pair is position "0"
+          !fr = VU.splitAt (I# l# - 2) w32Vec
+        in (p, fr)
+
 
 {-# INLINE prepArgs #-}
 prepArgs :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
 prepArgs l# iRem w32Vec tBFX_# = let           
-          !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
-          !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (I# l# - 2) w32Vec
+          !(I# p#, (ri32Vec, nxtTwoDgtsVec)) = prepA l# w32Vec
           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec) radixW32
-          _ = VU.force nxtTwoDgtsVec -- // TODO MAYBE THIS HELPS?
+          --_ = VU.force nxtTwoDgtsVec -- // TODO MAYBE THIS HELPS?
           !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX_# -- sqrtF previous digits being scaled right here
         in 
           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
 
-scaleByPower2 :: Int64# -> FloatingX# -> FloatingX#
-scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
-{-# INLINE scaleByPower2 #-}
+-- prepArgs :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
+-- prepArgs l# iRem w32Vec tBFX_# = let           
+--           !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
+--           !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (I# l# - 2) w32Vec
+--           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec) radixW32
+--           --_ = VU.force nxtTwoDgtsVec -- // TODO MAYBE THIS HELPS?
+--           !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX_# -- sqrtF previous digits being scaled right here
+--         in 
+--           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
@@ -323,17 +336,17 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (next
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
-computeRem_ :: Integer -> Int# -> VU.Vector Word32 -> IterArgs_ -> Int64 -> IterRes
-computeRem_ yC l# ycVec iArgs_ yTilde_ = let
-      !tc = getTC l# yC ycVec
+computeRem_ :: Integer -> Int# -> IterArgs_ -> Int64 -> IterRes
+computeRem_ yC l# iArgs_ yTilde_ = let
+      !tc = getTC l# yC
       !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_
    in handleRems_ (IterRes tc yTilde_ rTrial)
 {-# INLINE computeRem_ #-}
 
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE getTC #-}
-getTC :: Int# -> Integer -> VU.Vector Word32 -> Integer 
-getTC l# yC yCVec = let 
+getTC :: Int# -> Integer -> Integer 
+getTC l# yC = let 
       p = pred $ I# l# `quot` 2 -- last pair is position "0"
       -- yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yCVec - (p+1)) yCVec --weirldy this makes it slower using VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
       !tBInteger' = yC --vectorToInteger yCurrWorkingCopy
@@ -358,6 +371,10 @@ fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 
 ------------------------------------------------------------------------
 -- -- | helper functions
+
+scaleByPower2 :: Int64# -> FloatingX# -> FloatingX#
+scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
+{-# INLINE scaleByPower2 #-}
 
 {-# INLINE mkIW32Vec #-}
 -- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
