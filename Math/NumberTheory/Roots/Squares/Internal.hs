@@ -207,7 +207,6 @@ data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: I
 data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq, Show)
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq, Show)          
 data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq, Show)
-data Propagations = Propagations {tb :: FloatingX# } deriving (Eq, Show)
 data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq, Show)
 
 preFI ::  VU.Vector Word32 -> ProcessedVec
@@ -226,9 +225,6 @@ theFI (ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = let
 fi__ :: VU.Vector Word32 -> Itr
 fi__ = theFI . preFI
   
-prpgate :: Int64 -> Propagations
-prpgate y1 = Propagations (normalizeFX# $ integer2FloatingX# (fromIntegral y1)) 
-
 {-# INLINE fstDgtRem #-}
 fstDgtRem :: Integer -> IterRes
 fstDgtRem i = let y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
@@ -245,18 +241,6 @@ splitVec vec = let
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer 
 optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (minMax i radixW32Squared 0) i) -- overflow trap
-
-{-# INLINE minMax #-}
-{-# SPECIALIZE minMax :: Int64 -> Int64 -> Int64 -> Int64 #-}
-{-# SPECIALIZE minMax :: Integer -> Integer -> Integer -> Integer #-}
-minMax :: Integral a => a -> a -> a -> a 
-minMax i mx mi = if i >= mx then mx else mi 
-
--- | handle overflow 
-{-# INLINE hndlOvflwW32 #-}
-{-# SPECIALIZE hndlOvflwW32 :: Int64 -> Int64 #-}
-hndlOvflwW32 :: Integral a => a -> a 
-hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 {-# INLINE initSqRootVec #-}
 initSqRootVec :: Int -> Int64 -> VU.Vector Word32        
@@ -333,16 +317,16 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (next
 -- that happens in handleRems_
 computeRem_ :: Integer -> Int# -> IterArgs_ -> Int64 -> IterRes
 computeRem_ yC l# iArgs_ yTilde_ = let
-      !tc = getTC l# yC
+      !tc = getTC yC
       !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_
    in handleRems_ (IterRes tc yTilde_ rTrial)
 {-# INLINE computeRem_ #-}
 
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE getTC #-}
-getTC :: Int# -> Integer -> Integer 
-getTC l# yC = let 
-      p = pred $ I# l# `quot` 2 -- last pair is position "0"
+getTC :: Integer -> Integer 
+getTC yC = let 
+      --p = pred $ I# l# `quot` 2 -- last pair is position "0"
       -- yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yCVec - (p+1)) yCVec --weirldy this makes it slower using VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
       !tBInteger' = yC --vectorToInteger yCurrWorkingCopy
       in  
@@ -366,6 +350,18 @@ fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 
 ------------------------------------------------------------------------
 -- -- | helper functions
+
+{-# INLINE minMax #-}
+{-# SPECIALIZE minMax :: Int64 -> Int64 -> Int64 -> Int64 #-}
+{-# SPECIALIZE minMax :: Integer -> Integer -> Integer -> Integer #-}
+minMax :: Integral a => a -> a -> a -> a 
+minMax i mx mi = if i >= mx then mx else mi 
+
+-- | handle overflow 
+{-# INLINE hndlOvflwW32 #-}
+{-# SPECIALIZE hndlOvflwW32 :: Int64 -> Int64 #-}
+hndlOvflwW32 :: Integral a => a -> a 
+hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 scaleByPower2 :: Int64# -> FloatingX# -> FloatingX#
 scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
