@@ -282,9 +282,9 @@ theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#)
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal tcfx_#
 
 nxtDgtRem :: Integer -> Int# -> IterArgs_-> IterRes 
-nxtDgtRem yCum l# iterargs_= let 
+nxtDgtRem yCumulat l# iterargs_= let 
     !yTilde_ = nxtDgt_# iterargs_
- in computeRem_ yCum l# iterargs_ yTilde_ 
+ in computeRem_ yCumulat l# iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
 
 {-# INLINE prepA #-}
@@ -294,26 +294,21 @@ prepA l# w32Vec = let
           !fr = VU.splitAt (I# l# - 2) w32Vec
         in (p, fr)
 
+prepB :: Integer -> FloatingX# -> VU.Vector Word32 -> (Integer, FloatingX#)
+prepB iRem tBFX# nxtTwoDgtsVec = let 
+          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec) radixW32
+          !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX# -- sqrtF previous digits being scaled right here
+          --_ = VU.force nxtTwoDgtsVec -- // TODO MAYBE THIS HELPS?
+        in (tAInteger, tCFX_#)
+{-# INLINE prepB #-} 
 
 {-# INLINE prepArgs #-}
 prepArgs :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
 prepArgs l# iRem w32Vec tBFX_# = let           
           !(I# p#, (ri32Vec, nxtTwoDgtsVec)) = prepA l# w32Vec
-          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec) radixW32
-          --_ = VU.force nxtTwoDgtsVec -- // TODO MAYBE THIS HELPS?
-          !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX_# -- sqrtF previous digits being scaled right here
+          !(tAInteger, tCFX_#) = prepB iRem tBFX_# nxtTwoDgtsVec
         in 
           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
-
--- prepArgs :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
--- prepArgs l# iRem w32Vec tBFX_# = let           
---           !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
---           !(ri32Vec, nxtTwoDgtsVec) = VU.splitAt (I# l# - 2) w32Vec
---           !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec) radixW32
---           --_ = VU.force nxtTwoDgtsVec -- // TODO MAYBE THIS HELPS?
---           !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX_# -- sqrtF previous digits being scaled right here
---         in 
---           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
