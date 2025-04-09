@@ -260,13 +260,13 @@ theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#)
   | VU.null w32Vec = yCumulated --vectorToInteger yCurrArr
   | otherwise =
       let 
-          !(LoopArgs !p# !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
-          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated l# inA_ 
+          !(LoopArgs _ !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
+          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ 
           !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal tcfx_#
 
-nxtDgtRem :: Integer -> Int# -> IterArgs_-> IterRes 
-nxtDgtRem yCumulat l# iterargs_= let 
+nxtDgtRem :: Integer -> IterArgs_-> IterRes 
+nxtDgtRem yCumulat iterargs_= let 
     !yTilde_ = nxtDgt_# iterargs_
  in computeRem_ yCumulat iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
