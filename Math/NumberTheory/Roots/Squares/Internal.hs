@@ -207,7 +207,7 @@ data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: I
 data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq, Show)
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq, Show)          
 data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq, Show)
-data Propagations = Propagations {yC :: VU.Vector Word32, tb :: FloatingX# } deriving (Eq, Show)
+data Propagations = Propagations {tb :: FloatingX# } deriving (Eq, Show)
 data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq, Show)
 
 preFI ::  VU.Vector Word32 -> ProcessedVec
@@ -219,15 +219,15 @@ preFI v
 theFI :: ProcessedVec -> Itr
 theFI (ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = let 
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
-      !(Propagations yCurrArr tb1#) = prpgate l' y1 
+      !tb1# = normalizeFX# $ integer2FloatingX# (fromIntegral y1)
       --_ = VU.force dxsVec' -- // TODO MAYBE THIS HELPS?
     in Itr 1 w32Vec l'# yc remInteger tb1#
 
 fi__ :: VU.Vector Word32 -> Itr
 fi__ = theFI . preFI
   
-prpgate :: Int -> Int64 -> Propagations
-prpgate l' y1 = Propagations (initSqRootVec l' y1) (normalizeFX# $ integer2FloatingX# (fromIntegral y1)) 
+prpgate :: Int64 -> Propagations
+prpgate y1 = Propagations (normalizeFX# $ integer2FloatingX# (fromIntegral y1)) 
 
 {-# INLINE fstDgtRem #-}
 fstDgtRem :: Integer -> IterRes
