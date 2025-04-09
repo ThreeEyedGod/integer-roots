@@ -268,7 +268,7 @@ theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#)
 nxtDgtRem :: Integer -> Int# -> IterArgs_-> IterRes 
 nxtDgtRem yCumulat l# iterargs_= let 
     !yTilde_ = nxtDgt_# iterargs_
- in computeRem_ yCumulat l# iterargs_ yTilde_ 
+ in computeRem_ yCumulat iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
 
 {-# INLINE prepA #-}
@@ -315,22 +315,12 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (next
 
 -- | compute the remainder. It may be that the "digit" may need to be reworked
 -- that happens in handleRems_
-computeRem_ :: Integer -> Int# -> IterArgs_ -> Int64 -> IterRes
-computeRem_ yC l# iArgs_ yTilde_ = let
-      !tc = getTC yC
+computeRem_ :: Integer -> IterArgs_ -> Int64 -> IterRes
+computeRem_ yC iArgs_ yTilde_ = let
+      !tc = radixW32 * yC --getTC yC
       !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_
    in handleRems_ (IterRes tc yTilde_ rTrial)
 {-# INLINE computeRem_ #-}
-
--- //FIXME TAKES DOWN PERFORMANCE
-{-# INLINE getTC #-}
-getTC :: Integer -> Integer 
-getTC yC = let 
-      --p = pred $ I# l# `quot` 2 -- last pair is position "0"
-      -- yCurrWorkingCopy  =  VU.unsafeSlice (p+1) (VU.length yCVec - (p+1)) yCVec --weirldy this makes it slower using VU.force (VU.unsafeSlice (p+1) (VU.length yCurrArr - (p+1)) yCurrArr) 
-      !tBInteger' = yC --vectorToInteger yCurrWorkingCopy
-      in  
-        radixW32 * tBInteger' -- sqrtF previous digits being scaled right here
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework 
