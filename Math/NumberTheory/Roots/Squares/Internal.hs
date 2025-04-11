@@ -11,6 +11,7 @@
 {-# LANGUAGE MagicHash        #-}
 -- {-# LANGUAGE CApiFFI #-} -- addition
 {-# LANGUAGE UnboxedTuples #-} -- addition
+{-# LANGUAGE LinearTypes #-} -- addition
 
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
@@ -185,20 +186,7 @@ double x = x `unsafeShiftL` 1
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
-isqrtB n = fromInteger . theNextIterations . fi__ . dgts__ . fromIntegral $ n
-
--- //FIXME TAKES DOWN PERFORMANCE
-{-# INLINE dgts__ #-}
-dgts__ :: Integer -> VU.Vector Word32
-dgts__ n | n < 0 = error "dgts_: Invalid negative argument"
-dgts__ 0 = VU.singleton 0 
-dgts__ n = mkIW32Vec n radixW32
-
-{-# INLINE dgts___ #-}
-dgts___ :: Integer -> JITDigits
-dgts___ n | n < 0 = error "dgts_: Invalid negative argument"
-dgts___ 0 = JITDigits [0] 0 0
-dgts___ n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 radixW32 (iToWrdListBase n 10)) in JITDigits evLst n l
+isqrtB n = fromInteger . theNextIterations . fi . dgtsVecBase32__ . fromIntegral $ n
       
 -- | Iteration loop data 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq, Show)
@@ -207,7 +195,6 @@ data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: I
 data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq, Show)
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq, Show)          
 data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq, Show)
-data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq, Show)
 
 preFI ::  VU.Vector Word32 -> ProcessedVec
 preFI v  
@@ -222,36 +209,21 @@ theFI (ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = let
       --_ = VU.force dxsVec' -- // TODO MAYBE THIS HELPS?
     in Itr 1 w32Vec l'# yc remInteger tb1#
 
-fi__ :: VU.Vector Word32 -> Itr
-fi__ = theFI . preFI
-  
+fi :: VU.Vector Word32 -> Itr
+fi = theFI . preFI
+
 {-# INLINE fstDgtRem #-}
 fstDgtRem :: Integer -> IterRes
 fstDgtRem i = let y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
 
 {-# INLINE splitVec #-}        
+-- | also evenizes the vector of digits
 splitVec :: VU.Vector Word32 -> ProcessedVec
 splitVec vec = let 
             !l = VU.length vec 
-            -- we need the next two to be lazy-evaluated. Do not ! them
-            (headVec1, lastVec1) = VU.splitAt (l - 1) vec
-            (headVec2, lastVec2) = VU.splitAt (l - 2) vec
-        in if even l then ProcessedVec (VU.force headVec2) (VU.force lastVec2) (l-2) else ProcessedVec (VU.force headVec1) (VU.force $ VU.snoc lastVec1 0) (l-1)
-
-{-# INLINE optmzedLrgstSqrtN #-}
-optmzedLrgstSqrtN :: Integer -> Integer 
-optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (minMax i radixW32Squared 0) i) -- overflow trap
-
-{-# INLINE initSqRootVec #-}
-initSqRootVec :: Int -> Int64 -> VU.Vector Word32        
-initSqRootVec l' lsb = let 
-          !rootLength  = (l' + 2) `quot` 2 
-          !rootVec = VU.replicate rootLength 0 
-        in rootVec VU.// [(rootLength - 1, fromIntegral lsb)]
-
-{-# INLINE updtSqRootVec #-}      
-updtSqRootVec :: Int# -> Int64 -> VU.Vector Word32 -> VU.Vector Word32
-updtSqRootVec position# yTildeFinal yCurrArr = yCurrArr VU.// [(I# position#, fromIntegral yTildeFinal)]
+            (headVec1, lastVec1) = brkVec vec (l-1)
+            (headVec2, lastVec2) = brkVec vec (l-2)
+        in if even l then ProcessedVec headVec2 lastVec2 (l-2) else ProcessedVec headVec1 (VU.force $ VU.snoc lastVec1 0) (l-1)
 
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE theNextIterations #-}
@@ -261,10 +233,11 @@ theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#)
   | otherwise =
       let 
           !(LoopArgs _ !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
-          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ 
+          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
           !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal tcfx_#
 
+-- | core of computations. Dealing with just numbers from this point on
 nxtDgtRem :: Integer -> IterArgs_-> IterRes 
 nxtDgtRem yCumulat iterargs_= let 
     !yTilde_ = nxtDgt_# iterargs_
@@ -275,7 +248,7 @@ nxtDgtRem yCumulat iterargs_= let
 prepA :: Int# -> VU.Vector Word32 -> (Int, (VU.Vector Word32, VU.Vector Word32))
 prepA l# w32Vec = let 
           !p = pred $ I# l# `quot` 2 -- last pair is position "0"
-          !fr = VU.splitAt (I# l# - 2) w32Vec
+          !fr = brkVec w32Vec (I# l# - 2)
         in (p, fr)
 
 prepB :: Integer -> FloatingX# -> VU.Vector Word32 -> (Integer, FloatingX#)
@@ -317,7 +290,7 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (next
 -- that happens in handleRems_
 computeRem_ :: Integer -> IterArgs_ -> Int64 -> IterRes
 computeRem_ yC iArgs_ yTilde_ = let
-      !tc = radixW32 * yC --getTC yC
+      !tc = radixW32 * yC 
       !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_
    in handleRems_ (IterRes tc yTilde_ rTrial)
 {-# INLINE computeRem_ #-}
@@ -329,17 +302,41 @@ handleRems_ :: IterRes -> IterRes
 handleRems_ (IterRes yc yi ri_)
   | (ri_ < 0) && (yi > 0) = let rdr = fixRemainder yc ri_ (yi-1) in IterRes (yc+fromIntegral yi-1) (yi-1) rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = IterRes (yc+fromIntegral yi) yi ri_
+{-# INLINE handleRems_ #-}
   
 -- Calculate remainder accompanying a 'digit'
 calcRemainder :: Integer -> Integer -> Int64 -> Integer
 calcRemainder tAI tc dgt =  tAI - ((2 * fromIntegral dgt * tc) + fromIntegral dgt * fromIntegral dgt)
+{-# INLINE calcRemainder #-}
 
 -- Fix remainder accompanying a 'next downed digit'
 fixRemainder :: Integer -> Integer -> Int64 -> Integer
 fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
+{-# INLINE fixRemainder #-}
 
 ------------------------------------------------------------------------
 -- -- | helper functions
+
+-- //FIXME TAKES DOWN PERFORMANCE
+{-# INLINE dgtsVecBase32__ #-}
+dgtsVecBase32__ :: Integer -> VU.Vector Word32
+dgtsVecBase32__ n | n < 0 = error "dgts_: Invalid negative argument"
+dgtsVecBase32__ 0 = VU.singleton 0 
+dgtsVecBase32__ n = mkIW32Vec n radixW32
+
+{-# INLINE dgtsLst #-}
+dgtsLst :: Integer -> JITDigits
+dgtsLst n | n < 0 = error "dgts_: Invalid negative argument"
+dgtsLst 0 = JITDigits [0] 0 0
+dgtsLst n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 radixW32 (iToWrdListBase n 10)) in JITDigits evLst n l
+
+brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
+brkVec v loc = let (hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
+{-# INLINE brkVec #-}
+
+{-# INLINE optmzedLrgstSqrtN #-}
+optmzedLrgstSqrtN :: Integer -> Integer 
+optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (minMax i radixW32Squared 0) i) -- overflow trap
 
 {-# INLINE minMax #-}
 {-# SPECIALIZE minMax :: Int64 -> Int64 -> Int64 -> Int64 #-}
@@ -381,6 +378,9 @@ evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
 evenizeLstRvrsdDgts [] = ([0], 1)
 evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++ [0], succ l)
 
+-- c: It controls how many digits are extracted from n in the current iteration.
+-- c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.
+data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq, Show)
 dripFeed2DigitsW32 :: JITDigits -> Int -> Word -> JITDigits
 dripFeed2DigitsW32 (JITDigits _ 0 _) _ _ = JITDigits [0] 0 0 
 dripFeed2DigitsW32 (JITDigits dg n rl) c b = let 
@@ -435,7 +435,7 @@ radixW32Squared = 18446744073709551616 --secndPlaceRadix
 radixW32Cubed :: Integer
 radixW32Cubed = 79228162514264337593543950336 --secndPlaceRadix * radixW32
 
--- | Custom double and its arithmetic        
+-- | Custom  and its arithmetic        
 data FloatingX = FloatingX !Double !Int64 deriving (Eq, Show) -- ! for strict data type
 -- | Custom double "unboxed" and its arithmetic
 data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-}!Double#, expnnt# :: {-# UNPACK #-}!Int64#} deriving (Eq, Show) -- ! for strict data type
