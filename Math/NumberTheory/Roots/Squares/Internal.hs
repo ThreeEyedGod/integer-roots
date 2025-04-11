@@ -38,7 +38,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized)
 import Data.FastDigits (digitsUnsigned, digits, undigits)
-import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force)
+import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast)
 import Data.Int (Int64)
 -- import Foreign.C.Types ( CLong(..) )
 --import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp, isNormal)
@@ -232,7 +232,8 @@ theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#)
   | VU.null w32Vec = yCumulated --vectorToInteger yCurrArr
   | otherwise =
       let 
-          !(LoopArgs _ !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
+          -- !(LoopArgs _ !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
+          !(LoopArgs _ !inA_ !ri32V ) = prepArgs' l# iRem w32Vec tbfx# 
           !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
           !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal tcfx_#
@@ -259,11 +260,34 @@ prepB iRem tBFX# nxtTwoDgtsVec = let
         in (tAInteger, tCFX_#)
 {-# INLINE prepB #-} 
 
+{-# INLINE prepA' #-}
+prepA' :: Int# -> VU.Vector Word32 -> (Int, (VU.Vector Word32, (Word32, Word32)))
+prepA' l# w32Vec = let 
+          !p = pred $ I# l# `quot` 2 -- last pair is position "0"
+          !fr@(rst,nxt2) = brkVec w32Vec (I# l# - 2)
+          n2@(n1,nl) = (VU.unsafeHead nxt2, VU.unsafeLast nxt2)
+        in (p, (rst, n2))
+
+prepB' :: Integer -> FloatingX# -> (Word32, Word32) -> (Integer, FloatingX#)
+prepB' iRem tBFX# (f,s) = let 
+          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdTuple (f,s) radixW32
+          !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX# -- sqrtF previous digits being scaled right here
+        in (tAInteger, tCFX_#)
+{-# INLINE prepB' #-} 
+
 {-# INLINE prepArgs #-}
 prepArgs :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
 prepArgs l# iRem w32Vec tBFX_# = let           
           !(I# p#, (ri32Vec, nxtTwoDgtsVec)) = prepA l# w32Vec
           !(tAInteger, tCFX_#) = prepB iRem tBFX_# nxtTwoDgtsVec
+        in 
+          LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
+
+{-# INLINE prepArgs' #-}
+prepArgs' :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
+prepArgs' l# iRem w32Vec tBFX_# = let           
+          !(I# p#, (ri32Vec, n2)) = prepA' l# w32Vec
+          !(tAInteger, tCFX_#) = prepB' iRem tBFX_# n2
         in 
           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
 
@@ -422,6 +446,11 @@ intgrFromRvsrd2ElemVec v2ElemW32s base =
         (Just u, Just v) -> (fst u, snd v)
         (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector" -- (Nothing, _) and (_, Nothing)
       in fromIntegral l2 * base + fromIntegral l1
+
+{-# INLINE intgrFromRvsrdTuple #-}
+-- | Integer from a "reversed" tuple of Word32 digits
+intgrFromRvsrdTuple :: (Word32,Word32) -> Integer -> Integer
+intgrFromRvsrdTuple (l1,l2) base = fromIntegral l2 * base + fromIntegral l1
 
 radixW32 :: Integral a => a 
 radixW32 = 4294967296 --2 ^ finiteBitSize (0 :: Word32)
