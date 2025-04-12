@@ -203,11 +203,9 @@ preFI v
   | otherwise = splitVec v
 
 theFI :: ProcessedVec -> Itr
-theFI (ProcessedVec w32Vec dxsVec' l'@(I# l'#)) = let 
+theFI (ProcessedVec w32Vec dxsVec' (I# l'#)) = let 
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
-      !tb1# = normalizeFX# $ integer2FloatingX# (fromIntegral y1)
-      --_ = VU.force dxsVec' -- // TODO MAYBE THIS HELPS?
-    in Itr 1 w32Vec l'# yc remInteger tb1#
+    in Itr 1 w32Vec l'# yc remInteger (int64NormalizedFloatingX# y1) 
 
 fi :: VU.Vector Word32 -> Itr
 fi = theFI . preFI
@@ -316,6 +314,10 @@ fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 
 ------------------------------------------------------------------------
 -- -- | helper functions
+
+{-# INLINE int64NormalizedFloatingX# #-}
+int64NormalizedFloatingX# :: Int64 -> FloatingX#
+int64NormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i64)
 
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE dgtsVecBase32__ #-}
