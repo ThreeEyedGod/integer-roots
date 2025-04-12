@@ -405,14 +405,12 @@ vectorToInteger = VU.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0
 
 {-# INLINE largestNSqLTE #-}
 largestNSqLTE :: Integer -> Integer -> Integer
-largestNSqLTE bot n = bbin bot (n + 1)
+largestNSqLTE bot n = go bot (n + 1)
   where
-    bbin a b
+    go a b
       | a + 1 == b = a
-      | otherwise =
-          if m * m > n
-            then bbin a m
-            else bbin m b
+      | m <= n `div` m = go m b
+      | otherwise = go a m
       where
         !m = (a + b) `div` 2
 
