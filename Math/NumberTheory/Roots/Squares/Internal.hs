@@ -232,10 +232,9 @@ theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#)
   | VU.null w32Vec = yCumulated --vectorToInteger yCurrArr
   | otherwise =
       let 
-          -- !(LoopArgs _ !inA_ !ri32V ) = prepArgs l# iRem w32Vec tbfx# 
-          !(LoopArgs _ !inA_ !ri32V ) = prepArgs' l# iRem w32Vec tbfx# 
-          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
-          !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
+          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ l# iRem w32Vec tbfx# 
+          (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
+          tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal tcfx_#
 
 -- | core of computations. Dealing with just numbers from this point on
@@ -245,49 +244,26 @@ nxtDgtRem yCumulat iterargs_= let
  in computeRem_ yCumulat iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
 
-{-# INLINE prepA #-}
-prepA :: Int# -> VU.Vector Word32 -> (Int, (VU.Vector Word32, VU.Vector Word32))
-prepA l# w32Vec = let 
-          !p = pred $ I# l# `quot` 2 -- last pair is position "0"
-          !fr = brkVec w32Vec (I# l# - 2)
-        in (p, fr)
+data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving (Eq, Show)
+{-# INLINE prepA_ #-}
+prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
+prepA_ l# w32Vec = let 
+          !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
+          !(rst,nxt2) = brkVec w32Vec (I# l# - 2)
+        in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
 
-prepB :: Integer -> FloatingX# -> VU.Vector Word32 -> (Integer, FloatingX#)
-prepB iRem tBFX# nxtTwoDgtsVec = let 
-          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrd2ElemVec (VU.force nxtTwoDgtsVec) radixW32
-          !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX# -- sqrtF previous digits being scaled right here
-          --_ = VU.force nxtTwoDgtsVec -- // TODO MAYBE THIS HELPS?
-        in (tAInteger, tCFX_#)
-{-# INLINE prepB #-} 
-
-{-# INLINE prepA' #-}
-prepA' :: Int# -> VU.Vector Word32 -> (Int, (VU.Vector Word32, (Word32, Word32)))
-prepA' l# w32Vec = let 
-          !p = pred $ I# l# `quot` 2 -- last pair is position "0"
-          !fr@(rst,nxt2) = brkVec w32Vec (I# l# - 2)
-          n2@(n1,nl) = (VU.unsafeHead nxt2, VU.unsafeLast nxt2)
-        in (p, (rst, n2))
-
-prepB' :: Integer -> FloatingX# -> (Word32, Word32) -> (Integer, FloatingX#)
-prepB' iRem tBFX# (f,s) = let 
-          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdTuple (f,s) radixW32
+prepB_ :: Integer -> FloatingX# -> RestNextTwo -> (Integer, FloatingX#)
+prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = let 
+          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdTuple (n1_,nl_) radixW32
           !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX# -- sqrtF previous digits being scaled right here
         in (tAInteger, tCFX_#)
-{-# INLINE prepB' #-} 
+{-# INLINE prepB_ #-} 
 
-{-# INLINE prepArgs #-}
-prepArgs :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
-prepArgs l# iRem w32Vec tBFX_# = let           
-          !(I# p#, (ri32Vec, nxtTwoDgtsVec)) = prepA l# w32Vec
-          !(tAInteger, tCFX_#) = prepB iRem tBFX_# nxtTwoDgtsVec
-        in 
-          LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
-
-{-# INLINE prepArgs' #-}
-prepArgs' :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
-prepArgs' l# iRem w32Vec tBFX_# = let           
-          !(I# p#, (ri32Vec, n2)) = prepA' l# w32Vec
-          !(tAInteger, tCFX_#) = prepB' iRem tBFX_# n2
+{-# INLINE prepArgs_ #-}
+prepArgs_ :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
+prepArgs_ l# iRem w32Vec tBFX_# = let           
+          !rnxt2@(RestNextTwo p# ri32Vec _ _) = prepA_ l# w32Vec
+          !(tAInteger, tCFX_#) = prepB_ iRem tBFX_# rnxt2
         in 
           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
 
