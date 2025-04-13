@@ -227,7 +227,7 @@ splitVec vec = let
 {-# INLINE theNextIterations #-}
 theNextIterations :: Itr -> Integer
 theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#) 
-  | VU.null w32Vec = yCumulated --vectorToInteger yCurrArr
+  | VU.null w32Vec = yCumulated 
   | otherwise =
       let 
           (LoopArgs _ !inA_ !ri32V ) = prepArgs_ l# iRem w32Vec tbfx# 
