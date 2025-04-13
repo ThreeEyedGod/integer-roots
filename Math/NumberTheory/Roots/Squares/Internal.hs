@@ -71,7 +71,7 @@ import Data.Vector (create, convert)
 {-# SPECIALISE isqrtA :: Integer -> Integer #-}
 isqrtA :: Integral a => a -> a
 isqrtA 0 = 0
-isqrtA n = isqrtB n -- heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
+isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
@@ -90,7 +90,6 @@ heron n a = go (step a)
 -- Find a fairly good approximation to the square root.
 -- At most one off for small Integers, about 48 bits should be correct
 -- for large Integers.
-data Switch = Switch Integer Integer deriving (Eq, Show)
 appSqrt :: Integer -> Integer
 appSqrt n@(IS i#) = IS (double2Int# (sqrtDouble# (int2Double# i#)))
 appSqrt n@(IP bn#)
