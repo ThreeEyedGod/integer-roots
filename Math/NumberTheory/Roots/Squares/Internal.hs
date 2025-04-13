@@ -71,7 +71,9 @@ import Data.Vector (create, convert)
 {-# SPECIALISE isqrtA :: Integer -> Integer #-}
 isqrtA :: Integral a => a -> a
 isqrtA 0 = 0
-isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
+-- | why 96 bits? Because the existing method is simply faster and above that the new one is appropriate
+isqrtA n | n <= 2^96 = heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
+isqrtA n = isqrtB n --heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
