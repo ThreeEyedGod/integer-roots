@@ -11,7 +11,8 @@
 {-# LANGUAGE MagicHash        #-}
 -- {-# LANGUAGE CApiFFI #-} -- addition
 {-# LANGUAGE UnboxedTuples #-} -- addition
-{-# LANGUAGE LinearTypes #-} -- addition
+-- //FIXME unsure if this actually improves performance 
+{-# LANGUAGE Strict #-}  --addition 
 
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
@@ -25,7 +26,6 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
 import GHC.Prim ((+#), (-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#)
--- import Data.Bits (Bits (xor))
 import qualified Data.Bits.Floating as DB (nextUp, nextDown)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.Integer
@@ -205,7 +205,7 @@ preFI v
 theFI :: ProcessedVec -> Itr
 theFI (ProcessedVec w32Vec dxsVec' (I# l'#)) = let 
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
-    in Itr 1 w32Vec l'# yc remInteger (int64NormalizedFloatingX# y1) 
+    in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1) 
 
 fi :: VU.Vector Word32 -> Itr
 fi = theFI . preFI
@@ -275,7 +275,7 @@ nxtDgt_# iax = comput (preComput iax)
 
 preComput :: IterArgs_ -> CoreArgs
 preComput (IterArgs_ tA__ tCFX#) = let  
-      !tAFX# = normalizeFX# (integer2FloatingX# tA__) 
+      !tAFX# = intNormalizedFloatingX# tA__
       !radFX# = tCFX# !*## tCFX# !+## tAFX#
     in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}    
@@ -284,7 +284,7 @@ comput :: CoreArgs -> Int64
 comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE comput #-}    
 
--- | compute the remainder. It may be that the "digit" may need to be reworked
+-- | compute the remainder. It may be that the trial "digit" may need to be reworked
 -- that happens in handleRems_
 computeRem_ :: Integer -> IterArgs_ -> Int64 -> IterRes
 computeRem_ yC iArgs_ yTilde_ = let
@@ -315,9 +315,11 @@ fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 ------------------------------------------------------------------------
 -- -- | helper functions
 
-{-# INLINE int64NormalizedFloatingX# #-}
-int64NormalizedFloatingX# :: Int64 -> FloatingX#
-int64NormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i64)
+{-# INLINE intNormalizedFloatingX# #-}
+{-# SPECIALIZE intNormalizedFloatingX# :: Int64 -> FloatingX# #-}
+{-# SPECIALIZE intNormalizedFloatingX# :: Integer -> FloatingX# #-}
+intNormalizedFloatingX# :: Integral a => a -> FloatingX#
+intNormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i64)
 
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE dgtsVecBase32__ #-}
