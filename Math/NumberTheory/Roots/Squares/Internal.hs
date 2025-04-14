@@ -188,12 +188,12 @@ isqrtB 0 = 0
 isqrtB n = fromInteger . theNextIterations . fi . dgtsVecBase32__ . fromIntegral $ n
       
 -- | Iteration loop data 
-data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq, Show)
-data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq,Show)
-data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq, Show) 
-data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq, Show)
-data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq, Show)          
-data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq, Show)
+data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
+data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq)
+data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq) 
+data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
+data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
+data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq)
 
 preFI ::  VU.Vector Word32 -> ProcessedVec
 preFI v  
@@ -241,7 +241,7 @@ nxtDgtRem yCumulat iterargs_= let
  in computeRem_ yCumulat iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
 
-data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving (Eq, Show)
+data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
 {-# INLINE prepA_ #-}
 prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
 prepA_ l# w32Vec = let 
@@ -387,7 +387,7 @@ evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++
 
 -- c: It controls how many digits are extracted from n in the current iteration.
 -- c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.
-data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq, Show)
+data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq)
 dripFeed2DigitsW32 :: JITDigits -> Int -> Word -> JITDigits
 dripFeed2DigitsW32 (JITDigits _ 0 _) _ _ = JITDigits [0] 0 0 
 dripFeed2DigitsW32 (JITDigits dg n rl) c b = let 
@@ -448,7 +448,7 @@ radixW32Cubed = 79228162514264337593543950336 --secndPlaceRadix * radixW32
 -- | Custom  and its arithmetic        
 data FloatingX = FloatingX !Double !Int64 deriving (Eq, Show) -- ! for strict data type
 -- | Custom double "unboxed" and its arithmetic
-data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-}!Double#, expnnt# :: {-# UNPACK #-}!Int64#} deriving (Eq, Show) -- ! for strict data type
+data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-}!Double#, expnnt# :: {-# UNPACK #-}!Int64#} deriving (Eq) -- ! for strict data type
 
 {-# INLINE floorX# #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}
