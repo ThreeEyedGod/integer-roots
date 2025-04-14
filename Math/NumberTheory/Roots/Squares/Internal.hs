@@ -25,7 +25,7 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import qualified Data.Number.MPFR as M
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
-import GHC.Prim ((+#), (-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#)
+import GHC.Prim ((+#), (-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#, uncheckedIShiftRA#)
 import qualified Data.Bits.Floating as DB (nextUp, nextDown)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.Integer
@@ -71,8 +71,6 @@ import Data.Vector (create, convert)
 {-# SPECIALISE isqrtA :: Integer -> Integer #-}
 isqrtA :: Integral a => a -> a
 isqrtA 0 = 0
--- | why 96 bits? Because the existing method is simply faster and above that the new one is appropriate
-isqrtA n | n <= 2^96 = heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
 isqrtA n = isqrtB n --heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
 
 -- Heron's method for integers. First make one step to ensure
@@ -213,7 +211,7 @@ fi = theFI . preFI
 
 {-# INLINE fstDgtRem #-}
 fstDgtRem :: Integer -> IterRes
-fstDgtRem i = let y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
+fstDgtRem i = let !y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
 
 {-# INLINE splitVec #-}        
 -- | also evenizes the vector of digits
@@ -233,7 +231,7 @@ theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#)
       let 
           (LoopArgs _ !inA_ !ri32V ) = prepArgs_ l# iRem w32Vec tbfx# 
           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
-          tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
+          !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal tcfx_#
 
 -- | core of computations. Dealing with just numbers from this point on
@@ -247,9 +245,11 @@ data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec
 {-# INLINE prepA_ #-}
 prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
 prepA_ l# w32Vec = let 
-          !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
+          -- !p# = l# `uncheckedIShiftRA#` 1# -# 1# -- Use bit-shift for division by 2
+          -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
           !(rst,nxt2) = brkVec w32Vec (I# l# - 2)
-        in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
+        -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
+        in RestNextTwo l# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
 
 prepB_ :: Integer -> FloatingX# -> RestNextTwo -> (Integer, FloatingX#)
 prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = let 
@@ -299,13 +299,15 @@ computeRem_ yC iArgs_ yTilde_ = let
 -- if it's positive and far larger in size then also the current digit rework 
 handleRems_ :: IterRes -> IterRes
 handleRems_ (IterRes yc yi ri_)
-  | (ri_ < 0) && (yi > 0) = let rdr = fixRemainder yc ri_ (yi-1) in IterRes (yc+fromIntegral yi-1) (yi-1) rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | otherwise = IterRes (yc+fromIntegral yi) yi ri_
+  | (ri_ < 0) && (yi > 0) = let rdr = fixRemainder yc ri_ (yi-1) in IterRes (ycyi-1) (yi-1) rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | otherwise = IterRes ycyi yi ri_
+ where 
+  !ycyi = yc+fromIntegral yi
 {-# INLINE handleRems_ #-}
   
 -- Calculate remainder accompanying a 'digit'
 calcRemainder :: Integer -> Integer -> Int64 -> Integer
-calcRemainder tAI tc dgt =  tAI - ((2 * fromIntegral dgt * tc) + fromIntegral dgt * fromIntegral dgt)
+calcRemainder tAI tc dgt =  let i = fromIntegral dgt in tAI - ((2 * i * tc) + i*i)
 {-# INLINE calcRemainder #-}
 
 -- Fix remainder accompanying a 'next downed digit'
@@ -462,6 +464,7 @@ zero# = FloatingX# 0.0## minBound64#
     where 
         !(I# minBoundInt#) = fromIntegral (minBound :: Int64) 
         !minBound64# = intToInt64# minBoundInt#
+
 minValue# :: FloatingX#
 minValue# = FloatingX# 1.0## zero64#
     where 
