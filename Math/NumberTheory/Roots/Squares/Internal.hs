@@ -307,7 +307,7 @@ handleRems_ (IterRes yc yi ri_)
   
 -- Calculate remainder accompanying a 'digit'
 calcRemainder :: Integer -> Integer -> Int64 -> Integer
-calcRemainder tAI tc dgt =  let i = fromIntegral dgt in tAI - ((2 * i * tc) + i*i)
+calcRemainder tAI tc dgt =  let !i = fromIntegral dgt in tAI - ((2 * i * tc) + i*i)
 {-# INLINE calcRemainder #-}
 
 -- Fix remainder accompanying a 'next downed digit'
