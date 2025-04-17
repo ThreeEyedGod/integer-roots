@@ -13,6 +13,7 @@
 {-# LANGUAGE UnboxedTuples #-} -- addition
 -- //FIXME unsure if this actually improves performance 
 {-# LANGUAGE Strict #-}  --addition 
+{-# LANGUAGE LinearTypes #-}  --addition 
 
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
@@ -338,7 +339,7 @@ dgtsLst 0 = JITDigits [0] 0 0
 dgtsLst n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 radixW32 (iToWrdListBase n 10)) in JITDigits evLst n l
 
 brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
-brkVec v loc = let (hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
+brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
 {-# INLINE brkVec #-}
 
 {-# INLINE optmzedLrgstSqrtN #-}
