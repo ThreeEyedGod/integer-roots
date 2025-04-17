@@ -426,7 +426,7 @@ intgrFromRvsrd2ElemVec v2ElemW32s base =
   let (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of
         (Just u, Just v) -> (fst u, snd v)
         (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector" -- (Nothing, _) and (_, Nothing)
-      in fromIntegral l2 * base + fromIntegral l1
+      in intgrFromRvsrdTuple (l1, l2) base
 
 {-# INLINE intgrFromRvsrdTuple #-}
 -- | Integer from a "reversed" tuple of Word32 digits
@@ -445,7 +445,7 @@ radixW32Squared = 18446744073709551616 --secndPlaceRadix
 radixW32Cubed :: Integer
 radixW32Cubed = 79228162514264337593543950336 --secndPlaceRadix * radixW32
 
--- | Custom  and its arithmetic        
+-- | Custom Double Type and its arithmetic        
 data FloatingX = FloatingX !Double !Int64 deriving (Eq, Show) -- ! for strict data type
 -- | Custom double "unboxed" and its arithmetic
 data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-}!Double#, expnnt# :: {-# UNPACK #-}!Int64#} deriving (Eq) -- ! for strict data type

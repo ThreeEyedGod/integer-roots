@@ -44,7 +44,7 @@ library
     Math.NumberTheory.Utils.BitMask
     Math.NumberTheory.Utils.FromIntegral
   default-language: Haskell2010 
-  ghc-options: -Wall -Widentities -fspec-constr -fllvm -XBangPatterns -fexpose-all-unfoldings -fexcess-precision -optc-O3 -optc-ffast-math -threaded -funfolding-use-threshold=256 -O2 -fspecialise-aggressively
+  ghc-options: -Wall -Widentities -fspec-constr -fspec-constr-count=16 -fllvm -XBangPatterns -fexpose-all-unfoldings -fexcess-precision -threaded -funfolding-use-threshold=256 -O2 -fspecialise-aggressively
   -- ghc-options: -Wall -O2 -Widentities -Wcompat -mfma -optc-target -optcarm64-apple-macos14.5 -optc-mmacosx-version-min=14.5 -funfolding-use-threshold=16 -O2 -fexcess-precision -optc-O3 -optc-ffast-math -no-recomp -optc-static -optc-lamath -optc-DINTEGER32 -optc-larmpl_lp64 -threaded -optc-DAPPLE -optc-DWORST -optc-DNO_FLOAT128 -optc-DNO_OPENMP -optc-DFOO=$f -optc-DUSE_DOUBLE -optc-O3 -optc-lmpfr -optc-lgmp -optc-lm
   -- these following are additions to the fork  
   -- c-sources: Math/c/fsqrt.c 
