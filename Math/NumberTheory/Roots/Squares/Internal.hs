@@ -224,7 +224,7 @@ splitVec vec = let
         in if even l then ProcessedVec headVec2 lastVec2 (l-2) else ProcessedVec headVec1 (VU.force $ VU.snoc lastVec1 0) (l-1)
 
 -- //FIXME TAKES DOWN PERFORMANCE
-{-# INLINE theNextIterations #-}
+-- Keep it this way: Inlining this lowers performance. 
 theNextIterations :: Itr -> Integer
 theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#) 
   | VU.null w32Vec = yCumulated 
@@ -382,6 +382,10 @@ iToWrdListBase :: Integer -> Word -> [Word]
 iToWrdListBase 0 _ = [0]
 iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reversed format
 
+convertBase :: Word -> Word -> [Word] -> [Word]
+convertBase _ _ [] = []
+convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs) 
+
 evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
 evenizeLstRvrsdDgts [] = ([0], 1)
 evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++ [0], succ l)
@@ -397,10 +401,6 @@ dripFeed2DigitsW32 (JITDigits dg n rl) c b = let
         (i,rsdual) = n `quotRem` dvsor 
     in JITDigits (mkIW32Lst i b) rsdual (fromIntegral rl_- 2) 
     
-convertBase :: Word -> Word -> [Word] -> [Word]
-convertBase _ _ [] = []
-convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs) 
-
 -- | Convert a vector of Word32 values to an Integer with base 2^32 (radixW32).
 -- This function takes a vector of Word32 values, where each element represents a digit in base 2^32,
 -- and combines them to form a single Integer.
