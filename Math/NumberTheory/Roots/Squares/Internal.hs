@@ -39,7 +39,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized)
 import Data.FastDigits (digitsUnsigned, digits, undigits)
-import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast)
+import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList)
 import Data.Int (Int64)
 -- import Foreign.C.Types ( CLong(..) )
 --import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp, isNormal)
@@ -240,33 +240,25 @@ prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
 prepA_ l# w32Vec = let 
           -- !p# = l# `uncheckedIShiftRA#` 1# -# 1# -- Use bit-shift for division by 2
           -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
-          !(rst,nxt2) = brkVec w32Vec (I# l# - 2)
+          -- w32Lst = VU.toList w32Vec
+          -- (rstLst,nxt2Lst@[nA,nL]) = brkLst w32Lst (I# l# - 2)
+          (rst,nxt2) = brkVec w32Vec (I# l# - 2)
         -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
         in RestNextTwo l# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
+        -- in RestNextTwo l# (VU.fromList rstLst) nA nL
 
 prepB_ :: Integer -> FloatingX# -> RestNextTwo -> (Integer, FloatingX#)
 prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = let 
-          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdTuple (n1_,nl_) radixW32
+          !tAInteger  = intgrFrom3DigitsBase32 iRem (n1_, nl_)
           !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX# -- sqrtF previous digits being scaled right here
         in (tAInteger, tCFX_#)
 {-# INLINE prepB_ #-} 
-
-tAScaledtB :: Integer -> FloatingX# -> [Word32] -> (Integer, FloatingX#)
-tAScaledtB _ _ [] = error "tAScaledtB :: Invalid null list"
-tAScaledtB _ _ [_] = error "tAScaledtB :: Invalid Too short list"
-tAScaledtB iRem tBFX# [n1_, nl_] = let 
-          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdTuple (n1_,nl_) radixW32
-          !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX# -- sqrtF previous digits being scaled right here
-        in (tAInteger, tCFX_#)
-tAScaledtB _ _ (_:_:_:_) = error "tAScaledtB :: Invalid list with more than two elements"
-{-# INLINE tAScaledtB #-} 
 
 {-# INLINE prepArgs_ #-}
 prepArgs_ :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
 prepArgs_ l# iRem w32Vec tBFX_# = let           
           !rnxt2@(RestNextTwo p# ri32Vec n1 nl) = prepA_ l# w32Vec
-          -- !(tAInteger, tCFX_#) = prepB_ iRem tBFX_# rnxt2
-          !(tAInteger, tCFX_#) = tAScaledtB iRem tBFX_# [n1,nl]
+          !(tAInteger, tCFX_#) = prepB_ iRem tBFX_# rnxt2
         in 
           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
 
@@ -355,6 +347,10 @@ dgtsLst n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 rad
 brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
 brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
 {-# INLINE brkVec #-}
+
+brkLst :: [Word32] -> Int -> ([Word32], [Word32])
+brkLst l loc = splitAt loc l
+{-# INLINE brkLst #-}
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer 
@@ -447,6 +443,11 @@ intgrFromRvsrd2ElemVec v2ElemW32s base =
 -- | Integer from a "reversed" tuple of Word32 digits
 intgrFromRvsrdTuple :: (Word32,Word32) -> Integer -> Integer
 intgrFromRvsrdTuple (l1,l2) base = fromIntegral l2 * base + fromIntegral l1
+
+{-# INLINE intgrFrom3DigitsBase32 #-}
+-- | Integer from a 3rd place plus a "reversed" tuple of 2 Word32 digits on base 
+intgrFrom3DigitsBase32 :: Integer -> (Word32,Word32) -> Integer
+intgrFrom3DigitsBase32 i (l1,l2)  = (i * secndPlaceRadix) + intgrFromRvsrdTuple (l1,l2) radixW32
 
 radixW32 :: Integral a => a 
 radixW32 = 4294967296 --2 ^ finiteBitSize (0 :: Word32)
