@@ -248,10 +248,7 @@ prepA_ l# w32Vec = let
         -- in RestNextTwo l# (VU.fromList rstLst) nA nL
 
 prepB_ :: Integer -> FloatingX# -> RestNextTwo -> (Integer, FloatingX#)
-prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = let 
-          !tAInteger  = intgrFrom3DigitsBase32 iRem (n1_, nl_)
-          !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX# -- sqrtF previous digits being scaled right here
-        in (tAInteger, tCFX_#)
+prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = (intgrFrom3DigitsBase32 iRem (n1_, nl_), scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
 {-# INLINE prepB_ #-} 
 
 {-# INLINE prepArgs_ #-}
