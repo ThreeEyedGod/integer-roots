@@ -254,13 +254,13 @@ prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase32 
 {-# INLINE prepArgs_ #-}
 prepArgs_ :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
 prepArgs_ l# iRem w32Vec tBFX_# = let           
-          !rnxt2@(RestNextTwo p# ri32Vec n1 nl) = prepA_ l# w32Vec
+          !rnxt2@(RestNextTwo p# ri32Vec _ _) = prepA_ l# w32Vec
           iargs = prepB_ iRem tBFX_# rnxt2
         in 
           LoopArgs p# iargs ri32Vec
 
-------------------------------------------------------------------------
--- | core of computations. Dealing with just numbers functions below from this point on
+---------------------------------------------------------------------------------------
+-- | core of computations. Functions from this point on are doing only number crunching
 nxtDgtRem :: Integer -> IterArgs_-> IterRes 
 nxtDgtRem yCumulat iterargs_= let 
     !yTilde_ = nxtDgt_# iterargs_
