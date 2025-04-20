@@ -444,13 +444,13 @@ intgrFromRvsrdTuple (l1,l2) base = fromIntegral l2 * base + fromIntegral l1
 {-# INLINE intgrFrom3DigitsBase32 #-}
 -- | Integer from a 3rd place plus a "reversed" tuple of 2 Word32 digits on base 
 intgrFrom3DigitsBase32 :: Integer -> (Word32,Word32) -> Integer
-intgrFrom3DigitsBase32 i (l1,l2)  = (i * secndPlaceRadix) + intgrFromRvsrdTuple (l1,l2) radixW32
+intgrFrom3DigitsBase32 i (l1,l2)  = (i * secndPlaceW32Radix) + intgrFromRvsrdTuple (l1,l2) radixW32
 
 radixW32 :: Integral a => a 
 radixW32 = 4294967296 --2 ^ finiteBitSize (0 :: Word32)
 
-secndPlaceRadix :: Integer
-secndPlaceRadix = 18446744073709551616 --radixW32 * radixW32
+secndPlaceW32Radix :: Integer
+secndPlaceW32Radix = 18446744073709551616 --radixW32 * radixW32
 
 radixW32Squared :: Integer
 radixW32Squared = 18446744073709551616 --secndPlaceRadix
