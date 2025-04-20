@@ -207,12 +207,12 @@ theFI (ProcessedVec w32Vec dxsVec' (I# l'#)) = let
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
     in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1) 
 
-fi :: VU.Vector Word32 -> Itr
-fi = theFI . preFI
-
 {-# INLINE fstDgtRem #-}
 fstDgtRem :: Integer -> IterRes
 fstDgtRem i = let !y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
+
+fi :: VU.Vector Word32 -> Itr
+fi = theFI . preFI
 
 {-# INLINE splitVec #-}        
 -- | also evenizes the vector of digits
@@ -232,15 +232,7 @@ theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#)
       let 
           (LoopArgs _ !inA_ !ri32V ) = prepArgs_ l# iRem w32Vec tbfx# 
           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
-          !tcfx_# = let tcfx# = tC_ inA_ in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
-       in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal tcfx_#
-
--- | core of computations. Dealing with just numbers from this point on
-nxtDgtRem :: Integer -> IterArgs_-> IterRes 
-nxtDgtRem yCumulat iterargs_= let 
-    !yTilde_ = nxtDgt_# iterargs_
- in computeRem_ yCumulat iterargs_ yTilde_ 
-{-# INLINE nxtDgtRem #-}
+       in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
 data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
 {-# INLINE prepA_ #-}
@@ -266,6 +258,17 @@ prepArgs_ l# iRem w32Vec tBFX_# = let
           !(tAInteger, tCFX_#) = prepB_ iRem tBFX_# rnxt2
         in 
           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
+          
+------------------------------------------------------------------------
+-- | core of computations. Dealing with just numbers functions below from this point on
+nxtDgtRem :: Integer -> IterArgs_-> IterRes 
+nxtDgtRem yCumulat iterargs_= let 
+    !yTilde_ = nxtDgt_# iterargs_
+ in computeRem_ yCumulat iterargs_ yTilde_ 
+{-# INLINE nxtDgtRem #-}
+
+fixTCFX# :: IterArgs_ -> Int -> Int64 -> FloatingX#
+fixTCFX# ia currlen yTildeFinal = let tcfx# = tC_ ia in if currlen <= 2 then nextDownFX# $ tcfx# !+##  integer2FloatingX# (fromIntegral yTildeFinal) else tcfx#  -- recall tcfx is already scaled by 32. Do not use normalize here
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm 
 -- for small values we can go with the standard double# arithmetic
