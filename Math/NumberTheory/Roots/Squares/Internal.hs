@@ -247,17 +247,17 @@ prepA_ l# w32Vec = let
         in RestNextTwo l# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
         -- in RestNextTwo l# (VU.fromList rstLst) nA nL
 
-prepB_ :: Integer -> FloatingX# -> RestNextTwo -> (Integer, FloatingX#)
-prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = (intgrFrom3DigitsBase32 iRem (n1_, nl_), scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
+prepB_ :: Integer -> FloatingX# -> RestNextTwo -> IterArgs_
+prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
 {-# INLINE prepB_ #-} 
 
 {-# INLINE prepArgs_ #-}
 prepArgs_ :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
 prepArgs_ l# iRem w32Vec tBFX_# = let           
           !rnxt2@(RestNextTwo p# ri32Vec n1 nl) = prepA_ l# w32Vec
-          !(tAInteger, tCFX_#) = prepB_ iRem tBFX_# rnxt2
+          iargs = prepB_ iRem tBFX_# rnxt2
         in 
-          LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
+          LoopArgs p# iargs ri32Vec
 
 ------------------------------------------------------------------------
 -- | core of computations. Dealing with just numbers functions below from this point on
