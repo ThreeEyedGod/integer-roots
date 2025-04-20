@@ -251,14 +251,25 @@ prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = let
         in (tAInteger, tCFX_#)
 {-# INLINE prepB_ #-} 
 
+tAScaledtB :: Integer -> FloatingX# -> [Word32] -> (Integer, FloatingX#)
+tAScaledtB _ _ [] = error "tAScaledtB :: Invalid null list"
+tAScaledtB _ _ [_] = error "tAScaledtB :: Invalid Too short list"
+tAScaledtB iRem tBFX# [n1_, nl_] = let 
+          !tAInteger = (iRem * secndPlaceRadix) + intgrFromRvsrdTuple (n1_,nl_) radixW32
+          !tCFX_# = scaleByPower2 (intToInt64# 32#) tBFX# -- sqrtF previous digits being scaled right here
+        in (tAInteger, tCFX_#)
+tAScaledtB _ _ (_:_:_:_) = error "tAScaledtB :: Invalid list with more than two elements"
+{-# INLINE tAScaledtB #-} 
+
 {-# INLINE prepArgs_ #-}
 prepArgs_ :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
 prepArgs_ l# iRem w32Vec tBFX_# = let           
-          !rnxt2@(RestNextTwo p# ri32Vec _ _) = prepA_ l# w32Vec
-          !(tAInteger, tCFX_#) = prepB_ iRem tBFX_# rnxt2
+          !rnxt2@(RestNextTwo p# ri32Vec n1 nl) = prepA_ l# w32Vec
+          -- !(tAInteger, tCFX_#) = prepB_ iRem tBFX_# rnxt2
+          !(tAInteger, tCFX_#) = tAScaledtB iRem tBFX_# [n1,nl]
         in 
           LoopArgs p# (IterArgs_ tAInteger tCFX_#) ri32Vec
-          
+
 ------------------------------------------------------------------------
 -- | core of computations. Dealing with just numbers functions below from this point on
 nxtDgtRem :: Integer -> IterArgs_-> IterRes 
