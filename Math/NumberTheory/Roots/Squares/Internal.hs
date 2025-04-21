@@ -339,7 +339,6 @@ brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
 
 brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
 brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
-{-# INLINE brkVecPv #-}
 
 -- | a bit tricky it leaves l alone in the predicate that brkVecPv does the right thing //FIXME HMMM
 evenizePv :: ProcessedVec -> ProcessedVec
@@ -555,7 +554,7 @@ sqrtSplitDbl (FloatingX d e)
   | otherwise = (sqrtOf2 * s, fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e-1) 1##) -- odd 
  where 
     !s = sqrtDX d 
-{-# INLINEABLE sqrtSplitDbl #-}
+{-# INLINE sqrtSplitDbl #-}
 
 sqrtDX :: Double -> Double
 sqrtDX d
@@ -564,6 +563,7 @@ sqrtDX d
   | isInfinite d = maxDouble
   | d == 1 = 1
   | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
+{-# INLINE sqrtDX #-}
 
 -- sqrtDoublehmpfr :: Double -> Double
 -- sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
@@ -585,7 +585,7 @@ fx2Double (FloatingX d@(D# d#) e)
     where 
         !(# m, n# #) = decodeDoubleInteger d# 
         !ex = I# n# + fromIntegral e 
-{-# INLINEABLE fx2Double #-}
+{-# INLINE fx2Double #-}
 
 
 {-# INLINE double2FloatingX# #-}
@@ -615,8 +615,6 @@ integer2FloatingX# i
     !(D# iDouble#) = fromIntegral i 
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
-
-{-# INLINE cI2D2 #-}
 cI2D2 :: Integer -> (Integer, Int)
 cI2D2  = cI2D2'
     where 
@@ -646,7 +644,6 @@ split# d#  = (# s#, ex# #)
         !ex# = intToInt64# expInt#
 
  -- | Normalising functions for our custom double  
-{-# INLINE normalize #-}
 normalize :: Double -> Double 
 normalize x
   -- | NFI.isNormal x = x 
