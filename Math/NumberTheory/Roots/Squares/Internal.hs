@@ -26,7 +26,7 @@ module Math.NumberTheory.Roots.Squares.Internal
 -- import qualified Data.Number.MPFR as M
 -- import Data.Number.MPFR.Instances.Up ()
 -- import qualified Data.Number.MPFR.Mutable as MM
-import GHC.Prim ((+#), (-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#, uncheckedIShiftRA#)
+import GHC.Exts ((+#), (-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#, uncheckedIShiftRA#)
 import qualified Data.Bits.Floating as DB (nextUp, nextDown)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.Integer
@@ -186,7 +186,7 @@ double x = x `unsafeShiftL` 1
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
-isqrtB n = fromInteger . theNextIterations . fi . dgtsVecBase32__ . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
       
 -- | Iteration loop data 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
@@ -202,18 +202,17 @@ preFI v
   | VU.length v == 1 && VU.unsafeHead v == 0 = ProcessedVec VU.empty VU.empty 0
   | otherwise = splitVec v
 
-theFI :: ProcessedVec -> Itr
-theFI (ProcessedVec w32Vec dxsVec' (I# l'#)) = let 
+fi :: ProcessedVec -> Itr
+fi (ProcessedVec w32Vec dxsVec' (I# l'#)) = let 
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
     in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1) 
 
-{-# INLINE fstDgtRem #-}
 fstDgtRem :: Integer -> IterRes
 fstDgtRem i = let !y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
 
--- | first iteration
-fi :: VU.Vector Word32 -> Itr
-fi = theFI . preFI
+-- | The First iteration
+theFi :: VU.Vector Word32 -> Itr
+theFi = fi . preFI
 
 {-# INLINE splitVec #-}        
 -- | also evenizes the vector of digits
