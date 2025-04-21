@@ -223,11 +223,11 @@ splitVec vec = let !l = VU.length vec in if even l then brkVecPv vec (l-2) else 
 -- //FIXME TAKES DOWN PERFORMANCE
 -- Keep it this way: Inlining this lowers performance. 
 theNextIterations :: Itr -> Integer
-theNextIterations (Itr currlen w32Vec l# yCumulated iRem tbfx#) 
+theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) 
   | VU.null w32Vec = yCumulated 
   | otherwise =
       let 
-          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ l# iRem w32Vec tbfx# 
+          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr --prepArgs_ l# iRem w32Vec tbfx# 
           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
@@ -246,12 +246,13 @@ prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase32 
 {-# INLINE prepB_ #-} 
 
 {-# INLINE prepArgs_ #-}
-prepArgs_ :: Int# -> Integer -> VU.Vector Word32 -> FloatingX# -> LoopArgs
-prepArgs_ l# iRem w32Vec tBFX_# = let           
+prepArgs_ :: Itr -> LoopArgs
+prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let           
           !rnxt2@(RestNextTwo p# ri32Vec _ _) = prepA_ l# w32Vec
           iargs = prepB_ iRem tBFX_# rnxt2
         in 
           LoopArgs p# iargs ri32Vec
+
 
 ---------------------------------------------------------------------------------------
 -- | core of computations. Functions from this point on are doing only number crunching
