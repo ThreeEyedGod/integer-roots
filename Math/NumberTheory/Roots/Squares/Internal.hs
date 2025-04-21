@@ -188,7 +188,7 @@ isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
       
--- | Iteration loop data - these have vectors / lists in them 
+-- | Iteration loop data - these records have vectors / lists in them 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
 data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq)
@@ -213,17 +213,6 @@ fi (ProcessedVec w32Vec dxsVec' (I# l'#)) = let
 theFi :: VU.Vector Word32 -> Itr
 theFi = fi . preFI
 
--- //FIXME TAKES DOWN PERFORMANCE
--- Keep it this way: Inlining this lowers performance. 
-theNextIterations :: Itr -> Integer
-theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) 
-  | VU.null w32Vec = yCumulated 
-  | otherwise =
-      let 
-          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr 
-          (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
-       in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
-
 data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
 {-# INLINE prepA_ #-}
 prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
@@ -246,8 +235,19 @@ prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let
         in 
           LoopArgs p# iargs ri32Vec
 
+-- //FIXME TAKES DOWN PERFORMANCE
+-- Keep it this way: Inlining this lowers performance. 
+theNextIterations :: Itr -> Integer
+theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) 
+  | VU.null w32Vec = yCumulated 
+  | otherwise =
+      let 
+          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr 
+          (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
+       in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
+
 -------------------------------------------------------------------------------------
--- | numeric loop data 
+-- | numeric loop records 
 data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq)
 data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq) 
 data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
@@ -314,7 +314,7 @@ fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 {-# INLINE fixRemainder #-}
 
 ------------------------------------------------------------------------
--- -- | helper functions
+-- | helper functions
 
 {-# INLINE intNormalizedFloatingX# #-}
 {-# SPECIALIZE intNormalizedFloatingX# :: Int64 -> FloatingX# #-}
