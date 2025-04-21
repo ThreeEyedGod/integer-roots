@@ -256,9 +256,7 @@ prepArgs_ l# iRem w32Vec tBFX_# = let
 ---------------------------------------------------------------------------------------
 -- | core of computations. Functions from this point on are doing only number crunching
 nxtDgtRem :: Integer -> IterArgs_-> IterRes 
-nxtDgtRem yCumulat iterargs_= let 
-    !yTilde_ = nxtDgt_# iterargs_
- in computeRem_ yCumulat iterargs_ yTilde_ 
+nxtDgtRem yCumulat iterargs_= let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ yCumulat iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
 
 fixTCFX# :: IterArgs_ -> Int -> Int64 -> FloatingX#
@@ -343,7 +341,7 @@ brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
 brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
 {-# INLINE brkVecPv #-}
 
--- | a nit tricky it leaves l alone in the predicate that brkVecPv does the right thing //FIXME HMMM
+-- | a bit tricky it leaves l alone in the predicate that brkVecPv does the right thing //FIXME HMMM
 evenizePv :: ProcessedVec -> ProcessedVec
 evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l
 {-# INLINE evenizePv #-}
@@ -448,18 +446,6 @@ intgrFromRvsrdTuple (l1,l2) base = fromIntegral l2 * base + fromIntegral l1
 -- | Integer from a 3rd place plus a "reversed" tuple of 2 Word32 digits on base 
 intgrFrom3DigitsBase32 :: Integer -> (Word32,Word32) -> Integer
 intgrFrom3DigitsBase32 i (l1,l2)  = (i * secndPlaceW32Radix) + intgrFromRvsrdTuple (l1,l2) radixW32
-
-radixW32 :: Integral a => a 
-radixW32 = 4294967296 --2 ^ finiteBitSize (0 :: Word32)
-
-secndPlaceW32Radix :: Integer
-secndPlaceW32Radix = 18446744073709551616 --radixW32 * radixW32
-
-radixW32Squared :: Integer
-radixW32Squared = 18446744073709551616 --secndPlaceRadix
-
-radixW32Cubed :: Integer
-radixW32Cubed = 79228162514264337593543950336 --secndPlaceRadix * radixW32
 
 -- | Custom Double Type and its arithmetic        
 data FloatingX = FloatingX !Double !Int64 deriving (Eq, Show) -- ! for strict data type
@@ -659,7 +645,7 @@ split# d#  = (# s#, ex# #)
         !(D# s#) = fromIntegral s 
         !ex# = intToInt64# expInt#
 
- -- | Normalising functions for doubles and our custom double  
+ -- | Normalising functions for our custom double  
 {-# INLINE normalize #-}
 normalize :: Double -> Double 
 normalize x
@@ -693,7 +679,20 @@ normalizeFX# (FloatingX# d# ex#) = FloatingX# s# expF#
     !(# s#, e# #) = split# nd#
     !expF# = ex# `plusInt64#` e#
 
+----------------------------------------------------------------------------
 -- | Some Constants 
+radixW32 :: Integral a => a 
+radixW32 = 4294967296 --2 ^ finiteBitSize (0 :: Word32)
+
+secndPlaceW32Radix :: Integer
+secndPlaceW32Radix = 18446744073709551616 --radixW32 * radixW32
+
+radixW32Squared :: Integer
+radixW32Squared = 18446744073709551616 --secndPlaceRadix
+
+radixW32Cubed :: Integer
+radixW32Cubed = 79228162514264337593543950336 --secndPlaceRadix * radixW32
+
 sqrtOf2 :: Double
 sqrtOf2 = 1.4142135623730950488016887242097
 
@@ -712,7 +711,8 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
--- | Floating Point rounding/nextup funxctions 
+-----------------------------------------------------------------------------------------------
+-- | Floating Point nextUp/nextDown funxctions 
 {-# INLINE nextUp #-}
 nextUp :: Double -> Double
 nextUp = DB.nextUp --NFI.nextUp
