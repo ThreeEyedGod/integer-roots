@@ -211,17 +211,14 @@ theFI (ProcessedVec w32Vec dxsVec' (I# l'#)) = let
 fstDgtRem :: Integer -> IterRes
 fstDgtRem i = let !y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
 
+-- | first iteration
 fi :: VU.Vector Word32 -> Itr
 fi = theFI . preFI
 
 {-# INLINE splitVec #-}        
 -- | also evenizes the vector of digits
 splitVec :: VU.Vector Word32 -> ProcessedVec
-splitVec vec = let 
-            !l = VU.length vec 
-            (headVec1, lastVec1) = brkVec vec (l-1)
-            (headVec2, lastVec2) = brkVec vec (l-2)
-        in if even l then ProcessedVec headVec2 lastVec2 (l-2) else ProcessedVec headVec1 (VU.force $ VU.snoc lastVec1 0) (l-1)
+splitVec vec = let !l = VU.length vec in if even l then brkVecPv vec (l-2) else evenizePv (brkVecPv vec (l-1))
 
 -- //FIXME TAKES DOWN PERFORMANCE
 -- Keep it this way: Inlining this lowers performance. 
@@ -240,12 +237,9 @@ prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
 prepA_ l# w32Vec = let 
           -- !p# = l# `uncheckedIShiftRA#` 1# -# 1# -- Use bit-shift for division by 2
           -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
-          -- w32Lst = VU.toList w32Vec
-          -- (rstLst,nxt2Lst@[nA,nL]) = brkLst w32Lst (I# l# - 2)
           (rst,nxt2) = brkVec w32Vec (I# l# - 2)
         -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
         in RestNextTwo l# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
-        -- in RestNextTwo l# (VU.fromList rstLst) nA nL
 
 prepB_ :: Integer -> FloatingX# -> RestNextTwo -> IterArgs_
 prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
@@ -344,6 +338,15 @@ dgtsLst n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 rad
 brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
 brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
 {-# INLINE brkVec #-}
+
+brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
+brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
+{-# INLINE brkVecPv #-}
+
+-- | a nit tricky it leaves l alone in the predicate that brkVecPv does the right thing //FIXME HMMM
+evenizePv :: ProcessedVec -> ProcessedVec
+evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l
+{-# INLINE evenizePv #-}
 
 brkLst :: [Word32] -> Int -> ([Word32], [Word32])
 brkLst l loc = splitAt loc l
