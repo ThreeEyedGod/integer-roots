@@ -188,13 +188,14 @@ isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
       
--- | Iteration loop data 
+-- | Iteration loop data - these have vectors / lists in them 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
+data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
+data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq)
+-- | numeric loop data 
 data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq)
 data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq) 
 data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
-data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
-data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq)
 
 preFI ::  VU.Vector Word32 -> ProcessedVec
 preFI v  
@@ -202,22 +203,19 @@ preFI v
   | VU.length v == 1 && VU.unsafeHead v == 0 = ProcessedVec VU.empty VU.empty 0
   | otherwise = splitVec v
 
+{-# INLINE splitVec #-}        
+-- | also evenizes the vector of digits
+splitVec :: VU.Vector Word32 -> ProcessedVec
+splitVec vec = let !l = VU.length vec in if even l then brkVecPv vec (l-2) else evenizePv (brkVecPv vec (l-1))
+
 fi :: ProcessedVec -> Itr
 fi (ProcessedVec w32Vec dxsVec' (I# l'#)) = let 
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
     in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1) 
 
-fstDgtRem :: Integer -> IterRes
-fstDgtRem i = let !y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
-
 -- | The First iteration
 theFi :: VU.Vector Word32 -> Itr
 theFi = fi . preFI
-
-{-# INLINE splitVec #-}        
--- | also evenizes the vector of digits
-splitVec :: VU.Vector Word32 -> ProcessedVec
-splitVec vec = let !l = VU.length vec in if even l then brkVecPv vec (l-2) else evenizePv (brkVecPv vec (l-1))
 
 -- //FIXME TAKES DOWN PERFORMANCE
 -- Keep it this way: Inlining this lowers performance. 
@@ -254,6 +252,9 @@ prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let
 
 ---------------------------------------------------------------------------------------
 -- | core of computations. Functions from this point on are doing only number crunching
+fstDgtRem :: Integer -> IterRes
+fstDgtRem i = let !y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
+
 nxtDgtRem :: Integer -> IterArgs_-> IterRes 
 nxtDgtRem yCumulat iterargs_= let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ yCumulat iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
