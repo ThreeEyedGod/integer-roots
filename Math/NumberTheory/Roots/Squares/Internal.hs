@@ -227,7 +227,7 @@ theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
   | VU.null w32Vec = yCumulated 
   | otherwise =
       let 
-          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr --prepArgs_ l# iRem w32Vec tbfx# 
+          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr 
           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
@@ -252,7 +252,6 @@ prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let
           iargs = prepB_ iRem tBFX_# rnxt2
         in 
           LoopArgs p# iargs ri32Vec
-
 
 ---------------------------------------------------------------------------------------
 -- | core of computations. Functions from this point on are doing only number crunching
