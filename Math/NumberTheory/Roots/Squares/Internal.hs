@@ -186,8 +186,9 @@ double x = x `unsafeShiftL` 1
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
-isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
-      
+-- isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterations . itrLst2itrVec . theFiL . dgtsLstBase32__ . fromIntegral $ n
+
 -- | Iteration loop data - these records have vectors / lists in them 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
@@ -212,6 +213,39 @@ fi (ProcessedVec w32Vec dxsVec' (I# l'#)) = let
 -- | The First iteration
 theFi :: VU.Vector Word32 -> Itr
 theFi = fi . preFI
+
+----------
+      
+-- | Iteration loop data - these records have vectors / lists in them 
+data ItrLst = ItrLst {ll :: {-# UNPACK #-} !Int, lstW32_ :: {-# UNPACK #-} ![Word32], ll_ :: {-# UNPACK #-} !Int#, yCumulativeL :: Integer, iRemL_ :: {-# UNPACK #-} !Integer, tbL# :: FloatingX#} deriving (Eq)
+data LoopArgsLst = LoopArgsLst {positionL :: {-# UNPACK #-} !Int#, inArgsL_ :: !IterArgs_, residuali32Lst :: ![Word32]} deriving (Eq)          
+data ProcessedLst  = ProcessedLst {theRestL :: [Word32], firstTwoL :: [Word32], lenL :: !Int} deriving (Eq)
+
+preFIL ::  [Word32] -> ProcessedLst
+preFIL xs  
+  | null xs = error "preFI: Invalid Argument null list "
+  | length xs == 1 && head xs == 0 = ProcessedLst [] [] 0 
+  | otherwise = splitLst xs
+
+{-# INLINE splitLst #-}        
+-- | also evenizes the list of digits
+splitLst :: [Word32] -> ProcessedLst
+splitLst xs = let !l = length xs in if even l then brkLstPl xs (l-2) else evenizePl (brkLstPl xs (l-1))
+
+fiL :: ProcessedLst -> ItrLst
+fiL (ProcessedLst w32Lst dxsLst' (I# l'#)) = let 
+      !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemLst dxsLst' radixW32) 
+    in ItrLst 1 w32Lst l'# yc remInteger (intNormalizedFloatingX# y1) 
+
+-- | The First iteration
+theFiL :: [Word32] -> ItrLst
+theFiL = fiL . preFIL
+
+itrLst2itrVec :: ItrLst -> Itr 
+itrLst2itrVec (ItrLst a b c d e f)  = Itr a (VU.fromList b) c d e f
+
+----------
+
 
 data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
 {-# INLINE prepA_ #-}
@@ -325,9 +359,15 @@ intNormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i6
 -- //FIXME TAKES DOWN PERFORMANCE
 {-# INLINE dgtsVecBase32__ #-}
 dgtsVecBase32__ :: Integer -> VU.Vector Word32
-dgtsVecBase32__ n | n < 0 = error "dgts_: Invalid negative argument"
+dgtsVecBase32__ n | n < 0 = error "dgtsVecBase32_: Invalid negative argument"
 dgtsVecBase32__ 0 = VU.singleton 0 
 dgtsVecBase32__ n = mkIW32Vec n radixW32
+
+{-# INLINE dgtsLstBase32__ #-}
+dgtsLstBase32__ :: Integer -> [Word32]
+dgtsLstBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
+dgtsLstBase32__ 0 = [0] 
+dgtsLstBase32__ n = mkIW32Lst n radixW32
 
 {-# INLINE dgtsLst #-}
 dgtsLst :: Integer -> JITDigits
@@ -339,17 +379,24 @@ brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
 brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
 {-# INLINE brkVec #-}
 
+brkLst :: [Word32] -> Int -> ([Word32], [Word32])
+brkLst xs loc = splitAt loc xs
+{-# INLINE brkLst #-}
+
 brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
 brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
+
+brkLstPl :: [Word32] -> Int -> ProcessedLst
+brkLstPl xs loc = let !(hd, rst) = brkLst xs loc in ProcessedLst hd rst loc
 
 -- | a bit tricky it leaves l alone in the predicate that brkVecPv does the right thing //FIXME HMMM
 evenizePv :: ProcessedVec -> ProcessedVec
 evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l
 {-# INLINE evenizePv #-}
 
-brkLst :: [Word32] -> Int -> ([Word32], [Word32])
-brkLst l loc = splitAt loc l
-{-# INLINE brkLst #-}
+evenizePl :: ProcessedLst -> ProcessedLst
+evenizePl (ProcessedLst he re l) = ProcessedLst he (re++[0]) l
+{-# INLINE evenizePl #-}
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer 
@@ -437,6 +484,11 @@ intgrFromRvsrd2ElemVec v2ElemW32s base =
         (Just u, Just v) -> (fst u, snd v)
         (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector" -- (Nothing, _) and (_, Nothing)
       in intgrFromRvsrdTuple (l1, l2) base
+
+{-# INLINE intgrFromRvsrd2ElemLst #-}
+-- | Integer from a "reversed" list of Word32 digits
+intgrFromRvsrd2ElemLst :: [Word32] -> Integer -> Integer
+intgrFromRvsrd2ElemLst xs2ElemW32s@[l1,l2] base = intgrFromRvsrdTuple (l1, l2) base
 
 {-# INLINE intgrFromRvsrdTuple #-}
 -- | Integer from a "reversed" tuple of Word32 digits
