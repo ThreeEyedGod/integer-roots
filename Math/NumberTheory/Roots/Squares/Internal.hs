@@ -187,7 +187,8 @@ double x = x `unsafeShiftL` 1
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 -- isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
-isqrtB n = fromInteger . theNextIterations . itrLst2itrVec . theFiL . dgtsLstBase32__ . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterations . itrLst2itrVec . theFiL . dgtsLstBase32__ . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsL . theFiL . dgtsLstBase32__ . fromIntegral $ n
 
 -- | Iteration loop data - these records have vectors / lists in them 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
@@ -246,7 +247,6 @@ itrLst2itrVec (ItrLst a b c d e f)  = Itr a (VU.fromList b) c d e f
 
 ----------
 
-
 data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
 {-# INLINE prepA_ #-}
 prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
@@ -281,6 +281,44 @@ theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
 -------------------------------------------------------------------------------------
+
+----------
+
+data RestNextTwoL = RestNextTwoL {pairpositionL :: {-# UNPACK #-} !Int#, theRestLst :: ![Word32], firstWord32L :: {-# UNPACK #-} !Word32, secondWord32L :: {-# UNPACK #-} !Word32} deriving Eq
+{-# INLINE prepAL_ #-}
+prepAL_ :: Int# -> [Word32] -> RestNextTwoL
+prepAL_ l# w32Lst = let 
+          -- !p# = l# `uncheckedIShiftRA#` 1# -# 1# -- Use bit-shift for division by 2
+          -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
+          (rst,nxt2@[a,b]) = brkLst w32Lst (I# l# - 2)
+        -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
+        in RestNextTwoL l# rst a b
+
+prepBL_ :: Integer -> FloatingX# -> RestNextTwoL -> IterArgs_
+prepBL_ iRem tBFX# (RestNextTwoL _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
+{-# INLINE prepBL_ #-} 
+
+{-# INLINE prepArgsL_ #-}
+prepArgsL_ :: ItrLst -> LoopArgsLst
+prepArgsL_ (ItrLst _ w32Lst l# _ iRem tBFX_#) = let           
+          !rnxt2@(RestNextTwoL p# residuali32Lst _ _) = prepAL_ l# w32Lst
+          iargs = prepBL_ iRem tBFX_# rnxt2
+        in 
+          LoopArgsLst p# iargs residuali32Lst
+
+-- //FIXME TAKES DOWN PERFORMANCE
+-- Keep it this way: Inlining this lowers performance. 
+theNextIterationsL :: ItrLst -> Integer
+theNextIterationsL itr@(ItrLst currlen w32Lst l# yCumulated iRem tbfx#) 
+  | null w32Lst = yCumulated 
+  | otherwise =
+      let 
+          (LoopArgsLst _ !inA_ !ri32L ) = prepArgsL_ itr 
+          (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
+       in theNextIterationsL $ ItrLst (succ currlen) ri32L (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
+
+-------------------------------------------------------------------------------------
+
 -- | numeric loop records 
 data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq)
 data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq) 
