@@ -72,7 +72,7 @@ import Control.Applicative (Alternative(empty))
 {-# SPECIALISE isqrtA :: Integer -> Integer #-}
 isqrtA :: Integral a => a -> a
 isqrtA 0 = 0
-isqrtA n = isqrtB n --heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
+isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
@@ -300,7 +300,7 @@ prepBL_ iRem tBFX# (RestNextTwoL _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase3
 
 {-# INLINE prepArgsL_ #-}
 prepArgsL_ :: ItrLst -> LoopArgsLst
-prepArgsL_ (ItrLst _ w32Lst l# _ iRem tBFX_#) = let           
+prepArgsL_ (ItrLst _ !w32Lst l# _ iRem tBFX_#) = let           
           !rnxt2@(RestNextTwoL p# residuali32Lst _ _) = prepAL_ l# w32Lst
           iargs = prepBL_ iRem tBFX_# rnxt2
         in 
@@ -309,7 +309,7 @@ prepArgsL_ (ItrLst _ w32Lst l# _ iRem tBFX_#) = let
 -- //FIXME TAKES DOWN PERFORMANCE
 -- Keep it this way: Inlining this lowers performance. 
 theNextIterationsL :: ItrLst -> Integer
-theNextIterationsL itr@(ItrLst currlen w32Lst l# yCumulated iRem tbfx#) 
+theNextIterationsL itr@(ItrLst currlen !w32Lst l# yCumulated iRem tbfx#) -- making w32Lst strict makes a diff
   | null w32Lst = yCumulated 
   | otherwise =
       let 
