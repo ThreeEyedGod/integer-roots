@@ -45,6 +45,10 @@ import Data.Int (Int64)
 --import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp, isNormal)
 import Data.Word (Word32)
 import GHC.Exts ((<##), (*##), Double(..), Double#, Int64#, intToInt64#, int64ToInt#)
+import Data.Sequence (Seq, fromList, (<|), (|>), singleton, splitAt)
+import qualified Data.Sequence as Seq
+import Data.Sequence ( ViewR( EmptyR ) , ViewL( EmptyL ), ViewL( (:<) ), ViewR( (:>) ) )
+import Data.Maybe (fromMaybe)
 -- *********** END NEW IMPORTS 
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -62,6 +66,7 @@ import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#)
 import GHC.Num.BigNat (bigNatSize#)
 import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
 import Control.Applicative (Alternative(empty))
+import qualified Data.List as DL
 -- import Data.Vector (create, convert)
 #endif
 
@@ -188,7 +193,8 @@ isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 -- isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterations . itrLst2itrVec . theFiL . dgtsLstBase32__ . fromIntegral $ n
-isqrtB n = fromInteger . theNextIterationsL . theFiL . dgtsLstBase32__ . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsL . theFiL . dgtsLstBase32__ . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsSeq . theFiSeq . dgtsSeqBase32__ . fromIntegral $ n
 
 -- -- | Iteration loop data - these records have vectors / lists in them 
 -- data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
@@ -228,19 +234,51 @@ preFIL xs
   | length xs == 1 && head xs == 0 = ProcessedLst [] [] 0 
   | otherwise = splitLst xs
 
+data ProcessedSeq  = ProcessedSeq {theRestSeq :: Seq Word32, firstTwoSeq :: Seq Word32, lenSeq :: !Int} deriving (Eq)
+preSeq ::  Seq Word32 -> ProcessedSeq
+preSeq a  
+  | Seq.null a = error "preSeq: Invalid Argument empty seq "
+  | Seq.length a == 1 && fromMaybe 0 (seqHeadW32 a) == 0 = ProcessedSeq Seq.empty Seq.empty 0 
+  | otherwise = splitSeq a
+
+zeroW32Seq :: Seq Word32
+zeroW32Seq = Seq.singleton 0 
+
+-- Equivalent of list's head (safe approach)
+seqHeadW32 :: Seq Word32 -> Maybe Word32
+seqHeadW32 s = case Seq.viewl s of
+    EmptyL -> Nothing  -- Equivalent of null check
+    x :< _ -> Just x
+
 {-# INLINE splitLst #-}        
 -- | also evenizes the list of digits
 splitLst :: [Word32] -> ProcessedLst
 splitLst xs = let !l = length xs in if even l then brkLstPl xs (l-2) else evenizePl (brkLstPl xs (l-1))
+
+{-# INLINE splitSeq #-}        
+-- | also evenizes the Seq of digits
+splitSeq :: Seq Word32 -> ProcessedSeq
+splitSeq xs = let !l = Seq.length xs in if even l then brkLstSeq xs (l-2) else evenizePSeq (brkLstSeq xs (l-1))
+
 
 fiL :: ProcessedLst -> ItrLst
 fiL (ProcessedLst w32Lst dxsLst' (I# l'#)) = let 
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemLst dxsLst' radixW32) 
     in ItrLst 1 w32Lst l'# yc remInteger (intNormalizedFloatingX# y1) 
 
+data ItrSeq = ItrSeq {llseq :: {-# UNPACK #-} !Int, seqW32_ :: {-# UNPACK #-} Seq Word32, llseq_ :: {-# UNPACK #-} !Int#, yCumulativeSeq :: Integer, iRemSeq_ :: {-# UNPACK #-} !Integer, tbSeq# :: FloatingX#} deriving (Eq)
+fiSeq :: ProcessedSeq -> ItrSeq
+fiSeq (ProcessedSeq w32Seq dxsSeq' (I# l'#)) = let 
+      !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemSeq dxsSeq' radixW32) 
+    in ItrSeq 1 w32Seq l'# yc remInteger (intNormalizedFloatingX# y1) 
+
 -- | The First iteration
 theFiL :: [Word32] -> ItrLst
 theFiL = fiL . preFIL
+
+-- | The First iteration
+theFiSeq :: Seq Word32 -> ItrSeq
+theFiSeq = fiSeq . preSeq
 
 -- itrLst2itrVec :: ItrLst -> Itr 
 -- itrLst2itrVec (ItrLst a b c d e f)  = Itr a (VU.fromList b) c d e f
@@ -294,9 +332,26 @@ prepAL_ l# w32Lst = let
         -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
         in RestNextTwoL l# rst a b
 
+data RestNextTwoSeq = RestNextTwoSeq {pairpositionSeq :: {-# UNPACK #-} !Int#, theRestSeq1 :: Seq Word32, firstWord32Seq :: {-# UNPACK #-} !Word32, secondWord32Seq :: {-# UNPACK #-} !Word32} deriving Eq
+{-# INLINE prepASeq_ #-}
+prepASeq_ :: Int# -> Seq Word32 -> RestNextTwoSeq
+prepASeq_ l# w32Seq = let 
+          -- !p# = l# `uncheckedIShiftRA#` 1# -# 1# -- Use bit-shift for division by 2
+          -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
+          (rst,nxt2) = brkSeq w32Seq (I# l# - 2)
+          (a,b) = case matchTwoElements nxt2 of 
+                Nothing -> error "oops"
+                Just (l1, l2) -> (l1, l2)
+        -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
+        in RestNextTwoSeq l# rst a b
+
 prepBL_ :: Integer -> FloatingX# -> RestNextTwoL -> IterArgs_
 prepBL_ iRem tBFX# (RestNextTwoL _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
 {-# INLINE prepBL_ #-} 
+
+prepBSeq_ :: Integer -> FloatingX# -> RestNextTwoSeq -> IterArgs_
+prepBSeq_ iRem tBFX# (RestNextTwoSeq _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
+{-# INLINE prepBSeq_ #-} 
 
 {-# INLINE prepArgsL_ #-}
 prepArgsL_ :: ItrLst -> LoopArgsLst
@@ -305,6 +360,17 @@ prepArgsL_ (ItrLst _ !w32Lst l# _ iRem tBFX_#) = let
           iargs = prepBL_ iRem tBFX_# rnxt2
         in 
           LoopArgsLst p# iargs residuali32Lst
+
+data LoopArgsSeq = LoopArgsSeq {positionSeq :: {-# UNPACK #-} !Int#, inArgsSeq_ :: !IterArgs_, residuali32Seq :: Seq Word32} deriving (Eq)          
+
+{-# INLINE prepArgsSeq_ #-}
+prepArgsSeq_ :: ItrSeq -> LoopArgsSeq
+prepArgsSeq_ (ItrSeq _ !w32Seq l# _ iRem tBFX_#) = let           
+          !rnxt2@(RestNextTwoSeq p# residuali32Seq _ _) = prepASeq_ l# w32Seq
+          iargs = prepBSeq_ iRem tBFX_# rnxt2
+        in 
+          LoopArgsSeq p# iargs residuali32Seq
+
 
 -- //FIXME TAKES DOWN PERFORMANCE
 -- Keep it this way: Inlining this lowers performance. 
@@ -316,6 +382,16 @@ theNextIterationsL itr@(ItrLst currlen !w32Lst l# yCumulated iRem tbfx#) -- maki
           (LoopArgsLst _ !inA_ !ri32L ) = prepArgsL_ itr 
           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
        in theNextIterationsL $ ItrLst (succ currlen) ri32L (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
+
+
+theNextIterationsSeq :: ItrSeq -> Integer
+theNextIterationsSeq itr@(ItrSeq currlen !w32Seq l# yCumulated iRem tbfx#) -- making w32Lst strict makes a diff
+  | Seq.null w32Seq = yCumulated 
+  | otherwise =
+      let 
+          (LoopArgsSeq _ !inA_ !ri32Seq ) = prepArgsSeq_ itr 
+          (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
+       in theNextIterationsSeq $ ItrSeq (succ currlen) ri32Seq (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
 -------------------------------------------------------------------------------------
 
@@ -407,6 +483,13 @@ dgtsLstBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
 dgtsLstBase32__ 0 = [0] 
 dgtsLstBase32__ n = mkIW32Lst n radixW32
 
+{-# INLINE dgtsSeqBase32__ #-}
+dgtsSeqBase32__ :: Integer -> Seq Word32
+dgtsSeqBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
+dgtsSeqBase32__ 0 = fromList [0] 
+dgtsSeqBase32__ n = fromList $ mkIW32Lst n radixW32
+
+
 {-# INLINE dgtsLst #-}
 dgtsLst :: Integer -> JITDigits
 dgtsLst n | n < 0 = error "dgts_: Invalid negative argument"
@@ -418,8 +501,16 @@ dgtsLst n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 rad
 -- {-# INLINE brkVec #-}
 
 brkLst :: [Word32] -> Int -> ([Word32], [Word32])
-brkLst xs loc = splitAt loc xs
+brkLst xs loc = DL.splitAt loc xs
 {-# INLINE brkLst #-}
+
+brkSeq :: Seq Word32 -> Int -> (Seq Word32, Seq Word32)
+brkSeq xs loc = Seq.splitAt loc xs
+{-# INLINE brkSeq #-}
+
+{-# INLINE brkLstSeq #-}
+brkLstSeq :: Seq Word32 -> Int -> ProcessedSeq
+brkLstSeq a loc = let !(hd, rst) = brkSeq a loc in ProcessedSeq hd rst loc
 
 -- brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
 -- brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
@@ -435,6 +526,11 @@ brkLstPl xs loc = let !(hd, rst) = brkLst xs loc in ProcessedLst hd rst loc
 evenizePl :: ProcessedLst -> ProcessedLst
 evenizePl (ProcessedLst he re l) = ProcessedLst he (re++[0]) l
 {-# INLINE evenizePl #-}
+
+evenizePSeq :: ProcessedSeq -> ProcessedSeq
+evenizePSeq (ProcessedSeq he re l) = ProcessedSeq he (re |> 0) l
+{-# INLINE evenizePSeq #-}
+
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer 
@@ -527,6 +623,20 @@ largestNSqLTE bot n = go bot (n + 1)
 -- | Integer from a "reversed" list of Word32 digits
 intgrFromRvsrd2ElemLst :: [Word32] -> Integer -> Integer
 intgrFromRvsrd2ElemLst xs2ElemW32s@[l1,l2] base = intgrFromRvsrdTuple (l1, l2) base
+
+{-# INLINE intgrFromRvsrd2ElemSeq #-}
+intgrFromRvsrd2ElemSeq :: Seq Word32 -> Integer -> Integer 
+intgrFromRvsrd2ElemSeq a base = case matchTwoElements a of 
+      Nothing -> error "oops"
+      Just (l1, l2) -> intgrFromRvsrdTuple (l1, l2) base
+
+matchTwoElements :: Seq Word32 -> Maybe (Word32, Word32)
+matchTwoElements s =
+    case Seq.viewl s of
+        x :< xs -> case Seq.viewr xs of
+            rest :> y -> Just (x, y) -- Matches exactly two elements
+            _ -> Nothing
+        _ -> Nothing
 
 {-# INLINE intgrFromRvsrdTuple #-}
 -- | Integer from a "reversed" tuple of Word32 digits
