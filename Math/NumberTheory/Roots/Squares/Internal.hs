@@ -38,7 +38,7 @@ import GHC.Num.Integer
       integerLogBase, 
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized)
-import Data.FastDigits (digitsUnsigned, digits, undigits)
+-- import Data.FastDigits (digitsUnsigned, digits, undigits)
 -- import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList)
 import Data.Int (Int64)
 -- import Foreign.C.Types ( CLong(..) )
@@ -47,8 +47,10 @@ import Data.Word (Word32)
 import GHC.Exts ((<##), (*##), Double(..), Double#, Int64#, intToInt64#, int64ToInt#)
 import Data.Sequence (Seq, fromList, (<|), (|>), singleton, splitAt)
 import qualified Data.Sequence as Seq
-import Data.Sequence ( ViewR( EmptyR ) , ViewL( EmptyL ), ViewL( (:<) ), ViewR( (:>) ) )
+import Data.Sequence ( Seq( (:|>) ) )
+import Data.Sequence ( ViewR( EmptyR ) , ViewL( EmptyL ), ViewL( (:<) ), ViewR( (:>) ))
 import Data.Maybe (fromMaybe)
+import Data.Sequence (Seq, (|>), empty)
 -- *********** END NEW IMPORTS 
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -338,10 +340,13 @@ prepASeq_ :: Int# -> Seq Word32 -> RestNextTwoSeq
 prepASeq_ l# w32Seq = let 
           -- !p# = l# `uncheckedIShiftRA#` 1# -# 1# -- Use bit-shift for division by 2
           -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
-          (rst,nxt2) = brkSeq w32Seq (I# l# - 2)
-          (a,b) = case matchTwoElements nxt2 of 
-                Nothing -> error "oops"
-                Just (l1, l2) -> (l1, l2)
+          (rst, a, b) = case splitAtLastTwoElements w32Seq of 
+              Just x -> x 
+              Nothing -> error "oops"
+          -- (rst,nxt2) = brkSeq w32Seq (I# l# - 2)
+          -- (a,b) = case matchTwoElements nxt2 of 
+          --       Nothing -> error "oops"
+          --       Just (l1, l2) -> (l1, l2)
         -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
         in RestNextTwoSeq l# rst a b
 
@@ -477,28 +482,39 @@ intNormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i6
 -- dgtsVecBase32__ 0 = VU.singleton 0 
 -- dgtsVecBase32__ n = mkIW32Vec n radixW32
 
-{-# INLINE dgtsLstBase32__ #-}
-dgtsLstBase32__ :: Integer -> [Word32]
-dgtsLstBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
-dgtsLstBase32__ 0 = [0] 
-dgtsLstBase32__ n = mkIW32Lst n radixW32
+-- {-# INLINE dgtsLstBase32__ #-}
+-- dgtsLstBase32__ :: Integer -> [Word32]
+-- dgtsLstBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
+-- dgtsLstBase32__ 0 = [0] 
+-- dgtsLstBase32__ n = mkIW32Lst n radixW32
 
 {-# INLINE dgtsSeqBase32__ #-}
 dgtsSeqBase32__ :: Integer -> Seq Word32
 dgtsSeqBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
 dgtsSeqBase32__ 0 = fromList [0] 
-dgtsSeqBase32__ n = fromList $ mkIW32Lst n radixW32
+dgtsSeqBase32__ n =  integerToSeqBase32 n --fromList $ mkIW32Lst n radixW32
 
 
-{-# INLINE dgtsLst #-}
-dgtsLst :: Integer -> JITDigits
-dgtsLst n | n < 0 = error "dgts_: Invalid negative argument"
-dgtsLst 0 = JITDigits [0] 0 0
-dgtsLst n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 radixW32 (iToWrdListBase n 10)) in JITDigits evLst n l
+-- {-# INLINE dgtsLst #-}
+-- dgtsLst :: Integer -> JITDigits
+-- dgtsLst n | n < 0 = error "dgts_: Invalid negative argument"
+-- dgtsLst 0 = JITDigits [0] 0 0
+-- dgtsLst n = let (evLst, l) = evenizeLstRvrsdDgts (wrd2wrd32 $ convertBase 10 radixW32 (iToWrdListBase n 10)) in JITDigits evLst n l
 
 -- brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
 -- brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
 -- {-# INLINE brkVec #-}
+
+-- Function to generate the digits of an integer in base 2^32 as a Sequence
+integerToSeqBase32 :: Integer -> Seq Word32
+integerToSeqBase32 n
+  | n < 0     = error "integerToSeqBase32: Negative numbers are not supported"
+  | n == 0    = Seq.empty |> 0
+  | otherwise = go n Seq.empty
+  where
+    base = 2 ^ 32
+    go 0 seq = seq
+    go x seq = go (x `div` base) (seq |> fromIntegral (x `mod` base))
 
 brkLst :: [Word32] -> Int -> ([Word32], [Word32])
 brkLst xs loc = DL.splitAt loc xs
@@ -558,23 +574,23 @@ scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# els
 -- mkIW32Vec 0 _ = VU.singleton 0 -- safety
 -- mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
 
-{-# INLINE mkIW32Lst #-}
+-- {-# INLINE mkIW32Lst #-}
 -- spit out the Word32 List from digitsUnsigned which comes in reversed format.
-mkIW32Lst :: Integer -> Word -> [Word32]
-mkIW32Lst 0 _ = [0]-- safety
-mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b) 
+-- mkIW32Lst :: Integer -> Word -> [Word32]
+-- mkIW32Lst 0 _ = [0]-- safety
+-- mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b) 
 
 {-# INLINE wrd2wrd32 #-}
 wrd2wrd32 :: [Word] -> [Word32]
 wrd2wrd32 xs = fromIntegral <$> xs
     
-iToWrdListBase :: Integer -> Word -> [Word]
-iToWrdListBase 0 _ = [0]
-iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reversed format
+-- iToWrdListBase :: Integer -> Word -> [Word]
+-- iToWrdListBase 0 _ = [0]
+-- iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reversed format
 
-convertBase :: Word -> Word -> [Word] -> [Word]
-convertBase _ _ [] = []
-convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs) 
+-- convertBase :: Word -> Word -> [Word] -> [Word]
+-- convertBase _ _ [] = []
+-- convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs) 
 
 evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
 evenizeLstRvrsdDgts [] = ([0], 1)
@@ -582,14 +598,14 @@ evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++
 
 -- c: It controls how many digits are extracted from n in the current iteration.
 -- c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.
-data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq)
-dripFeed2DigitsW32 :: JITDigits -> Int -> Word -> JITDigits
-dripFeed2DigitsW32 (JITDigits _ 0 _) _ _ = JITDigits [0] 0 0 
-dripFeed2DigitsW32 (JITDigits dg n rl) c b = let 
-        rl_ = if rl == 0 then 1 + integerLogBase 10 n else fromIntegral rl
-        dvsor  = 10^(rl_ - fromIntegral c)
-        (i,rsdual) = n `quotRem` dvsor 
-    in JITDigits (mkIW32Lst i b) rsdual (fromIntegral rl_- 2) 
+-- data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq)
+-- dripFeed2DigitsW32 :: JITDigits -> Int -> Word -> JITDigits
+-- dripFeed2DigitsW32 (JITDigits _ 0 _) _ _ = JITDigits [0] 0 0 
+-- dripFeed2DigitsW32 (JITDigits dg n rl) c b = let 
+--         rl_ = if rl == 0 then 1 + integerLogBase 10 n else fromIntegral rl
+--         dvsor  = 10^(rl_ - fromIntegral c)
+--         (i,rsdual) = n `quotRem` dvsor 
+--     in JITDigits (mkIW32Lst i b) rsdual (fromIntegral rl_- 2) 
     
 -- | Convert a vector of Word32 values to an Integer with base 2^32 (radixW32).
 -- This function takes a vector of Word32 values, where each element represents a digit in base 2^32,
@@ -629,6 +645,15 @@ intgrFromRvsrd2ElemSeq :: Seq Word32 -> Integer -> Integer
 intgrFromRvsrd2ElemSeq a base = case matchTwoElements a of 
       Nothing -> error "oops"
       Just (l1, l2) -> intgrFromRvsrdTuple (l1, l2) base
+
+splitAtLastTwoElements :: Seq Word32 -> Maybe (Seq Word32, Word32, Word32)
+splitAtLastTwoElements (xs_ :|> x1 :|> x2) = Just (xs_, x1, x2)
+splitAtLastTwoElements _ = Nothing 
+
+splitAtLastElement :: Seq Word32 -> Maybe (Seq Word32, Word32)
+splitAtLastElement (xs_ :|> x1) = Just (xs_, x1)
+splitAtLastElement _ = Nothing 
+
 
 matchTwoElements :: Seq Word32 -> Maybe (Word32, Word32)
 matchTwoElements s =
