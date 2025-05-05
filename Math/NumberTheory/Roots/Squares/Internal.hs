@@ -38,7 +38,7 @@ import GHC.Num.Integer
       integerLogBase, 
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized)
--- import Data.FastDigits (digitsUnsigned, digits, undigits)
+import Data.FastDigits (digitsUnsigned, digits, undigits)
 -- import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList)
 import Data.Int (Int64)
 -- import Foreign.C.Types ( CLong(..) )
@@ -195,8 +195,8 @@ isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 -- isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterations . itrLst2itrVec . theFiL . dgtsLstBase32__ . fromIntegral $ n
--- isqrtB n = fromInteger . theNextIterationsL . theFiL . dgtsLstBase32__ . fromIntegral $ n
-isqrtB n = fromInteger . theNextIterationsSeq . theFiSeq . dgtsSeqBase32__ . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsL . theFiL . dgtsLstBase32__ . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsSeq . theFiSeq . dgtsSeqBase32__ . fromIntegral $ n
 
 -- -- | Iteration loop data - these records have vectors / lists in them 
 -- data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
@@ -411,7 +411,7 @@ fstDgtRem :: Integer -> IterRes
 fstDgtRem i = let !y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
 
 nxtDgtRem :: Integer -> IterArgs_-> IterRes 
-nxtDgtRem yCumulat iterargs_= let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ yCumulat iterargs_ yTilde_ 
+nxtDgtRem yCumulat iterargs_= let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ (yCumulat*radixW32) iterargs_ yTilde_ 
 {-# INLINE nxtDgtRem #-}
 
 fixTCFX# :: IterArgs_ -> Int -> Int64 -> FloatingX#
@@ -439,10 +439,7 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (next
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
 -- that happens in handleRems_
 computeRem_ :: Integer -> IterArgs_ -> Int64 -> IterRes
-computeRem_ yC iArgs_ yTilde_ = let
-      !tc = radixW32 * yC 
-      !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_
-   in handleRems_ (IterRes tc yTilde_ rTrial)
+computeRem_ tc iArgs_ yTilde_ = let !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_ in handleRems_ (IterRes tc yTilde_ rTrial)
 {-# INLINE computeRem_ #-}
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
@@ -482,11 +479,11 @@ intNormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i6
 -- dgtsVecBase32__ 0 = VU.singleton 0 
 -- dgtsVecBase32__ n = mkIW32Vec n radixW32
 
--- {-# INLINE dgtsLstBase32__ #-}
--- dgtsLstBase32__ :: Integer -> [Word32]
--- dgtsLstBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
--- dgtsLstBase32__ 0 = [0] 
--- dgtsLstBase32__ n = mkIW32Lst n radixW32
+{-# INLINE dgtsLstBase32__ #-}
+dgtsLstBase32__ :: Integer -> [Word32]
+dgtsLstBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
+dgtsLstBase32__ 0 = [0] 
+dgtsLstBase32__ n = mkIW32Lst n radixW32
 
 {-# INLINE dgtsSeqBase32__ #-}
 dgtsSeqBase32__ :: Integer -> Seq Word32
@@ -574,19 +571,19 @@ scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# els
 -- mkIW32Vec 0 _ = VU.singleton 0 -- safety
 -- mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
 
--- {-# INLINE mkIW32Lst #-}
--- spit out the Word32 List from digitsUnsigned which comes in reversed format.
--- mkIW32Lst :: Integer -> Word -> [Word32]
--- mkIW32Lst 0 _ = [0]-- safety
--- mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b) 
+{-# INLINE mkIW32Lst #-}
+--spit out the Word32 List from digitsUnsigned which comes in reversed format.
+mkIW32Lst :: Integer -> Word -> [Word32]
+mkIW32Lst 0 _ = [0]-- safety
+mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b) 
 
 {-# INLINE wrd2wrd32 #-}
 wrd2wrd32 :: [Word] -> [Word32]
 wrd2wrd32 xs = fromIntegral <$> xs
     
--- iToWrdListBase :: Integer -> Word -> [Word]
--- iToWrdListBase 0 _ = [0]
--- iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reversed format
+iToWrdListBase :: Integer -> Word -> [Word]
+iToWrdListBase 0 _ = [0]
+iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reversed format
 
 -- convertBase :: Word -> Word -> [Word] -> [Word]
 -- convertBase _ _ [] = []
