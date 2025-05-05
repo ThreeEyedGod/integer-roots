@@ -43,7 +43,6 @@ import Data.FastDigits (digitsUnsigned, digits, undigits)
 import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList)
 import Data.Int (Int64)
 -- import Foreign.C.Types ( CLong(..) )
---import qualified Numeric.Floating.IEEE as NFI (nextDown, nextUp, isNormal)
 import Data.Word (Word32)
 import GHC.Exts ((<##), (*##), Double(..), Double#, Int64#, intToInt64#, int64ToInt#)
 import Data.Sequence (Seq, fromList, (<|), (|>), singleton, splitAt)
@@ -273,6 +272,9 @@ theNextIterationsSeq itr@(ItrSeq currlen !w32Seq l# yCumulated iRem tbfx#) -- ma
 -- END using sequences ****************************************************************
 -- END ****************************************************************
 
+-- BEGIN using vectors ****************************************************************
+-- BEGIN ****************************************************************
+
 -- | Iteration loop data - these records have vectors / lists in them 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
@@ -298,10 +300,12 @@ fi (ProcessedVec w32Vec dxsVec' (I# l'#)) = let
 theFi :: VU.Vector Word32 -> Itr
 theFi = fi . preFI
 
+-- END using vectors ****************************************************************
+-- END ****************************************************************
+
 -- BEGIN using lists ****************************************************************
 -- BEGIN ****************************************************************
 
-      
 -- | Iteration loop data - these records have vectors / lists in them 
 data ItrLst = ItrLst {ll :: {-# UNPACK #-} !Int, lstW32_ :: {-# UNPACK #-} ![Word32], ll_ :: {-# UNPACK #-} !Int#, yCumulativeL :: Integer, iRemL_ :: {-# UNPACK #-} !Integer, tbL# :: FloatingX#} deriving (Eq)
 data LoopArgsLst = LoopArgsLst {positionL :: {-# UNPACK #-} !Int#, inArgsL_ :: !IterArgs_, residuali32Lst :: ![Word32]} deriving (Eq)          
@@ -324,15 +328,9 @@ fiL (ProcessedLst w32Lst dxsLst' (I# l'#)) = let
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemLst dxsLst' radixW32) 
     in ItrLst 1 w32Lst l'# yc remInteger (intNormalizedFloatingX# y1) 
 
-
 -- | The First iteration
 theFiL :: [Word32] -> ItrLst
 theFiL = fiL . preFIL
-
-
-itrLst2itrVec :: ItrLst -> Itr 
-itrLst2itrVec (ItrLst a b c d e f)  = Itr a (VU.fromList b) c d e f
-
 
 data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
 {-# INLINE prepA_ #-}
@@ -474,10 +472,12 @@ fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 {-# INLINE fixRemainder #-}
 
 ------------------------------------------------------------------------
--- | helper functions
+-- | HELPER functions
 
 --- BEGIN helpers for Sequences, Lists and Vectors
 --- ***********************************
+itrLst2itrVec :: ItrLst -> Itr 
+itrLst2itrVec (ItrLst a b c d e f)  = Itr a (VU.fromList b) c d e f
 
 -- // FIXME TAKES DOWN PERFORMANCE
 {-# INLINE dgtsVecBase32__ #-}
@@ -498,10 +498,6 @@ dgtsSeqBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
 dgtsSeqBase32__ 0 = fromList [0] 
 dgtsSeqBase32__ n =  integerToSeqBase32 n --fromList $ mkIW32Lst n radixW32
 
-brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
-brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
-{-# INLINE brkVec #-}
-
 -- Function to generate the digits of an integer in base 2^32 as a Sequence
 integerToSeqBase32 :: Integer -> Seq Word32
 integerToSeqBase32 n
@@ -512,6 +508,10 @@ integerToSeqBase32 n
     base = 2 ^ 32
     go 0 seq = seq
     go x seq = go (x `div` base) (seq |> fromIntegral (x `mod` base))
+
+brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
+brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
+{-# INLINE brkVec #-}
 
 brkLst :: [Word32] -> Int -> ([Word32], [Word32])
 brkLst xs loc = DL.splitAt loc xs
@@ -531,7 +531,7 @@ brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
 brkLstPl :: [Word32] -> Int -> ProcessedLst
 brkLstPl xs loc = let !(hd, rst) = brkLst xs loc in ProcessedLst hd rst loc
 
--- | a bit tricky it leaves l alone in the predicate that brkVecPv does the right thing //FIXME HMMM
+-- | a bit tricky it leaves l alone in the predicate that brkVecPv-brkLst-brkLstSeq does the right thing //FIXME HMMM
 evenizePv :: ProcessedVec -> ProcessedVec
 evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l
 {-# INLINE evenizePv #-}
@@ -573,7 +573,7 @@ intgrFromRvsrd2ElemLst xs2ElemW32s@[l1,l2] base = intgrFromRvsrdTuple (l1, l2) b
 {-# INLINE intgrFromRvsrd2ElemSeq #-}
 intgrFromRvsrd2ElemSeq :: Seq Word32 -> Integer -> Integer 
 intgrFromRvsrd2ElemSeq a base = case matchTwoElements a of 
-      Nothing -> error "oops"
+      Nothing -> error "intgrFromRvsrd2ElemSeq : Invalid not 2 elements or empty seq"
       Just (l1, l2) -> intgrFromRvsrdTuple (l1, l2) base
 
 splitAtLastTwoElements :: Seq Word32 -> Maybe (Seq Word32, Word32, Word32)
@@ -597,6 +597,20 @@ matchTwoElements s =
 intgrFromRvsrdTuple :: (Word32,Word32) -> Integer -> Integer
 intgrFromRvsrdTuple (l1,l2) base = fromIntegral l2 * base + fromIntegral l1
 
+evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
+evenizeLstRvrsdDgts [] = ([0], 1)
+evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++ [0], succ l)
+
+{-# INLINE vectorToInteger #-}
+-- | Convert a vector of Word32 values to an Integer with base 2^32 (radixW32).
+-- This function takes a vector of Word32 values, where each element represents a digit in base 2^32,
+-- and combines them to form a single Integer.
+-- Function to convert a vector of Word32 values to an Integer with base 2^32 (radixw32)
+vectorToInteger :: VU.Vector Word32 -> Integer
+vectorToInteger = VU.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0 
+
+--- END helpers for Sequences, Lists and Vectors
+--- END ***********************************
 
 --- BEGIN Core numeric helper functions
 --- ***********************************
@@ -639,10 +653,6 @@ convertBase :: Word -> Word -> [Word] -> [Word]
 convertBase _ _ [] = []
 convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs) 
 
-evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
-evenizeLstRvrsdDgts [] = ([0], 1)
-evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++ [0], succ l)
-
 -- c: It controls how many digits are extracted from n in the current iteration.
 -- c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.
 -- data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq)
@@ -654,14 +664,6 @@ evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++
 --         (i,rsdual) = n `quotRem` dvsor 
 --     in JITDigits (mkIW32Lst i b) rsdual (fromIntegral rl_- 2) 
     
--- | Convert a vector of Word32 values to an Integer with base 2^32 (radixW32).
--- This function takes a vector of Word32 values, where each element represents a digit in base 2^32,
--- and combines them to form a single Integer.
--- {-# INLINE vectorToInteger #-}
--- -- Function to convert a vector of Word32 values to an Integer with base 2^32 (radixw32)
--- vectorToInteger :: VU.Vector Word32 -> Integer
--- vectorToInteger = VU.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0 
-
 {-# INLINE largestNSqLTE #-}
 largestNSqLTE :: Integer -> Integer -> Integer
 largestNSqLTE bot n = go bot (n + 1)
@@ -982,6 +984,6 @@ nextDownFX# x@(FloatingX# s# e#)
      in 
         if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` intToInt64# 1#) else FloatingX# interimS# e#
 
--- End isqrtB ****************************************************************
--- End isqrtB ****************************************************************
+-- END isqrtB ****************************************************************
+-- END isqrtB ****************************************************************
 
