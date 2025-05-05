@@ -194,8 +194,8 @@ isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 -- isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterations . itrLst2itrVec . theFiL . dgtsLstBase32__ . fromIntegral $ n
-isqrtB n = fromInteger . theNextIterationsL . theFiL . dgtsLstBase32__ . fromIntegral $ n
--- isqrtB n = fromInteger . theNextIterationsSeq . theFiSeq . dgtsSeqBase32__ . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsL . theFiL . dgtsLstBase32__ . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsSeq . theFiSeq . dgtsSeqBase32__ . fromIntegral $ n
 
 -- BEGIN using sequences ****************************************************************
 -- BEGIN ****************************************************************
@@ -206,15 +206,6 @@ preSeq a
   | Seq.null a = error "preSeq: Invalid Argument empty seq "
   | Seq.length a == 1 && fromMaybe 0 (seqHeadW32 a) == 0 = ProcessedSeq Seq.empty Seq.empty 0 
   | otherwise = splitSeq a
-
-zeroW32Seq :: Seq Word32
-zeroW32Seq = Seq.singleton 0 
-
--- Equivalent of list's head (safe approach)
-seqHeadW32 :: Seq Word32 -> Maybe Word32
-seqHeadW32 s = case Seq.viewl s of
-    EmptyL -> Nothing  -- Equivalent of null check
-    x :< _ -> Just x
 
 {-# INLINE splitSeq #-}        
 -- | also evenizes the Seq of digits
@@ -476,6 +467,16 @@ fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
 
 --- BEGIN helpers for Sequences, Lists and Vectors
 --- ***********************************
+
+-- Equivalent of list's head (safe approach)
+seqHeadW32 :: Seq Word32 -> Maybe Word32
+seqHeadW32 s = case Seq.viewl s of
+    EmptyL -> Nothing  -- Equivalent of null check
+    x :< _ -> Just x
+
+zeroW32Seq :: Seq Word32
+zeroW32Seq = Seq.singleton 0 
+
 itrLst2itrVec :: ItrLst -> Itr 
 itrLst2itrVec (ItrLst a b c d e f)  = Itr a (VU.fromList b) c d e f
 
