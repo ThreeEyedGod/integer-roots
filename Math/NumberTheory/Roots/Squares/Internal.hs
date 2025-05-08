@@ -215,7 +215,6 @@ splitSeq xs = let !l = Seq.length xs in if even l then brkLstSeq xs (l-2) else e
 data ItrSeq = ItrSeq {llseq :: {-# UNPACK #-} !Int, seqW32_ :: {-# UNPACK #-} Seq Word32, llseq_ :: {-# UNPACK #-} !Int#, yCumulativeSeq :: Integer, iRemSeq_ :: {-# UNPACK #-} !Integer, tbSeq# :: FloatingX#} deriving (Eq)
 fiSeq :: ProcessedSeq -> ItrSeq
 fiSeq (ProcessedSeq w32Seq dxsSeq' (I# l'#)) = let 
-      i = intgrFromRvsrd2ElemSeq dxsSeq' radixW32
       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemSeq dxsSeq' radixW32)
     in ItrSeq 1 w32Seq l'# yc remInteger (intNormalizedFloatingX# y1) 
 
@@ -231,7 +230,7 @@ prepASeq_ l# w32Seq = let
           -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
           (rst, a, b) = case splitAtLastTwoElements w32Seq of 
               Just x -> x 
-              Nothing -> error "oops"
+              Nothing -> error "prepASeq_ : invalid argument to splitAtLastTwoElements"
           -- (rst,nxt2) = brkSeq w32Seq (I# l# - 2)
           -- (a,b) = case matchTwoElements nxt2 of 
           --       Nothing -> error "oops"
@@ -250,7 +249,6 @@ prepArgsSeq_ (ItrSeq _ !w32Seq l# _ iRem tBFX_#) = let
           iargs = prepBSeq_ iRem tBFX_# rnxt2
         in 
           LoopArgsSeq p# iargs residuali32Seq
-
 
 theNextIterationsSeq :: ItrSeq -> Integer
 theNextIterationsSeq itr@(ItrSeq currlen !w32Seq l# yCumulated iRem tbfx#) -- making w32Lst strict makes a diff
@@ -313,7 +311,6 @@ preFIL xs
 -- | also evenizes the list of digits
 splitLst :: [Word32] -> ProcessedLst
 splitLst xs = let !l = length xs in if even l then brkLstPl xs (l-2) else evenizePl (brkLstPl xs (l-1))
-
 
 fiL :: ProcessedLst -> ItrLst
 fiL (ProcessedLst w32Lst dxsLst' (I# l'#)) = let 
