@@ -741,12 +741,12 @@ add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
 {-# INLINE mul# #-}
 mul# :: FloatingX# -> FloatingX# -> FloatingX#
 -- mul# (FloatingX# 1.0## 0#) b = b
--- mul# a (FloatingX# 1.0 0) = a
+-- mul# a (FloatingX# 1.00## 0.00##) = a
 mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) 
     | isTrue# (sA# ==## 0.00##) = zero#
     | isTrue# (sB# ==## 0.00##) = zero#
-    | isTrue# (sA# ==## 1.00##) = b
-    | isTrue# (sB# ==## 1.00##) = a
+    | isTrue# (sA# ==## 1.00##) = b -- //FIXME THIS IS WRONG
+    | isTrue# (sB# ==## 1.00##) = a -- //FIXME this is wrong
     | otherwise = 
           let !resExp# = expA# `plusInt64#` expB#
               !resSignif# = sA# *## sB#
@@ -759,7 +759,7 @@ divide# :: FloatingX# -> FloatingX# -> FloatingX#
 divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
     | d == FloatingX# 1.0## (intToInt64# 0#) = n 
     | isTrue# (s1# ==## 0.0##) = zero#
-    | isTrue# (s2# ==## 0.0##) = error "divide: error divide by zero " 
+    | isTrue# (s2# ==## 0.0##) = error "divide#: error divide by zero " 
     | otherwise = 
         let !resExp# = e1# `subInt64#` e2#
             !resSignif# = s1# /## s2#
@@ -839,7 +839,7 @@ double2FloatingX# d = let
 integer2FloatingX# :: Integer -> FloatingX#
 integer2FloatingX# i
   | i == 0 = zero#
-  | i < 0 = error "integer2FloatingX : invalid negative argument"
+  | i < 0 = error "integer2FloatingX# : invalid negative argument"
   | itsOKtoUsePlainDoubleCalc =  double2FloatingX# (fromIntegral i) 
   | otherwise =  let 
       !(i_, e_) = cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
