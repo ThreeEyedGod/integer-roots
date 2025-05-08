@@ -38,7 +38,7 @@ import GHC.Num.Integer
       integerLogBase#,
       integerLogBase, 
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
-import GHC.Float (divideDouble, isDoubleDenormalized)
+import GHC.Float (divideDouble, isDoubleDenormalized, ceilingDouble, floorDouble)
 import Data.FastDigits (digitsUnsigned, digits, undigits)
 import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList)
 import Data.Int (Int64)
@@ -215,7 +215,8 @@ splitSeq xs = let !l = Seq.length xs in if even l then brkLstSeq xs (l-2) else e
 data ItrSeq = ItrSeq {llseq :: {-# UNPACK #-} !Int, seqW32_ :: {-# UNPACK #-} Seq Word32, llseq_ :: {-# UNPACK #-} !Int#, yCumulativeSeq :: Integer, iRemSeq_ :: {-# UNPACK #-} !Integer, tbSeq# :: FloatingX#} deriving (Eq)
 fiSeq :: ProcessedSeq -> ItrSeq
 fiSeq (ProcessedSeq w32Seq dxsSeq' (I# l'#)) = let 
-      !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemSeq dxsSeq' radixW32) 
+      i = intgrFromRvsrd2ElemSeq dxsSeq' radixW32
+      !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemSeq dxsSeq' radixW32)
     in ItrSeq 1 w32Seq l'# yc remInteger (intNormalizedFloatingX# y1) 
 
 -- | The First iteration
@@ -256,7 +257,7 @@ theNextIterationsSeq itr@(ItrSeq currlen !w32Seq l# yCumulated iRem tbfx#) -- ma
   | Seq.null w32Seq = yCumulated 
   | otherwise =
       let 
-          (LoopArgsSeq _ !inA_ !ri32Seq ) = prepArgsSeq_ itr 
+          !(LoopArgsSeq _ !inA_ !ri32Seq ) = prepArgsSeq_ itr 
           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
        in theNextIterationsSeq $ ItrSeq (succ currlen) ri32Seq (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
@@ -577,6 +578,15 @@ intgrFromRvsrd2ElemSeq a base = case matchTwoElements a of
       Nothing -> error "intgrFromRvsrd2ElemSeq : Invalid not 2 elements or empty seq"
       Just (l1, l2) -> intgrFromRvsrdTuple (l1, l2) base
 
+-- | mimicing the java code
+{-# INLINE doubleFromRvsrd2ElemSeq #-}
+doubleFromRvsrd2ElemSeq :: Seq Word32 -> Integer -> Double 
+doubleFromRvsrd2ElemSeq a base = case matchTwoElements a of 
+      Nothing -> error "intgrFromRvsrd2ElemSeq : Invalid not 2 elements or empty seq"
+      Just (l1, l2) -> case (l1, l2) of 
+            (unitplace, 0) -> doubleFromRvsrdTuple (unitplace, 0) base
+            _ -> nextUp (doubleFromRvsrdTuple (l1, l2) base)
+
 splitAtLastTwoElements :: Seq Word32 -> Maybe (Seq Word32, Word32, Word32)
 splitAtLastTwoElements (xs_ :|> x1 :|> x2) = Just (xs_, x1, x2)
 splitAtLastTwoElements _ = Nothing 
@@ -597,6 +607,11 @@ matchTwoElements s =
 -- | Integer from a "reversed" tuple of Word32 digits
 intgrFromRvsrdTuple :: (Word32,Word32) -> Integer -> Integer
 intgrFromRvsrdTuple (l1,l2) base = fromIntegral l2 * base + fromIntegral l1
+
+{-# INLINE doubleFromRvsrdTuple #-}
+-- | double from a "reversed" tuple of Word32 digits
+doubleFromRvsrdTuple :: (Word32,Word32) -> Integer -> Double
+doubleFromRvsrdTuple (l1,l2) base = fromIntegral l2 * fromIntegral base + fromIntegral l1
 
 evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
 evenizeLstRvrsdDgts [] = ([0], 1)
@@ -624,13 +639,13 @@ intNormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i6
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer 
-optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (minMax i radixW32Squared 0) i) -- overflow trap
+optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (startAt i radixW32Squared 0) i) -- overflow trap
 
-{-# INLINE minMax #-}
-{-# SPECIALIZE minMax :: Int64 -> Int64 -> Int64 -> Int64 #-}
-{-# SPECIALIZE minMax :: Integer -> Integer -> Integer -> Integer #-}
-minMax :: Integral a => a -> a -> a -> a 
-minMax i mx mi = if i >= mx then mx else mi 
+{-# INLINE startAt #-}
+{-# SPECIALIZE startAt :: Int64 -> Int64 -> Int64 -> Int64 #-}
+{-# SPECIALIZE startAt :: Integer -> Integer -> Integer -> Integer #-}
+startAt :: Integral a => a -> a -> a -> a 
+startAt i mx mi = pred $ floorDouble (sqrt (fromIntegral i)::Double)--if i >= mx then mx else mi 
 
 -- | handle overflow 
 {-# INLINE hndlOvflwW32 #-}
@@ -653,20 +668,9 @@ iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reverse
 convertBase :: Word -> Word -> [Word] -> [Word]
 convertBase _ _ [] = []
 convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs) 
-
--- c: It controls how many digits are extracted from n in the current iteration.
--- c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.c is the number of digits to process in the current step, used to calculate the divisor for extracting the most significant digits from n.
--- data JITDigits = JITDigits {dgts :: [Word32], r :: Integer, rLen :: Int} deriving (Eq)
--- dripFeed2DigitsW32 :: JITDigits -> Int -> Word -> JITDigits
--- dripFeed2DigitsW32 (JITDigits _ 0 _) _ _ = JITDigits [0] 0 0 
--- dripFeed2DigitsW32 (JITDigits dg n rl) c b = let 
---         rl_ = if rl == 0 then 1 + integerLogBase 10 n else fromIntegral rl
---         dvsor  = 10^(rl_ - fromIntegral c)
---         (i,rsdual) = n `quotRem` dvsor 
---     in JITDigits (mkIW32Lst i b) rsdual (fromIntegral rl_- 2) 
     
 {-# INLINE largestNSqLTE #-}
-largestNSqLTE :: Integer -> Integer -> Integer
+largestNSqLTE :: Integer -> Integer -> Integer 
 largestNSqLTE bot n = go bot (n + 1)
   where
     go a b
