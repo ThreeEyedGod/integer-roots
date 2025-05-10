@@ -12,13 +12,14 @@
 -- {-# LANGUAGE CApiFFI #-} -- addition
 {-# LANGUAGE UnboxedTuples #-} -- addition
 -- //FIXME unsure if this actually improves performance 
-{-# LANGUAGE Strict #-}  --addition 
+{-# LANGUAGE Strict, StrictData #-} --addition 
 {-# LANGUAGE LinearTypes #-}  --addition 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
   , isqrtA
+  , isqrtB
   ) where
 
 -- *********** BEGIN NEW IMPORTS   
@@ -647,7 +648,7 @@ optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (startAt i radixW32Squared 0) 
 {-# SPECIALIZE startAt :: Int64 -> Int64 -> Int64 -> Int64 #-}
 {-# SPECIALIZE startAt :: Integer -> Integer -> Integer -> Integer #-}
 startAt :: Integral a => a -> a -> a -> a 
-startAt i mx mi = pred $ floorDouble (sqrt (fromIntegral i)::Double)--if i >= mx then mx else mi 
+startAt i mx mi = pred $ floorDouble (sqrt (fromIntegral i) :: Double)--if i >= mx then mx else mi 
 
 -- | handle overflow 
 {-# INLINE hndlOvflwW32 #-}
@@ -677,7 +678,7 @@ largestNSqLTE bot n = go bot (n + 1)
   where
     go a b
       | a + 1 == b = a
-      | m <= n `div` m = go m b
+      | m * m <= n = go m b
       | otherwise = go a m
       where
         !m = (a + b) `div` 2
