@@ -80,7 +80,7 @@ import qualified Data.List as DL
 {-# SPECIALISE isqrtA :: Integer -> Integer #-}
 isqrtA :: Integral a => a -> a
 isqrtA 0 = 0
-isqrtA n = isqrtB n -- heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
+isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
@@ -486,18 +486,33 @@ zeroW32Seq = Seq.singleton 0
 dgtsSeqBase32__ :: Integer -> Seq Word32
 dgtsSeqBase32__ n | n < 0 = error "dgtsLstBase32__: Invalid negative argument"
 dgtsSeqBase32__ 0 = fromList [0] 
-dgtsSeqBase32__ n =  integerToSeqBase32 n --fromList $ mkIW32Lst n radixW32
+dgtsSeqBase32__ n =  fromList (mkIW32Lst n radixW32) --integerToSeqBase32 n --fromList $ mkIW32Lst n radixW32
 
--- Function to generate the digits of an integer in base 2^32 as a Sequence
+-- -- Function to generate the digits of an integer in base 2^32 as a Sequence
+-- integerToSeqBase32 :: Integer -> Seq Word32
+-- integerToSeqBase32 n
+--   | n < 0     = error "integerToSeqBase32: Negative numbers are not supported"
+--   | n == 0    = Seq.empty |> 0
+--   | otherwise = go n Seq.empty
+--   where
+--     base = radixW32
+--     go 0 seq = seq
+--     go x seq = go (x `div` base) (seq |> fromIntegral (x `mod` base))
+
+-- Function to generate the digits of an integer in base 2^32 as a Sequence,
+-- discarding digits beyond the precision of a Double.
 integerToSeqBase32 :: Integer -> Seq Word32
 integerToSeqBase32 n
   | n < 0     = error "integerToSeqBase32: Negative numbers are not supported"
   | n == 0    = Seq.empty |> 0
-  | otherwise = go n Seq.empty
+  | otherwise = go n Seq.empty 0
   where
-    base = 2 ^ 32
-    go 0 seq = seq
-    go x seq = go (x `div` base) (seq |> fromIntegral (x `mod` base))
+    base = radixW32
+    maxDigits = 24  -- Limit to 2 Word32 digits (64 bits)
+    go 0 seq _ = seq
+    go x seq count
+      | count >= maxDigits = seq  -- Stop once we've collected enough digits
+      | otherwise = go (x `div` base) (seq |> fromIntegral (x `mod` base)) (count + 1)
 
 brkSeq :: Seq Word32 -> Int -> (Seq Word32, Seq Word32)
 brkSeq xs loc = Seq.splitAt loc xs
@@ -587,11 +602,11 @@ matchTwoElements s =
 -- mkIW32Vec 0 _ = VU.singleton 0 -- safety
 -- mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
 
--- {-# INLINE mkIW32Lst #-}
--- --spit out the Word32 List from digitsUnsigned which comes in reversed format.
--- mkIW32Lst :: Integer -> Word -> [Word32]
--- mkIW32Lst 0 _ = [0]-- safety
--- mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b) 
+{-# INLINE mkIW32Lst #-}
+--spit out the Word32 List from digitsUnsigned which comes in reversed format.
+mkIW32Lst :: Integer -> Word -> [Word32]
+mkIW32Lst 0 _ = [0]-- safety
+mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b) 
 
 -- {-# INLINE intgrFromRvsrd2ElemVec #-}
 -- -- | Integer from a "reversed" list of Word32 digits
@@ -683,6 +698,7 @@ largestNSqLTE bot n = go bot (n + 1)
       where
         !m = (a + b) `div` 2
 
+-- //FIXME bring it down to precision of double 
 {-# INLINE intgrFrom3DigitsBase32 #-}
 -- | Integer from a 3rd place plus a "reversed" tuple of 2 Word32 digits on base 
 intgrFrom3DigitsBase32 :: Integer -> (Word32,Word32) -> Integer
@@ -858,18 +874,33 @@ integer2FloatingX# i
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
 cI2D2 :: Integer -> (Integer, Int)
-cI2D2  = cI2D2'
-    where 
-      cI2D2' 0 = (0, 0)
-      cI2D2' i | i <= maxSafeInteger = (i, 0)
-      cI2D2' i = go 0 i
-          where
-            go e n
-              | n <= maxUnsafeInteger = (n, e)
-              | otherwise = go (e + shiftAmount) (n `unsafeShiftR` shiftAmount) 
-              where
-                exPlus = fromIntegral (integerLogBase 10 n - 308 `quot` 100) -- would be dynamic (100-10)
-                shiftAmount = max 1 exPlus
+cI2D2 i
+  | i == 0    = (0, 0)
+  | i <= maxSafeInteger = (i, 0)
+  | otherwise =
+      let logSafe = integerLog2 maxUnsafeInteger
+          logNum  = integerLog2 i
+          shiftNeeded = max 1 (logNum - logSafe)
+          totalShift = shiftNeeded
+      in (i `unsafeShiftR` totalShift, totalShift)
+
+-- Helper: base-2 logarithm for integers (floor of log2)
+integerLog2 :: Integer -> Int
+integerLog2 n = I# (word2Int# (integerLog2# n))
+
+-- cI2D2 :: Integer -> (Integer, Int)
+-- cI2D2  = cI2D2'
+--     where 
+--       cI2D2' 0 = (0, 0)
+--       cI2D2' i | i <= maxSafeInteger = (i, 0)
+--       cI2D2' i = go 0 i
+--           where
+--             go e n
+--               | n <= maxUnsafeInteger = (n, e)
+--               | otherwise = go (e + shiftAmount) (n `unsafeShiftR` shiftAmount) 
+--               where
+--                 exPlus = fromIntegral (integerLogBase 10 n - 308 `quot` 100) -- would be dynamic (100-10)
+--                 shiftAmount = max 1 exPlus
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
@@ -940,6 +971,15 @@ maxDouble = 1.7976931348623157e308
 
 minDouble :: Double
 minDouble = 4.9406564584124654e-324 -- Minimum positive normalized value for Double as per IEEE 754
+
+doublePrecisionBinary :: Int 
+doublePrecisionBinary = 53
+
+doublePrecisionDecimal :: Int 
+doublePrecisionDecimal = 308
+
+doublePrecisionRadix32 :: Int
+doublePrecisionRadix32 = 32
 
 maxSafeInteger :: Integer
 maxSafeInteger = 9007199254740991 -- 2^53 -1 this is the max integer that can be represented without losing precision
