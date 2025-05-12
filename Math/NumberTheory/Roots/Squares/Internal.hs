@@ -663,7 +663,7 @@ optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (startAt i radixW32Squared 0) 
 {-# SPECIALIZE startAt :: Int64 -> Int64 -> Int64 -> Int64 #-}
 {-# SPECIALIZE startAt :: Integer -> Integer -> Integer -> Integer #-}
 startAt :: Integral a => a -> a -> a -> a 
-startAt i mx mi = pred $ floorDouble (sqrt (fromIntegral i) :: Double)--if i >= mx then mx else mi 
+startAt i mx mi = let x = floorDouble (sqrt (fromIntegral i) :: Double) in if i <= radixW32 then x else pred x --if i >= mx then mx else mi 
 
 -- | handle overflow 
 {-# INLINE hndlOvflwW32 #-}
@@ -799,10 +799,11 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
-sqrtFX# (FloatingX# s# e#)  = FloatingX# sX# (intToInt64# eX#) 
-  where 
+sqrtFX# (FloatingX# s# e#) = 
+  let 
     !(D# sX#, eX) = sqrtSplitDbl (FloatingX (D# s#) (fromIntegral (I# (int64ToInt# e#)))) 
     !(I# eX#) = fromIntegral eX
+  in FloatingX# sX# (intToInt64# eX#)
 
 sqrtSplitDbl :: FloatingX -> (Double, Int64) 
 sqrtSplitDbl (FloatingX d e) 
@@ -884,39 +885,21 @@ cI2D2 i
           !totalShift = shiftNeeded
       in (i `unsafeShiftR` totalShift, totalShift)
 
--- Helper: base-2 logarithm for integers (floor of log2)
-integerLog2 :: Integer -> Int
-integerLog2 n = I# (word2Int# (integerLog2# n))
-
--- cI2D2 :: Integer -> (Integer, Int)
--- cI2D2  = cI2D2'
---     where 
---       cI2D2' 0 = (0, 0)
---       cI2D2' i | i <= maxSafeInteger = (i, 0)
---       cI2D2' i = go 0 i
---           where
---             go e n
---               | n <= maxUnsafeInteger = (n, e)
---               | otherwise = go (e + shiftAmount) (n `unsafeShiftR` shiftAmount) 
---               where
---                 exPlus = fromIntegral (integerLogBase 10 n - 308 `quot` 100) -- would be dynamic (100-10)
---                 shiftAmount = max 1 exPlus
-
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
-split d  = (fromIntegral s, fromIntegral $ I# expInt#) where 
+split d = let 
   !(D# d#) = d
-  !(# s, expInt# #) = decodeDoubleInteger d# 
+  !(# s, expInt# #) = decodeDoubleInteger d#
+  in (fromIntegral s, fromIntegral $ I# expInt#)
 
 {-# INLINE split# #-}
-split# :: Double# -> (# Double#, Int64# #) 
-split# d#  = (# s#, ex# #) 
-  where 
-        !(# s, expInt# #) = decodeDoubleInteger d# 
-        !(D# s#) = fromIntegral s 
-        !ex# = intToInt64# expInt#
+split# :: Double# -> (# Double#, Int64# #)
+split# d# = let 
+  !(# s, expInt# #) = decodeDoubleInteger d#
+  !(D# s#) = fromIntegral s
+  !ex# = intToInt64# expInt#
+  in (# s#, ex# #)
 
- -- | Normalising functions for our custom double  
 normalize :: Double -> Double 
 normalize x
   -- | NFI.isNormal x = x 
@@ -943,11 +926,11 @@ normalize x
 
 {-# INLINE normalizeFX# #-}
 normalizeFX# :: FloatingX# -> FloatingX#
-normalizeFX# (FloatingX# d# ex#) = FloatingX# s# expF#
-  where
-    !(D# nd#) = normalize (D# d#)
-    !(# s#, e# #) = split# nd#
-    !expF# = ex# `plusInt64#` e#
+normalizeFX# (FloatingX# d# ex#) = 
+  let !(D# nd#) = normalize (D# d#)
+      !(# s#, e# #) = split# nd#
+      !expF# = ex# `plusInt64#` e#
+  in FloatingX# s# expF#
 
 ----------------------------------------------------------------------------
 -- | Some Constants 
@@ -986,6 +969,9 @@ maxSafeInteger = 9007199254740991 -- 2^53 -1 this is the max integer that can be
 
 logSafe :: Int
 logSafe = integerLog2 maxUnsafeInteger
+-- Helper: base-2 logarithm for integers (floor of log2)
+integerLog2 :: Integer -> Int
+integerLog2 n = I# (word2Int# (integerLog2# n))
 
 -- This is approximately 1.8 x 10^308 representable as Double but will lose precision
 maxUnsafeInteger :: Integer
