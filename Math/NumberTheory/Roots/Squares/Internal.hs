@@ -80,7 +80,7 @@ import qualified Data.List as DL
 {-# SPECIALISE isqrtA :: Integer -> Integer #-}
 isqrtA :: Integral a => a -> a
 isqrtA 0 = 0
-isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
+isqrtA n = isqrtB n --heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
@@ -873,15 +873,15 @@ integer2FloatingX# i
     !(D# iDouble#) = fromIntegral i 
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
+{-# INLINE cI2D2 #-}
 cI2D2 :: Integer -> (Integer, Int)
 cI2D2 i
   | i == 0    = (0, 0)
   | i <= maxSafeInteger = (i, 0)
   | otherwise =
-      let logSafe = integerLog2 maxUnsafeInteger
-          logNum  = integerLog2 i
-          shiftNeeded = max 1 (logNum - logSafe)
-          totalShift = shiftNeeded
+      let !logNum  = integerLog2 i
+          !shiftNeeded = max 1 (logNum - logSafe)
+          !totalShift = shiftNeeded
       in (i `unsafeShiftR` totalShift, totalShift)
 
 -- Helper: base-2 logarithm for integers (floor of log2)
@@ -983,6 +983,9 @@ doublePrecisionRadix32 = 32
 
 maxSafeInteger :: Integer
 maxSafeInteger = 9007199254740991 -- 2^53 -1 this is the max integer that can be represented without losing precision
+
+logSafe :: Int
+logSafe = integerLog2 maxUnsafeInteger
 
 -- This is approximately 1.8 x 10^308 representable as Double but will lose precision
 maxUnsafeInteger :: Integer
