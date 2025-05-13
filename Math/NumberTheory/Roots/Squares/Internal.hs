@@ -80,7 +80,7 @@ import qualified Data.List as DL
 {-# SPECIALISE isqrtA :: Integer -> Integer #-}
 isqrtA :: Integral a => a -> a
 isqrtA 0 = 0
-isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
+isqrtA n = isqrtB n --heron n (fromInteger . appSqrt . fromIntegral $ n) -- replace with isqrtB n
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
@@ -712,23 +712,27 @@ data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-}!Double#, expnnt# :: {-# 
 {-# INLINE floorX# #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}
 floorX# :: (Integral a) => FloatingX# -> a
-floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) e) of
+-- floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) e) of
+--     Just d -> floor d
+--     _ -> error "floorX#: fx2Double resulted in Nothing  " --fromIntegral $ toLong (D# s#) (fromIntegral e)
+--   where 
+--     e = fromIntegral (I# $ int64ToInt# e#)
+floorX# (FloatingX# s# e#) = let e = fromIntegral (I# $ int64ToInt# e#) 
+  in case fx2Double (FloatingX (D# s#) e) of
     Just d -> floor d
     _ -> error "floorX#: fx2Double resulted in Nothing  " --fromIntegral $ toLong (D# s#) (fromIntegral e)
-  where 
-    e = fromIntegral (I# $ int64ToInt# e#)
-
+    
 zero# :: FloatingX#
-zero# = FloatingX# 0.0## minBound64# 
-    where 
+zero# = let 
         !(I# minBoundInt#) = fromIntegral (minBound :: Int64) 
         !minBound64# = intToInt64# minBoundInt#
+  in FloatingX# 0.0## minBound64# 
 
 minValue# :: FloatingX#
-minValue# = FloatingX# 1.0## zero64#
-    where 
+minValue# = let 
         !(I# zeroInt#) = fromIntegral (0 :: Int64) 
         !zero64# = intToInt64# zeroInt#
+  in FloatingX# 1.0## zero64#
 
 {-# INLINE (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
@@ -799,10 +803,10 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
-sqrtFX# (FloatingX# s# e#)  = FloatingX# sX# (intToInt64# eX#) 
-  where 
+sqrtFX# (FloatingX# s# e#)  = let
     !(D# sX#, eX) = sqrtSplitDbl (FloatingX (D# s#) (fromIntegral (I# (int64ToInt# e#)))) 
     !(I# eX#) = fromIntegral eX
+ in FloatingX# sX# (intToInt64# eX#) 
 
 sqrtSplitDbl :: FloatingX -> (Double, Int64) 
 sqrtSplitDbl (FloatingX d e) 
@@ -854,9 +858,6 @@ double2FloatingX# d = let
    !e# = intToInt64# eInt#
   in FloatingX# s# e#
 
--- The maximum integral value that can be unambiguously represented as a
--- Double. Equal to 9,007,199,254,740,991.
-
 {-# INLINE integer2FloatingX# #-}
 integer2FloatingX# :: Integer -> FloatingX#
 integer2FloatingX# i
@@ -873,34 +874,36 @@ integer2FloatingX# i
     !(D# iDouble#) = fromIntegral i 
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
+-- The maximum integral value that can be unambiguously represented as a
+-- Double. Equal to 9,007,199,254,740,991.
 cI2D2 :: Integer -> (Integer, Int)
-cI2D2 i
-  | i == 0    = (0, 0)
-  | i <= maxSafeInteger = (i, 0)
-  | otherwise =
-      let logSafe = integerLog2 maxUnsafeInteger
-          logNum  = integerLog2 i
-          shiftNeeded = max 1 (logNum - logSafe)
-          totalShift = shiftNeeded
-      in (i `unsafeShiftR` totalShift, totalShift)
-
--- Helper: base-2 logarithm for integers (floor of log2)
-integerLog2 :: Integer -> Int
-integerLog2 n = I# (word2Int# (integerLog2# n))
+cI2D2  = cI2D2'
+    where 
+      cI2D2' 0 = (0, 0)
+      cI2D2' i | i <= maxSafeInteger = (i, 0)
+      cI2D2' i = go 0 i
+          where
+            go e n
+              | n <= maxUnsafeInteger = (n, e)
+              | otherwise = go (e + shiftAmount) (n `unsafeShiftR` shiftAmount) 
+              where
+                exPlus = fromIntegral (integerLogBase 10 n - 308 `quot` 100) -- would be dynamic (100-10)
+                shiftAmount = max 1 exPlus
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
-split d  = (fromIntegral s, fromIntegral $ I# expInt#) where 
+split d  = let 
   !(D# d#) = d
   !(# s, expInt# #) = decodeDoubleInteger d# 
+ in (fromIntegral s, fromIntegral $ I# expInt#) 
 
 {-# INLINE split# #-}
 split# :: Double# -> (# Double#, Int64# #) 
-split# d#  = (# s#, ex# #) 
-  where 
+split# d#  = let 
         !(# s, expInt# #) = decodeDoubleInteger d# 
         !(D# s#) = fromIntegral s 
         !ex# = intToInt64# expInt#
+  in (# s#, ex# #) 
 
  -- | Normalising functions for our custom double  
 normalize :: Double -> Double 
@@ -929,11 +932,11 @@ normalize x
 
 {-# INLINE normalizeFX# #-}
 normalizeFX# :: FloatingX# -> FloatingX#
-normalizeFX# (FloatingX# d# ex#) = FloatingX# s# expF#
-  where
+normalizeFX# (FloatingX# d# ex#) = let
     !(D# nd#) = normalize (D# d#)
     !(# s#, e# #) = split# nd#
     !expF# = ex# `plusInt64#` e#
+  in FloatingX# s# expF#
 
 ----------------------------------------------------------------------------
 -- | Some Constants 
