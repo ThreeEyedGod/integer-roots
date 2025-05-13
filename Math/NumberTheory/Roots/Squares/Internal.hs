@@ -228,7 +228,7 @@ data LoopArgsSeq = LoopArgsSeq {positionSeq :: {-# UNPACK #-} !Int#, inArgsSeq_ 
 preSeq ::  Seq Word32 -> ProcessedSeq
 preSeq a  
   | Seq.null a = error "preSeq: Invalid Argument empty seq "
-  | Seq.length a == 1 && fromMaybe 0 (seqHeadW32 a) == 0 = ProcessedSeq Seq.empty Seq.empty 0 
+  | Seq.length a == 1 && fromMaybe 0 (seqHeadW32 a) == 0 = ProcessedSeq Seq.empty Seq.empty 0 -- //FIXME REMOVE FROMMAYBE
   | otherwise = splitSeq a
 
 {-# INLINE splitSeq #-}        
@@ -278,7 +278,7 @@ theNextIterationsSeq itr@(ItrSeq currlen !w32Seq l# yCumulated iRem tbfx#) -- ma
   | otherwise =
       let 
           !(LoopArgsSeq _ !inA_ !ri32Seq ) = prepArgsSeq_ itr 
-          (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
+          !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
        in theNextIterationsSeq $ ItrSeq (succ currlen) ri32Seq (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
 -- END using sequences ****************************************************************
@@ -678,11 +678,13 @@ scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# els
 {-# INLINE wrd2wrd32 #-}
 wrd2wrd32 :: [Word] -> [Word32]
 wrd2wrd32 xs = fromIntegral <$> xs
-    
+
+{-# INLINE iToWrdListBase #-}    
 iToWrdListBase :: Integer -> Word -> [Word]
 iToWrdListBase 0 _ = [0]
 iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reversed format
 
+{-# INLINE convertBase #-} 
 convertBase :: Word -> Word -> [Word] -> [Word]
 convertBase _ _ [] = []
 convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs) 
@@ -711,6 +713,7 @@ data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-}!Double#, expnnt# :: {-# 
 
 {-# INLINE floorX# #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}
+{-# SPECIALIZE floorX# :: FloatingX# -> Int64 #-}
 floorX# :: (Integral a) => FloatingX# -> a
 -- floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) e) of
 --     Just d -> floor d
@@ -833,7 +836,6 @@ sqrtDX d
 -- foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrt_fsqrt" sqrt_fsqrt :: Double -> Double
 -- foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
 -- foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h toLong" toLong :: Double -> CLong -> CLong
-
 fx2Double :: FloatingX -> Maybe Double
 fx2Double (FloatingX d@(D# d#) e)
     | isNaN d = Nothing --error "Input is NaN"
@@ -876,6 +878,7 @@ integer2FloatingX# i
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991.
+{-# INLINE cI2D2 #-}
 cI2D2 :: Integer -> (Integer, Int)
 cI2D2  = cI2D2'
     where 
@@ -906,6 +909,7 @@ split# d#  = let
   in (# s#, ex# #) 
 
  -- | Normalising functions for our custom double  
+{-# INLINE normalize #-}
 normalize :: Double -> Double 
 normalize x
   -- | NFI.isNormal x = x 
