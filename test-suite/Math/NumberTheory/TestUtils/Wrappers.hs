@@ -90,7 +90,7 @@ instance (Num a, Arbitrary a) => Arbitrary (Huge a) where
   arbitrary = do
     Positive l <- arbitrary
     ds <- vector l
-    return $ Huge $ foldl1 (\acc n -> acc * 2 ^ (127 :: Int) + n) ds
+    return $ Huge $ foldl1 (\acc n -> acc * 2 ^ (63 :: Int) + n) ds
 
 instance Eq1 Huge where
   liftEq eq (Huge a) (Huge b) = a `eq` b
