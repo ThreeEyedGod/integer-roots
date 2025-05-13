@@ -79,7 +79,7 @@ test-suite integer-roots-tests
                -Wcompat 
                -threaded 
                -rtsopts 
-               -with-rtsopts=-N4 -w 
+               -with-rtsopts=-N6 -w 
 
 
 executable roots-exe
