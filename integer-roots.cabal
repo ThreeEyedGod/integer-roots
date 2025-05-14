@@ -24,7 +24,7 @@ source-repository head
 library
   build-depends:
     base >= 4.9 && <5
-  --  ,vector >= 0.13.2.0
+   ,vector >= 0.13.2.0
    ,containers >= 0.8
    ,fast-digits >= 0.3.2.0
    ,floating-bits >= 0.3.1.0

@@ -41,7 +41,7 @@ import GHC.Num.Integer
       integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
 import GHC.Float (divideDouble, isDoubleDenormalized, ceilingDouble, floorDouble)
 import Data.FastDigits (digitsUnsigned, digits, undigits)
--- import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList)
+import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList)
 import Data.Int (Int64)
 -- import Foreign.C.Types ( CLong(..) )
 import Data.Word (Word32)
@@ -206,17 +206,17 @@ data ItrSeq = ItrSeq {llseq :: {-# UNPACK #-} !Int, seqW32_ :: {-# UNPACK #-} Se
 data RestNextTwoSeq = RestNextTwoSeq {pairpositionSeq :: {-# UNPACK #-} !Int#, theRestSeq1 :: Seq Word32, firstWord32Seq :: {-# UNPACK #-} !Word32, secondWord32Seq :: {-# UNPACK #-} !Word32} deriving Eq
 data LoopArgsSeq = LoopArgsSeq {positionSeq :: {-# UNPACK #-} !Int#, inArgsSeq_ :: !IterArgs_, residuali32Seq :: Seq Word32} deriving (Eq)          
 
--- -- | Iteration loop data - these records have vectors / lists in them 
--- data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
--- data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
--- data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq)
--- data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
+-- | Iteration loop data - these records have vectors / lists in them 
+data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
+data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
+data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq)
+data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
 
--- -- | Iteration loop data - these records have vectors / lists in them 
--- data ItrLst = ItrLst {ll :: {-# UNPACK #-} !Int, lstW32_ :: {-# UNPACK #-} ![Word32], ll_ :: {-# UNPACK #-} !Int#, yCumulativeL :: Integer, iRemL_ :: {-# UNPACK #-} !Integer, tbL# :: FloatingX#} deriving (Eq)
--- data LoopArgsLst = LoopArgsLst {positionL :: {-# UNPACK #-} !Int#, inArgsL_ :: !IterArgs_, residuali32Lst :: ![Word32]} deriving (Eq)          
--- data ProcessedLst  = ProcessedLst {theRestL :: [Word32], firstTwoL :: [Word32], lenL :: !Int} deriving (Eq)
--- data RestNextTwoL = RestNextTwoL {pairpositionL :: {-# UNPACK #-} !Int#, theRestLst :: ![Word32], firstWord32L :: {-# UNPACK #-} !Word32, secondWord32L :: {-# UNPACK #-} !Word32} deriving Eq
+-- | Iteration loop data - these records have vectors / lists in them 
+data ItrLst = ItrLst {ll :: {-# UNPACK #-} !Int, lstW32_ :: {-# UNPACK #-} ![Word32], ll_ :: {-# UNPACK #-} !Int#, yCumulativeL :: Integer, iRemL_ :: {-# UNPACK #-} !Integer, tbL# :: FloatingX#} deriving (Eq)
+data LoopArgsLst = LoopArgsLst {positionL :: {-# UNPACK #-} !Int#, inArgsL_ :: !IterArgs_, residuali32Lst :: ![Word32]} deriving (Eq)          
+data ProcessedLst  = ProcessedLst {theRestL :: [Word32], firstTwoL :: [Word32], lenL :: !Int} deriving (Eq)
+data RestNextTwoL = RestNextTwoL {pairpositionL :: {-# UNPACK #-} !Int#, theRestLst :: ![Word32], firstWord32L :: {-# UNPACK #-} !Word32, secondWord32L :: {-# UNPACK #-} !Word32} deriving Eq
 
 -- END data structures for lists, vectors, sequences ****************************************************************
 -- END ****************************************************************
@@ -228,7 +228,7 @@ data LoopArgsSeq = LoopArgsSeq {positionSeq :: {-# UNPACK #-} !Int#, inArgsSeq_ 
 preSeq ::  Seq Word32 -> ProcessedSeq
 preSeq a  
   | Seq.null a = error "preSeq: Invalid Argument empty seq "
-  | Seq.length a == 1 && fromMaybe 0 (seqHeadW32 a) == 0 = ProcessedSeq Seq.empty Seq.empty 0 -- //FIXME REMOVE FROMMAYBE
+  | Seq.length a == 1 && seqOnlyElemZero a = ProcessedSeq Seq.empty Seq.empty 0
   | otherwise = splitSeq a
 
 {-# INLINE splitSeq #-}        
@@ -287,57 +287,57 @@ theNextIterationsSeq itr@(ItrSeq currlen !w32Seq l# yCumulated iRem tbfx#) -- ma
 -- BEGIN using vectors ****************************************************************
 -- BEGIN ****************************************************************
 
--- preFI ::  VU.Vector Word32 -> ProcessedVec
--- preFI v  
---   | VU.null v = error "preFI: Invalid Argument null vector "
---   | VU.length v == 1 && VU.unsafeHead v == 0 = ProcessedVec VU.empty VU.empty 0
---   | otherwise = splitVec v
+preFI ::  VU.Vector Word32 -> ProcessedVec
+preFI v  
+  | VU.null v = error "preFI: Invalid Argument null vector "
+  | VU.length v == 1 && VU.unsafeHead v == 0 = ProcessedVec VU.empty VU.empty 0
+  | otherwise = splitVec v
 
--- {-# INLINE splitVec #-}        
--- -- | also evenizes the vector of digits
--- splitVec :: VU.Vector Word32 -> ProcessedVec
--- splitVec vec = let !l = VU.length vec in if even l then brkVecPv vec (l-2) else evenizePv (brkVecPv vec (l-1))
+{-# INLINE splitVec #-}        
+-- | also evenizes the vector of digits
+splitVec :: VU.Vector Word32 -> ProcessedVec
+splitVec vec = let !l = VU.length vec in if even l then brkVecPv vec (l-2) else evenizePv (brkVecPv vec (l-1))
 
--- fi :: ProcessedVec -> Itr
--- fi (ProcessedVec w32Vec dxsVec' (I# l'#)) = let 
---       !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
---     in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1) 
+fi :: ProcessedVec -> Itr
+fi (ProcessedVec w32Vec dxsVec' (I# l'#)) = let 
+      !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32) 
+    in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1) 
 
--- -- | The First iteration
--- theFi :: VU.Vector Word32 -> Itr
--- theFi = fi . preFI
+-- | The First iteration
+theFi :: VU.Vector Word32 -> Itr
+theFi = fi . preFI
 
--- {-# INLINE prepA_ #-}
--- prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
--- prepA_ l# w32Vec = let 
---           -- !p# = l# `uncheckedIShiftRA#` 1# -# 1# -- Use bit-shift for division by 2
---           -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
---           (rst,nxt2) = brkVec w32Vec (I# l# - 2)
---         -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
---         in RestNextTwo l# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
+{-# INLINE prepA_ #-}
+prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
+prepA_ l# w32Vec = let 
+          -- !p# = l# `uncheckedIShiftRA#` 1# -# 1# -- Use bit-shift for division by 2
+          -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
+          (rst,nxt2) = brkVec w32Vec (I# l# - 2)
+        -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
+        in RestNextTwo l# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
 
--- prepB_ :: Integer -> FloatingX# -> RestNextTwo -> IterArgs_
--- prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
--- {-# INLINE prepB_ #-} 
+prepB_ :: Integer -> FloatingX# -> RestNextTwo -> IterArgs_
+prepB_ iRem tBFX# (RestNextTwo _ _ n1_ nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
+{-# INLINE prepB_ #-} 
 
--- {-# INLINE prepArgs_ #-}
--- prepArgs_ :: Itr -> LoopArgs
--- prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let           
---           !rnxt2@(RestNextTwo p# ri32Vec _ _) = prepA_ l# w32Vec
---           iargs = prepB_ iRem tBFX_# rnxt2
---         in 
---           LoopArgs p# iargs ri32Vec
+{-# INLINE prepArgs_ #-}
+prepArgs_ :: Itr -> LoopArgs
+prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let           
+          !rnxt2@(RestNextTwo p# ri32Vec _ _) = prepA_ l# w32Vec
+          iargs = prepB_ iRem tBFX_# rnxt2
+        in 
+          LoopArgs p# iargs ri32Vec
 
--- -- //FIXME TAKES DOWN PERFORMANCE
--- -- Keep it this way: Inlining this lowers performance. 
--- theNextIterations :: Itr -> Integer
--- theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) 
---   | VU.null w32Vec = yCumulated 
---   | otherwise =
---       let 
---           (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr 
---           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
---        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
+-- //FIXME TAKES DOWN PERFORMANCE
+-- Keep it this way: Inlining this lowers performance. 
+theNextIterations :: Itr -> Integer
+theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) 
+  | VU.null w32Vec = yCumulated 
+  | otherwise =
+      let 
+          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr 
+          (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
+       in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
 -------------------------------------------------------------------------------------
 
@@ -479,6 +479,9 @@ seqHeadW32 s = case Seq.viewl s of
     EmptyL -> Nothing  -- Equivalent of null check
     x :< _ -> Just x
 
+seqOnlyElemZero :: Seq Word32 -> Bool 
+seqOnlyElemZero s = s == zeroW32Seq
+
 zeroW32Seq :: Seq Word32
 zeroW32Seq = Seq.singleton 0 
 
@@ -560,12 +563,12 @@ matchTwoElements s =
 -- itrLst2itrVec :: ItrLst -> Itr 
 -- itrLst2itrVec (ItrLst a b c d e f)  = Itr a (VU.fromList b) c d e f
 
--- -- // FIXME TAKES DOWN PERFORMANCE
--- {-# INLINE dgtsVecBase32__ #-}
--- dgtsVecBase32__ :: Integer -> VU.Vector Word32
--- dgtsVecBase32__ n | n < 0 = error "dgtsVecBase32_: Invalid negative argument"
--- dgtsVecBase32__ 0 = VU.singleton 0 
--- dgtsVecBase32__ n = mkIW32Vec n radixW32
+-- // FIXME TAKES DOWN PERFORMANCE
+{-# INLINE dgtsVecBase32__ #-}
+dgtsVecBase32__ :: Integer -> VU.Vector Word32
+dgtsVecBase32__ n | n < 0 = error "dgtsVecBase32_: Invalid negative argument"
+dgtsVecBase32__ 0 = VU.singleton 0 
+dgtsVecBase32__ n = mkIW32Vec n radixW32
 
 -- {-# INLINE dgtsLstBase32__ #-}
 -- dgtsLstBase32__ :: Integer -> [Word32]
@@ -573,34 +576,34 @@ matchTwoElements s =
 -- dgtsLstBase32__ 0 = [0] 
 -- dgtsLstBase32__ n = mkIW32Lst n radixW32
 
--- brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
--- brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
--- {-# INLINE brkVec #-}
+brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
+brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
+{-# INLINE brkVec #-}
 
 -- brkLst :: [Word32] -> Int -> ([Word32], [Word32])
 -- brkLst xs loc = DL.splitAt loc xs
 -- {-# INLINE brkLst #-}
 
--- brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
--- brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
+brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
+brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
 
 -- brkLstPl :: [Word32] -> Int -> ProcessedLst
 -- brkLstPl xs loc = let !(hd, rst) = brkLst xs loc in ProcessedLst hd rst loc
 
--- -- | a bit tricky it leaves l alone in the predicate that brkVecPv-brkLst-brkLstSeq does the right thing //FIXME HMMM
--- evenizePv :: ProcessedVec -> ProcessedVec
--- evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l
--- {-# INLINE evenizePv #-}
+-- | a bit tricky it leaves l alone in the predicate that brkVecPv-brkLst-brkLstSeq does the right thing //FIXME HMMM
+evenizePv :: ProcessedVec -> ProcessedVec
+evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l
+{-# INLINE evenizePv #-}
 
 -- evenizePl :: ProcessedLst -> ProcessedLst
 -- evenizePl (ProcessedLst he re l) = ProcessedLst he (re++[0]) l
 -- {-# INLINE evenizePl #-}
 
--- {-# INLINE mkIW32Vec #-}
--- -- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
--- mkIW32Vec :: Integer -> Word -> VU.Vector Word32
--- mkIW32Vec 0 _ = VU.singleton 0 -- safety
--- mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
+{-# INLINE mkIW32Vec #-}
+-- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
+mkIW32Vec :: Integer -> Word -> VU.Vector Word32
+mkIW32Vec 0 _ = VU.singleton 0 -- safety
+mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
 
 {-# INLINE mkIW32Lst #-}
 --spit out the Word32 List from digitsUnsigned which comes in reversed format.
@@ -608,14 +611,14 @@ mkIW32Lst :: Integer -> Word -> [Word32]
 mkIW32Lst 0 _ = [0]-- safety
 mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b) 
 
--- {-# INLINE intgrFromRvsrd2ElemVec #-}
--- -- | Integer from a "reversed" list of Word32 digits
--- intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer -> Integer
--- intgrFromRvsrd2ElemVec v2ElemW32s base =
---   let (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of
---         (Just u, Just v) -> (fst u, snd v)
---         (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector" -- (Nothing, _) and (_, Nothing)
---       in intgrFromRvsrdTuple (l1, l2) base
+{-# INLINE intgrFromRvsrd2ElemVec #-}
+-- | Integer from a "reversed" list of Word32 digits
+intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer -> Integer
+intgrFromRvsrd2ElemVec v2ElemW32s base =
+  let (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of
+        (Just u, Just v) -> (fst u, snd v)
+        (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector" -- (Nothing, _) and (_, Nothing)
+      in intgrFromRvsrdTuple (l1, l2) base
 
 -- evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
 -- evenizeLstRvrsdDgts [] = ([0], 1)
