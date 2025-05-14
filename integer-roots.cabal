@@ -24,8 +24,8 @@ source-repository head
 library
   build-depends:
     base >= 4.9 && <5
-   ,vector >= 0.13.2.0
-   ,containers >= 0.8
+  --  ,vector >= 0.13.2.0
+  --  ,containers >= 0.8
    ,fast-digits >= 0.3.2.0
    ,floating-bits >= 0.3.1.0
   if impl(ghc < 9.0)
@@ -101,4 +101,4 @@ executable roots-exe
                        -Wredundant-constraints
                        -threaded
                        -rtsopts
-                       -with-rtsopts=-N4 -A64M
+                       -with-rtsopts=-N4 -w

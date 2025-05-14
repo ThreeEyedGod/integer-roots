@@ -22,6 +22,7 @@ module Math.NumberTheory.TestUtils.Wrappers
   ( AnySign(..)
   , Power(..)
   , Huge(..)
+  , Humoungous(..)
   ) where
 
 import Control.Applicative
@@ -102,6 +103,30 @@ instance Show1 Huge where
   liftShowsPrec shw _ p (Huge a) = shw p a
 
 -------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+-- Humoungous
+
+newtype Humoungous a = Humoungous { getHumoungous :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (Humoungous a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ Humoungous $ foldl1 (\acc n -> acc * 2 ^ (127 :: Int) + n) ds
+
+instance Eq1 Humoungous where
+  liftEq eq (Humoungous a) (Humoungous b) = a `eq` b
+
+instance Ord1 Humoungous where
+  liftCompare cmp (Humoungous a) (Humoungous b) = a `cmp` b
+
+instance Show1 Humoungous where
+  liftShowsPrec shw _ p (Humoungous a) = shw p a
+
+-------------------------------------------------------------------------------
+
 -- Power
 
 newtype Power a = Power { getPower :: a }
