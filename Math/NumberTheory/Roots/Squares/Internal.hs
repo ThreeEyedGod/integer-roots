@@ -460,12 +460,12 @@ handleRems_ (IterRes yc yi ri_)
 -- Calculate remainder accompanying a 'digit'
 calcRemainder :: Integer -> Integer -> Int64 -> Integer
 calcRemainder tAI !_ 0 =  tAI 
-calcRemainder tAI tc dgt =  let !i = fromIntegral dgt in tAI - ((2 * i * tc) + i*i)
+calcRemainder tAI tc dgt =  let !i = fromIntegral dgt in tAI - ((double i * tc) + i*i)
 {-# INLINE calcRemainder #-}
 
 -- Fix remainder accompanying a 'next downed digit'
 fixRemainder :: Integer -> Integer -> Int64 -> Integer
-fixRemainder tc rdr dgt =  rdr + 2 * tc + 2 * fromIntegral dgt + 1
+fixRemainder tc rdr dgt =  rdr + double tc + double (fromIntegral dgt) + 1
 {-# INLINE fixRemainder #-}
 
 ------------------------------------------------------------------------
