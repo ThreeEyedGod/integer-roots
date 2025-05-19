@@ -425,7 +425,7 @@ fixTCFX# ia currlen yTildeFinal = let tcfx# = tC_ ia in if currlen <= 2 then nex
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_# :: IterArgs_ -> Int64
-nxtDgt_# (IterArgs_ 0 _) = 0 
+nxtDgt_# (IterArgs_ 0 !_) = 0 
 nxtDgt_# iax = comput (preComput iax) 
 {-# INLINE nxtDgt_# #-}
 
@@ -459,6 +459,7 @@ handleRems_ (IterRes yc yi ri_)
   
 -- Calculate remainder accompanying a 'digit'
 calcRemainder :: Integer -> Integer -> Int64 -> Integer
+calcRemainder tAI !_ 0 =  tAI 
 calcRemainder tAI tc dgt =  let !i = fromIntegral dgt in tAI - ((2 * i * tc) + i*i)
 {-# INLINE calcRemainder #-}
 
