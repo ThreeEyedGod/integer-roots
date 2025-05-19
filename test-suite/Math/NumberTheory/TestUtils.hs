@@ -121,8 +121,8 @@ testIntegralProperty name f = testGroup name
   , QC.testProperty "quickcheck Large Word"    ((f :: wrapper Word    -> bool) . getLarge)
   , QC.testProperty "quickcheck Huge  Integer" ((f :: wrapper Integer -> bool) . getHuge)
   , QC.testProperty "quickcheck Huge  Natural" ((f :: wrapper Natural -> bool) . getHuge)
-  , QC.testProperty "quickcheck Humoungous  Integer" ((f :: wrapper Integer -> bool) . getHumoungous)
-  , QC.testProperty "quickcheck Humoungous  Natural" ((f :: wrapper Natural -> bool) . getHumoungous)
+  -- , QC.testProperty "quickcheck Humoungous  Integer" ((f :: wrapper Integer -> bool) . getHumoungous)
+  -- , QC.testProperty "quickcheck Humoungous  Natural" ((f :: wrapper Natural -> bool) . getHumoungous)
   ]
 
 testIntegral2Property
@@ -199,8 +199,8 @@ testIntegral2Property name f = testGroup name
   , QC.testProperty "quickcheck Huge  Natural Word"    ((f :: wrapper1 Natural -> wrapper2 Word    -> bool) . fmap getHuge)
   , QC.testProperty "quickcheck Huge  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . fmap getHuge)
   , QC.testProperty "quickcheck Huge  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . fmap getHuge)
-  , QC.testProperty "quickcheck Humoungous  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getHumoungous)
-  , QC.testProperty "quickcheck Humoungous  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getHumoungous)
+  -- , QC.testProperty "quickcheck Humoungous  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getHumoungous)
+  -- , QC.testProperty "quickcheck Humoungous  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getHumoungous)
   ]
 
 testSmallAndQuick

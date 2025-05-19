@@ -647,6 +647,9 @@ intgrFromRvsrd2ElemLst xs2ElemW32s@[l1,l2] base = intgrFromRvsrdTuple (l1, l2) b
 {-# INLINE intgrFromRvsrdTuple #-}
 -- | Integer from a "reversed" tuple of Word32 digits
 intgrFromRvsrdTuple :: (Word32,Word32) -> Integer -> Integer
+intgrFromRvsrdTuple (0,0) 0 = 0
+intgrFromRvsrdTuple (0,l2) base = fromIntegral l2 * base 
+intgrFromRvsrdTuple (l1,0) _ = fromIntegral l1
 intgrFromRvsrdTuple (l1,l2) base = fromIntegral l2 * base + fromIntegral l1
 
 {-# INLINE doubleFromRvsrdTuple #-}
@@ -658,6 +661,7 @@ doubleFromRvsrdTuple (l1,l2) base = fromIntegral l2 * fromIntegral base + fromIn
 {-# SPECIALIZE intNormalizedFloatingX# :: Int64 -> FloatingX# #-}
 {-# SPECIALIZE intNormalizedFloatingX# :: Integer -> FloatingX# #-}
 intNormalizedFloatingX# :: Integral a => a -> FloatingX#
+intNormalizedFloatingX# 0 = zero#
 intNormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i64)
 
 {-# INLINE optmzedLrgstSqrtN #-}
@@ -729,7 +733,8 @@ floorX# (FloatingX# s# e#) = let e = fromIntegral (I# $ int64ToInt# e#)
   in case fx2Double (FloatingX (D# s#) e) of
     Just d -> floor d
     _ -> error "floorX#: fx2Double resulted in Nothing  " --fromIntegral $ toLong (D# s#) (fromIntegral e)
-    
+
+{-# INLINE zero# #-}    
 zero# :: FloatingX#
 zero# = let 
         !(I# minBoundInt#) = fromIntegral (minBound :: Int64) 
