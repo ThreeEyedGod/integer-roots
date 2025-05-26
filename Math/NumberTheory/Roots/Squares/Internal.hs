@@ -20,24 +20,65 @@ module Math.NumberTheory.Roots.Squares.Internal
   ) where
 
 -- *********** BEGIN NEW IMPORTS   
-import GHC.Exts ((+#), (-#),(/##), (+##), (>=##),(**##), plusInt64#, (==##), subInt64#, gtInt64#, ltInt64#, leInt64#, uncheckedIShiftRA#)
+import GHC.Exts
+    ( (+#),
+      (-#),
+      (/##),
+      (+##),
+      (>=##),
+      (**##),
+      plusInt64#,
+      (==##),
+      subInt64#,
+      gtInt64#,
+      ltInt64#,
+      leInt64#,
+      uncheckedIShiftRA#,
+      (<##),
+      (*##),
+      Double(..),
+      Double#,
+      Int64#,
+      intToInt64#,
+      int64ToInt#,
+      Int(..),
+      Int#,
+      isTrue#,
+      int2Double#,
+      sqrtDouble#,
+      double2Int#,
+      (<#),
+      uncheckedShiftRL#,
+      word2Int#,
+      minusWord#,
+      timesWord#
+    )
 import qualified Data.Bits.Floating as DB (nextUp, nextDown)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.Integer
-    ( integerDecodeDouble#, integerShiftL#, integerFromInt,integerFromWordList,
+    ( integerDecodeDouble#,
+      integerShiftL#,
+      integerFromInt,
+      integerFromWordList,
       integerFromInt#,
       integerFromInt64#,
       integerShiftR#,
       integerLog2#,
       integerLogBase#,
-      integerLogBase, 
-      integerQuotRem, integerToInt, integerLogBase, integerEncodeDouble, integerLogBase#)
+      integerLogBase,
+      integerQuotRem,
+      integerToInt,
+      integerEncodeDouble,
+      Integer(..),
+      integerLog2#,
+      integerShiftR#,
+      integerShiftL#
+    )
 import GHC.Float (divideDouble, isDoubleDenormalized, ceilingDouble, floorDouble)
 import Data.FastDigits (digitsUnsigned, digits, undigits)
 import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList)
 import Data.Int (Int64)
 import Data.Word (Word32)
-import GHC.Exts ((<##), (*##), Double(..), Double#, Int64#, intToInt64#, int64ToInt#)
 -- *********** END NEW IMPORTS 
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -181,20 +222,11 @@ isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromIntegral $ n
 
--- BEGIN data structures for lists, vectors, sequences  ****************************************************************
--- BEGIN ****************************************************************
-
 -- | Iteration loop data - these records have vectors / lists in them 
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
 data ProcessedVec  = ProcessedVec {theRest :: VU.Vector Word32, firstTwo :: VU.Vector Word32, len :: !Int} deriving (Eq)
 data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
-
--- END data structures for lists, vectors, sequences ****************************************************************
--- END ****************************************************************
-
--- BEGIN using vectors ****************************************************************
--- BEGIN ****************************************************************
 
 preFI ::  VU.Vector Word32 -> ProcessedVec
 preFI v  
@@ -247,19 +279,11 @@ theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
--------------------------------------------------------------------------------------
-
--- END using vectors ****************************************************************
--- END ****************************************************************
-
--------------------------------------------------------------------------------------
-
 -- | numeric loop records 
 data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq)
 data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-}!Int64, ri :: Integer} deriving (Eq) 
 data CoreArgs  = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
----------------------------------------------------------------------------------------
 -- | core of computations. Functions from this point on are doing only number crunching
 fstDgtRem :: Integer -> IterRes
 fstDgtRem i = let !y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
@@ -320,8 +344,6 @@ fixRemainder tc rdr dgt =  rdr + double tc + double (fromIntegral dgt) + 1
 
 ------------------------------------------------------------------------
 -- | HELPER functions
-
---- BEGIN helpers for Sequences, Lists and Vectors
 --- ***********************************
 
 -- // FIXME TAKES DOWN PERFORMANCE
@@ -368,17 +390,7 @@ evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
 evenizeLstRvrsdDgts [] = ([0], 1)
 evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++ [0], succ l)
 
--- {-# INLINE vectorToInteger #-}
--- -- | Convert a vector of Word32 values to an Integer with base 2^32 (radixW32).
--- -- This function takes a vector of Word32 values, where each element represents a digit in base 2^32,
--- -- and combines them to form a single Integer.
--- -- Function to convert a vector of Word32 values to an Integer with base 2^32 (radixw32)
--- vectorToInteger :: VU.Vector Word32 -> Integer
--- vectorToInteger = VU.ifoldl' (\acc i w -> acc + fromIntegral w * radixW32 ^ i) 0 
-
---- END helpers for Sequences, Lists and Vectors
---- END ***********************************
-
+--- END helpers 
 --- BEGIN Core numeric helper functions
 --- ***********************************
 {-# INLINE intgrFromRvsrd2ElemLst #-}
@@ -581,12 +593,6 @@ sqrtDX d
   | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 {-# INLINE sqrtDX #-}
 
--- sqrtDoublehmpfr :: Double -> Double
--- sqrtDoublehmpfr d = M.toDouble M.Near $ M.sqrt M.Near 1000 (M.fromDouble M.Near 1000 d)
-
--- foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrt_fsqrt" sqrt_fsqrt :: Double -> Double
--- foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h sqrtC" sqrtC :: Double -> Double
--- foreign import capi "/Users/mandeburung/Documents/integer-roots/Math/c/fsqrt.h toLong" toLong :: Double -> CLong -> CLong
 fx2Double :: FloatingX -> Maybe Double
 fx2Double (FloatingX d@(D# d#) e)
     | isNaN d = Nothing --error "Input is NaN"
@@ -691,7 +697,6 @@ normalizeFX# (FloatingX# d# ex#) = let
     !expF# = ex# `plusInt64#` e#
   in FloatingX# s# expF#
 
-----------------------------------------------------------------------------
 -- | Some Constants 
 radixW32 :: Integral a => a 
 radixW32 = 4294967296 --2 ^ finiteBitSize (0 :: Word32)
@@ -774,5 +779,4 @@ nextDownFX# x@(FloatingX# s# e#)
      in 
         if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` intToInt64# 1#) else FloatingX# interimS# e#
 
--- END isqrtB ****************************************************************
 -- END isqrtB ****************************************************************
