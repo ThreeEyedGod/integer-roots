@@ -73,26 +73,26 @@ import GHC.Num.Integer
     )
 import GHC.Float (divideDouble, isDoubleDenormalized, ceilingDouble, floorDouble)
 import Data.FastDigits (digitsUnsigned, digits, undigits)
-import qualified Data.Vector.Unboxed as VU (Vector,(//), unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList)
+import qualified Data.Vector.Unboxed as VU (Vector,(//), head, unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList,(!))
 import Data.Int (Int64)
 import Data.Word (Word32)
 -- *********** END NEW IMPORTS 
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 
-import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#))
-#ifdef MIN_VERSION_integer_gmp
-import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
-import GHC.Integer.GMP.Internals (Integer(..), shiftLInteger, shiftRInteger, sizeofBigNat#)
-import GHC.Integer.Logarithms (integerLog2#)
-#define IS S#
-#define IP Jp#
-#define bigNatSize sizeofBigNat
-#else
-import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#)
-import GHC.Num.BigNat (bigNatSize#)
-import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
-#endif
+-- import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#))
+-- #ifdef MIN_VERSION_integer_gmp
+-- import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
+-- import GHC.Integer.GMP.Internals (Integer(..), shiftLInteger, shiftRInteger, sizeofBigNat#)
+-- import GHC.Integer.Logarithms (integerLog2#)
+-- #define IS S#
+-- #define IP Jp#
+-- #define bigNatSize sizeofBigNat
+-- #else
+-- import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#)
+-- import GHC.Num.BigNat (bigNatSize#)
+-- import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
+-- #endif
 
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
@@ -256,13 +256,13 @@ mkIW32Vec 0 _ = VU.singleton 0 -- safety
 mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
 
 {-# INLINE intgrFromRvsrd2ElemVec #-}
--- | Integer from a "reversed" list of Word32 digits
+-- | Integer from a "reversed" Vector of Word32 digits
 intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer -> Integer
 intgrFromRvsrd2ElemVec v2ElemW32s base =
-  let (l1, l2) = case (VU.uncons v2ElemW32s, VU.unsnoc v2ElemW32s) of
-        (Just u, Just v) -> (fst u, snd v)
-        (_,_)           -> error "intgrFromRvsrd2ElemVec : Empty Vector" -- (Nothing, _) and (_, Nothing)
-      in intgrFromRvsrdTuple (l1, l2) base
+  let (l1, l2) = case VU.uncons v2ElemW32s of
+        Just (u, v) -> (u, VU.head v)
+        Nothing -> error "intgrFromRvsrd2ElemVec : Invalid Vector - empty or less than 2 " -- (Nothing, _) and (_, Nothing)
+   in intgrFromRvsrdTuple (l1, l2) base
 
 {-# INLINE mkIW32Lst #-}
 --spit out the Word32 List from digitsUnsigned which comes in reversed format.

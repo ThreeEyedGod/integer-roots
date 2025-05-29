@@ -12,7 +12,7 @@
 
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt,
-    isqrtA,
+    isqrtA
   )
 where
 
