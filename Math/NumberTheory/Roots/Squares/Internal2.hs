@@ -115,8 +115,8 @@ data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs
 data ProcessedVec  = ProcessedVec {theRest :: !(VU.Vector Word32), firstTwo :: !(VU.Vector Word32), len :: !Int} deriving (Eq)
 data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
 
-preFI ::  VU.Vector Word32 -> ProcessedVec
-preFI v  
+preFI :: VU.Vector Word32 -> ProcessedVec
+preFI v
   | VU.null v = error "preFI: Invalid Argument null vector "
   | VU.length v == 1 && VU.unsafeHead v == 0 = ProcessedVec VU.empty VU.empty 0
   | otherwise = splitVec v

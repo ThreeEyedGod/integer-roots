@@ -11,9 +11,10 @@
 {-# LANGUAGE MagicHash        #-}
 
 module Math.NumberTheory.Roots.Squares.Internal
-  ( karatsubaSqrt
-  , isqrtA
-  ) where
+  ( karatsubaSqrt,
+    isqrtA,
+  )
+where
 
 import Math.NumberTheory.Roots.Squares.Internal2 -- addition
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -36,10 +37,10 @@ import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL
 -- find the integer square root by the integer variant
 -- of Heron's method. Takes only a handful of steps
 -- unless the input is really large.
-{-# SPECIALISE isqrtA :: Integer -> Integer #-}
-isqrtA :: Integral a => a -> a
+{-# SPECIALIZE isqrtA :: Integer -> Integer #-}
+isqrtA :: (Integral a) => a -> a
 isqrtA 0 = 0
-isqrtA n = isqrtB n --heron n (fromInteger . appSqrt . fromIntegral $ n)
+isqrtA n = isqrtB n -- heron n (fromInteger . appSqrt . fromIntegral $ n)
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
