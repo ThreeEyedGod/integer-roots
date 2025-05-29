@@ -158,7 +158,15 @@ prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let
 
 -- Keep it this way: Inlining this lowers performance. 
 theNextIterations :: Itr -> Integer
-theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) 
+-- theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx# 
+--   where
+--     tni cl v l# yC iR t# = 
+--       if VU.null v then yC else
+--       let 
+--           (LoopArgs _ !inA_ !ri32V ) = prepArgs_ (Itr cl v l# yC iR t#)
+--           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yC inA_ -- number crunching only
+--        in tni (succ cl)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal)
+theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
   | VU.null w32Vec = yCumulated 
   | otherwise =
       let 

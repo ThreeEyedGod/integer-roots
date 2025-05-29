@@ -9,6 +9,8 @@ main =
         [ 
           bench "Int Integer" $ whnf integerSquareRoot (2^31+1013),
           bench "Huge Integer" $ whnf integerSquareRoot (2^63+1013),
-          bench "Humoungous Integer " $ whnf integerSquareRoot (2^127+1013)
+          bench "Humoungous Integer " $ whnf integerSquareRoot (2^255+1013),
+          bench "Gargantuan Integer" $ whnf integerSquareRoot (2^511+1013),
+          bench "Googolplex Integer " $ whnf integerSquareRoot (2^1027+1013)
         ]
     ]
