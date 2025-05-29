@@ -75,24 +75,17 @@ test-suite integer-roots-tests
                -rtsopts 
                -with-rtsopts=-N6 -w 
 
-
-executable roots-exe
-  hs-source-dirs:      app
-  main-is:             Main.hs
+benchmark integer-roots-benchmark
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      bench
+  main-is:             BenchIntegerRoots.hs
   build-depends:       base
+                     , tasty-bench
                      , integer-roots
-                    --  , time >= 1.12.2 && < 1.13
-
+                     , tasty >= 1.5
   default-language:    Haskell2010
-  ghc-options:         -Wall
-                       -Wcompat
-                       -Widentities
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wmissing-export-lists
-                       -Wmissing-home-modules
-                       -Wpartial-fields
-                       -Wredundant-constraints
-                       -threaded
+  ghc-options:
+                       -fproc-alignment=64 
                        -rtsopts
-                       -with-rtsopts=-N4 -w
+                       -threaded
+                       -with-rtsopts=-N6 -w
