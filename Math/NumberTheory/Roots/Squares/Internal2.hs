@@ -300,13 +300,13 @@ intNormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i6
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer 
-optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (startAt i radixW32Squared 0) i) -- overflow trap
+optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (startAt i) i) -- overflow trap
 
 {-# INLINE startAt #-}
-{-# SPECIALIZE startAt :: Int64 -> Int64 -> Int64 -> Int64 #-}
-{-# SPECIALIZE startAt :: Integer -> Integer -> Integer -> Integer #-}
-startAt :: Integral a => a -> a -> a -> a 
-startAt i mx mi = pred $ floorDouble (sqrt (fromIntegral i) :: Double)--if i >= mx then mx else mi 
+{-# SPECIALIZE startAt :: Int64 -> Int64 #-}
+{-# SPECIALIZE startAt :: Integer -> Integer #-}
+startAt :: Integral a => a -> a 
+startAt i = pred $ floorDouble (sqrt (fromIntegral i) :: Double)
 
 -- | handle overflow 
 {-# INLINE hndlOvflwW32 #-}
