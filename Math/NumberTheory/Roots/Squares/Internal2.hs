@@ -12,7 +12,7 @@
 {-# LANGUAGE UnboxedTuples #-} -- addition
 {-# LANGUAGE LinearTypes #-}  --addition 
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
-{-# OPTIONS_GHC -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=60 -fmax-worker-args=20 #-} --addition
+{-# OPTIONS_GHC -fllvm -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-} --addition
 
 module Math.NumberTheory.Roots.Squares.Internal2
   ( 
@@ -76,23 +76,8 @@ import Data.FastDigits (digitsUnsigned, digits, undigits)
 import qualified Data.Vector.Unboxed as VU (Vector,(//), head, unsafeSlice,length, replicate, unsafeHead, snoc, unsnoc, uncons, empty, ifoldl', singleton, fromList, null, length, splitAt, force, unsafeLast, toList,(!))
 import Data.Int (Int64)
 import Data.Word (Word32)
--- *********** END NEW IMPORTS 
-
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-
--- import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#))
--- #ifdef MIN_VERSION_integer_gmp
--- import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
--- import GHC.Integer.GMP.Internals (Integer(..), shiftLInteger, shiftRInteger, sizeofBigNat#)
--- import GHC.Integer.Logarithms (integerLog2#)
--- #define IS S#
--- #define IP Jp#
--- #define bigNatSize sizeofBigNat
--- #else
--- import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#)
--- import GHC.Num.BigNat (bigNatSize#)
--- import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
--- #endif
+-- *********** END NEW IMPORTS 
 
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
@@ -258,7 +243,7 @@ evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l
 {-# INLINE evenizePv #-}
 
 {-# INLINE mkIW32Vec #-}
--- spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
+-- | Spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
 mkIW32Vec :: Integer -> Word -> VU.Vector Word32
 mkIW32Vec 0 _ = VU.singleton 0 -- safety
 mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
@@ -273,7 +258,7 @@ intgrFromRvsrd2ElemVec v2ElemW32s base =
    in intgrFromRvsrdTuple (l1, l2) base
 
 {-# INLINE mkIW32Lst #-}
---spit out the Word32 List from digitsUnsigned which comes in reversed format.
+-- | Spit out the Word32 List from digitsUnsigned which comes in reversed format.
 mkIW32Lst :: Integer -> Word -> [Word32]
 mkIW32Lst 0 _ = [0]-- safety
 mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b) 
