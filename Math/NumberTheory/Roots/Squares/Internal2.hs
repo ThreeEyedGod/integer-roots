@@ -158,21 +158,21 @@ prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let
 
 -- Keep it this way: Inlining this lowers performance. 
 theNextIterations :: Itr -> Integer
--- theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx# 
---   where
---     tni cl v l# yC iR t# = 
---       if VU.null v then yC else
---       let 
---           (LoopArgs _ !inA_ !ri32V ) = prepArgs_ (Itr cl v l# yC iR t#)
---           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yC inA_ -- number crunching only
---        in tni (succ cl)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal)
-theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
-  | VU.null w32Vec = yCumulated 
-  | otherwise =
+theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx# 
+  where
+    tni cl v l# yC iR t# = 
+      if VU.null v then yC else
       let 
-          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr 
-          (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
-       in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
+          (LoopArgs _ !inA_ !ri32V ) = prepArgs_ (Itr cl v l# yC iR t#)
+          (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yC inA_ -- number crunching only
+       in tni (succ cl)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal)
+-- theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
+--   | VU.null w32Vec = yCumulated 
+--   | otherwise =
+--       let 
+--           (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr 
+--           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
+--        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
 -- | numeric loop records 
 data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq)
@@ -420,8 +420,8 @@ mul# :: FloatingX# -> FloatingX# -> FloatingX#
 mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) 
     | isTrue# (sA# ==## 0.00##) = zero#
     | isTrue# (sB# ==## 0.00##) = zero#
-    | isTrue# (sA# ==## 1.00##) = b -- //FIXME THIS IS WRONG
-    | isTrue# (sB# ==## 1.00##) = a -- //FIXME this is wrong
+    | isTrue# (sA# ==## 1.00##) && (integerFromInt64# expA# == 0) = b 
+    | isTrue# (sB# ==## 1.00##) && (integerFromInt64# expB# == 0) = a 
     | otherwise = 
           let !resExp# = expA# `plusInt64#` expB#
               !resSignif# = sA# *## sB#
