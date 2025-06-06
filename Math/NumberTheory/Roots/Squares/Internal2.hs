@@ -289,7 +289,7 @@ doubleFromRvsrdTuple (l1,l2) base = fromIntegral l2 * fromIntegral base + fromIn
 {-# SPECIALIZE intNormalizedFloatingX# :: Integer -> FloatingX# #-}
 intNormalizedFloatingX# :: Integral a => a -> FloatingX#
 intNormalizedFloatingX# 0 = zero#
-intNormalizedFloatingX# i64 = normalizeFX# $ integer2FloatingX# (fromIntegral i64)
+intNormalizedFloatingX# i = normalizeFX# $ integer2FloatingX# (fromIntegral i)
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer 
