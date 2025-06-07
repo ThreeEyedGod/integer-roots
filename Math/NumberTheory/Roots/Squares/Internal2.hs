@@ -98,7 +98,7 @@ isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromInteg
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)          
 data ProcessedVec  = ProcessedVec {theRest :: !(VU.Vector Word32), firstTwo :: !(VU.Vector Word32), len :: !Int} deriving (Eq)
-data RestNextTwo = RestNextTwo {pairposition :: {-# UNPACK #-} !Int#, theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
+data RestNextTwo = RestNextTwo {theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving Eq
 
 preFI :: VU.Vector Word32 -> ProcessedVec
 preFI v
@@ -122,24 +122,19 @@ theFi = fi . preFI
 
 {-# INLINE prepA_ #-}
 prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
-prepA_ l# w32Vec = let 
-          -- !p# = l# `uncheckedIShiftRA#` 1# -# 1# -- Use bit-shift for division by 2
-          -- !(I# p#) = pred $ I# l# `quot` 2 -- last pair is position "0"
-          (rst,nxt2) = brkVec w32Vec (I# l# - 2)
-        -- in RestNextTwo p# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
-        in RestNextTwo l# rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
+prepA_ l# w32Vec = let (rst,nxt2) = brkVec w32Vec (I# l# - 2) in RestNextTwo rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
 
 prepB_ :: Integer -> FloatingX# -> RestNextTwo -> IterArgs_
-prepB_ iRem tBFX# (RestNextTwo _ _ !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
+prepB_ iRem tBFX# (RestNextTwo _ !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX# )-- sqrtF previous digits being scaled right here
 {-# INLINE prepB_ #-} 
 
 {-# INLINE prepArgs_ #-}
 prepArgs_ :: Itr -> LoopArgs
 prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let           
-          !rnxt2@(RestNextTwo p# ri32Vec _ _) = prepA_ l# w32Vec
+          !rnxt2@(RestNextTwo ri32Vec _ _) = prepA_ l# w32Vec
           iargs = prepB_ iRem tBFX_# rnxt2
         in 
-          LoopArgs p# iargs ri32Vec
+          LoopArgs l# iargs ri32Vec
 
 -- Keep it this way: Inlining this lowers performance. 
 theNextIterations :: Itr -> Integer
@@ -208,7 +203,7 @@ handleRems_ (IterRes yc yi ri_)
   | (ri_ < 0) && (yi > 0) = let rdr = fixRemainder yc ri_ (yi-1) in IterRes (ycyi-1) (yi-1) rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = IterRes ycyi yi ri_
  where 
-  !ycyi = yc+fromIntegral yi
+  !ycyi = yc+fromIntegral yi -- accumulating the growing square root
 {-# INLINE handleRems_ #-}
   
 -- Calculate remainder accompanying a 'digit'
