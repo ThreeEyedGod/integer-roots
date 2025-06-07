@@ -130,15 +130,11 @@ prepB_ iRem tBFX# (RestNextTwo _ !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 
 
 {-# INLINE prepArgs_ #-}
 prepArgs_ :: Itr -> LoopArgs
-prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let           
-          !rnxt2@(RestNextTwo ri32Vec _ _) = prepA_ l# w32Vec
-          iargs = prepB_ iRem tBFX_# rnxt2
-        in 
-          LoopArgs l# iargs ri32Vec
+prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let !rnxt2@(RestNextTwo ri32Vec _ _) = prepA_ l# w32Vec in LoopArgs l# (prepB_ iRem tBFX_# rnxt2) ri32Vec
 
 -- Keep it this way: Inlining this lowers performance. 
 theNextIterations :: Itr -> Integer
-theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx# 
+theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx# 
   where
     tni cl v l# yC iR t# = 
       if VU.null v then yC else
