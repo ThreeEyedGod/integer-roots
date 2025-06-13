@@ -166,7 +166,7 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
         else
           let (LoopArgs _ !inA_ !ri32V) = prepArgs_ (Itr cl v l# yC iR t#)
               (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yC inA_ -- number crunching only
-           in tni (succ cl) (VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal)
+           in tni (succ cl) ri32V (l# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal) -- do not VU.force ri32V
 
 -- theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
 --   | VU.null w32Vec = yCumulated
@@ -258,7 +258,7 @@ brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
 
 -- | a bit tricky it leaves l alone in the predicate that brkVecPv-brkLst-brkLstSeq does the right thing //FIXME HMMM
 evenizePv :: ProcessedVec -> ProcessedVec
-evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l
+evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l --VU.force here seems to help
 {-# INLINE evenizePv #-}
 
 {-# INLINE mkIW32Vec #-}
