@@ -22,7 +22,20 @@ module Math.NumberTheory.Roots.Squares.Internal2
   )
 where
 
--- \*********** BEGIN NEW IMPORTS
+-- *********** BEGIN NEW IMPORTS
+
+#ifdef MIN_VERSION_integer_gmp
+import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
+import GHC.Integer.GMP.Internals (Integer(..), shiftLInteger, shiftRInteger, sizeofBigNat#)
+import GHC.Integer.Logarithms (integerLog2#)
+#define IS S#
+#define IP Jp#
+#define bigNatSize sizeofBigNat
+#else
+import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#, (*#))
+import GHC.Num.BigNat (bigNatSize#)
+import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
+#endif
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import qualified Data.Bits.Floating as DB (nextDown, nextUp)
@@ -506,7 +519,7 @@ integer2FloatingX# i
   | i < 0 = error "integer2FloatingX# : invalid negative argument"
   | itsOKtoUsePlainDoubleCalc = double2FloatingX# (fromIntegral i)
   | otherwise =
-      let !(i_, e_) = cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+      let !(i_, e_) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
           !(D# s#) = fromIntegral i_
           !(I# e_#) = e_
        in FloatingX# s# (intToInt64# e_#)
@@ -514,6 +527,30 @@ integer2FloatingX# i
     !(D# maxDouble#) = maxDouble
     !(D# iDouble#) = fromIntegral i
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+
+cI2D2_ :: Integer -> (Integer, Int)
+cI2D2_ i@(IS i#) = (i, 0)
+cI2D2_ n@(IP bn#)
+    | isTrue# ((bigNatSize# bn#) <# thresh#) = (n,0)
+    | otherwise = case integerLog2# n of
+#ifdef MIN_VERSION_integer_gmp
+                    l# -> case uncheckedIShiftRA# l# 1# -# 47# of
+                            h# -> case shiftRInteger n (2# *# h#) of
+                                    m -> (m, I# 2# *# h#)
+#else
+                    l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
+                            h# -> case integerShiftR# n (2## `timesWord#` h#) of
+                                    m -> (m, 2 * I# (word2Int# h#))
+#endif
+    where
+        -- threshold for shifting vs. direct fromInteger
+        -- we shift when we expect more than 256 bits
+        thresh# :: Int#
+        thresh# = if finiteBitSize (0 :: Word) == 64 then 5# else 9#
+-- There's already a check for negative in integerSquareRoot,
+-- but integerSquareRoot' is exported directly too.
+cI2D2_ _ = error "cI2D2_': negative argument"
+
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
