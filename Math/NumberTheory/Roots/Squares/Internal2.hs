@@ -191,8 +191,9 @@ nxtDgtRem :: Integer -> IterArgs_ -> IterRes
 nxtDgtRem yCumulat iterargs_ = let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ (yCumulat * radixW32) iterargs_ yTilde_
 {-# INLINE nxtDgtRem #-}
 
+-- |Early termination if more than the 3rd digit or if digit is 0 
 fixTCFX# :: IterArgs_ -> Int -> Int64 -> FloatingX#
-fixTCFX# ia currlen yTildeFinal = let tcfx# = tC_ ia in if currlen <= 2 then nextDownFX# $ tcfx# !+## integer2FloatingX# (fromIntegral yTildeFinal) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
+fixTCFX# ia currlen yTildeFinal = let tcfx# = tC_ ia in if currlen <= 2 && yTildeFinal > 0 then nextDownFX# $ tcfx# !+## integer2FloatingX# (fromIntegral yTildeFinal) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
@@ -215,6 +216,7 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (next
 
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
 -- that happens in handleRems_
+-- if the trial digit is zero skip computing remainder
 computeRem_ :: Integer -> IterArgs_ -> Int64 -> IterRes
 computeRem_ tc iArgs_ yTilde_ = let !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_ in handleRems_ (IterRes tc yTilde_ rTrial)
 {-# INLINE computeRem_ #-}
