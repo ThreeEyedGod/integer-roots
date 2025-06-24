@@ -240,7 +240,7 @@ calcRemainder tAI tc dgt = let !i = fromIntegral dgt in tAI - ((double i * tc) +
 
 -- Fix remainder accompanying a 'next downed digit'
 fixRemainder :: Integer -> Integer -> Int64 -> Integer
-fixRemainder tc rdr dgt = rdr + double tc + double (fromIntegral dgt) + 1
+fixRemainder tc rdr dgt = rdr + double (tc + fromIntegral dgt) + 1
 {-# INLINE fixRemainder #-}
 
 -- | HELPER functions
