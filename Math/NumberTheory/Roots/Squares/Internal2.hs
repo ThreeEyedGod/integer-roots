@@ -128,10 +128,10 @@ theFi v
     | VU.null v = error "theFI: Invalid Argument null vector "
     | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 w32Vec l'# 0 0 zero#
     | evenLen = let 
-             IterRes !yc !y1 !remInteger = fstDgtRem i
+             IterRes !yc !y1 !remInteger =  fstDgtRem i
           in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
     | otherwise = let 
-             y = floorDouble (sqrt (fromIntegral i :: Double))
+             y = succ $ startAt i 
              IterRes !yc !y1 !remInteger = IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
           in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
  where 
@@ -315,13 +315,19 @@ intNormalizedFloatingX# i = normalizeFX# $ integer2FloatingX# (fromIntegral i)
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer
-optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (startAt i) i) -- overflow trap
+optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (closeEnough i) i) -- overflow trap
 
 {-# INLINE startAt #-}
 {-# SPECIALIZE startAt :: Int64 -> Int64 #-}
 {-# SPECIALIZE startAt :: Integer -> Integer #-}
 startAt :: (Integral a) => a -> a
 startAt i = pred $ floorDouble (sqrt (fromIntegral i) :: Double)
+
+{-# INLINE closeEnough #-}
+{-# SPECIALIZE closeEnough :: Int64 -> Int64 #-}
+{-# SPECIALIZE closeEnough :: Integer -> Integer #-}
+closeEnough :: (Integral a) => a -> a
+closeEnough i = let i_ = nextUp (fromIntegral i :: Double) in pred $ floorDouble (nextUp (sqrt i_)) 
 
 -- | handle overflow
 {-# INLINE hndlOvflwW32 #-}
