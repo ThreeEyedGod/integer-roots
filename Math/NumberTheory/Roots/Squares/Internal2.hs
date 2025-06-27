@@ -123,26 +123,22 @@ data ProcessedVec = ProcessedVec {theRest :: !(VU.Vector Word32), firstTwo :: !(
 
 data RestNextTwo = RestNextTwo {theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving (Eq)
 
-preFI :: VU.Vector Word32 -> ProcessedVec
-preFI v
-  | VU.null v = error "preFI: Invalid Argument null vector "
-  | VU.length v == 1 && VU.unsafeHead v == 0 = ProcessedVec VU.empty VU.empty 0
-  | otherwise = splitVec v
-
-{-# INLINE splitVec #-}
-
--- | also evenizes the vector of digits
-splitVec :: VU.Vector Word32 -> ProcessedVec
-splitVec vec = let !l = VU.length vec in if even l then brkVecPv vec (l - 2) else evenizePv (brkVecPv vec (l - 1))
-
-fi :: ProcessedVec -> Itr
-fi (ProcessedVec w32Vec dxsVec' (I# l'#)) =
-  let !(IterRes !yc !y1 !remInteger) = fstDgtRem (intgrFromRvsrd2ElemVec dxsVec' radixW32)
-   in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
-
--- | The First iteration
-theFi :: VU.Vector Word32 -> Itr
-theFi = fi . preFI
+theFi :: VU.Vector Word32 -> Itr 
+theFi v 
+    | VU.null v = error "theFI: Invalid Argument null vector "
+    | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 w32Vec l'# 0 0 zero#
+    | evenLen = let 
+             IterRes !yc !y1 !remInteger = fstDgtRem i
+          in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
+    | otherwise = let 
+             y = floorDouble (sqrt (fromIntegral i :: Double))
+             IterRes !yc !y1 !remInteger = IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
+          in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
+ where 
+      !l = VU.length v 
+      !evenLen = even l 
+      !(ProcessedVec w32Vec dxsVec' (I# l'#)) = if evenLen then brkVecPv v (l-2) else brkVecPv v (l-1) 
+      !i = intgrFromRvsrd2ElemVec dxsVec' radixW32
 
 {-# INLINE prepA_ #-}
 prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
