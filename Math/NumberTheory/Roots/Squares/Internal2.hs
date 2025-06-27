@@ -275,10 +275,10 @@ mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
 -- | Integer from a "reversed" Vector of Word32 digits
 intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer -> Integer
 intgrFromRvsrd2ElemVec v2ElemW32s base =
-  let (l1, l2) = case VU.uncons v2ElemW32s of
-        Just (u, v) -> (u, VU.head v)
-        Nothing -> error "intgrFromRvsrd2ElemVec : Invalid Vector - empty or less than 2 " -- (Nothing, _) and (_, Nothing)
-   in intgrFromRvsrdTuple (l1, l2) base
+  let (llsb, lmsb) = case VU.uncons v2ElemW32s of
+        Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
+        Nothing -> error "intgrFromRvsrd2ElemVec : Invalid Vector - empty " 
+   in intgrFromRvsrdTuple (llsb, lmsb) base
 
 {-# INLINE mkIW32Lst #-}
 
@@ -300,9 +300,9 @@ evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++
 -- | Integer from a "reversed" tuple of Word32 digits
 intgrFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer
 intgrFromRvsrdTuple (0, 0) 0 = 0
-intgrFromRvsrdTuple (0, l2) base = fromIntegral l2 * base
-intgrFromRvsrdTuple (l1, 0) _ = fromIntegral l1
-intgrFromRvsrdTuple (l1, l2) base = fromIntegral l2 * base + fromIntegral l1
+intgrFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
+intgrFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
+intgrFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
 {-# INLINE doubleFromRvsrdTuple #-}
 
