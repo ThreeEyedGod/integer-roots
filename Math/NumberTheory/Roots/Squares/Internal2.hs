@@ -181,7 +181,7 @@ data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !Float
 
 -- | core of computations. Functions from this point on are doing only number crunching
 fstDgtRem :: Integer -> IterRes
-fstDgtRem i = let !y = optmzedLrgstSqrtN i in IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
+fstDgtRem i = let !y = hndlOvflwW32 (optmzedLrgstSqrtN i) in IterRes y (fromIntegral y) (i - y * y)
 
 nxtDgtRem :: Integer -> IterArgs_ -> IterRes
 nxtDgtRem yCumulat iterargs_ = let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ (yCumulat * radixW32) iterargs_ yTilde_
