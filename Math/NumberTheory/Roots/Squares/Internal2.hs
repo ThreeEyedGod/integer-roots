@@ -189,7 +189,7 @@ nxtDgtRem yCumulat iterargs_ = let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ 
 
 -- |Early termination if more than the 3rd digit or if digit is 0 
 fixTCFX# :: IterArgs_ -> Int -> Int64 -> FloatingX#
-fixTCFX# ia currlen yTildeFinal = let tcfx# = tC_ ia in if currlen <= 2 && yTildeFinal > 0 then nextDownFX# $ tcfx# !+## integer2FloatingX# (fromIntegral yTildeFinal) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
+fixTCFX# ia currlen yTildeFinal = let !tcfx# = tC_ ia in if currlen <= 2 && yTildeFinal > 0 then nextDownFX# $ tcfx# !+## integer2FloatingX# (fromIntegral yTildeFinal) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
