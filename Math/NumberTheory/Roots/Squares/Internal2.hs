@@ -254,11 +254,6 @@ brkVec v loc = VU.splitAt loc v
 brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
 brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
 
--- | a bit tricky it leaves l alone in the predicate that brkVecPv-brkLst-brkLstSeq does the right thing //FIXME HMMM
-evenizePv :: ProcessedVec -> ProcessedVec
-evenizePv (ProcessedVec he re l) = ProcessedVec he (VU.force $ VU.snoc re 0) l --VU.force here seems to help
-{-# INLINE evenizePv #-}
-
 {-# INLINE mkIW32Vec #-}
 
 -- | Spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
