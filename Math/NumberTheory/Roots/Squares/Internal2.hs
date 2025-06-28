@@ -131,7 +131,7 @@ theFi v
              IterRes !yc !y1 !remInteger =  fstDgtRem i
           in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
     | otherwise = let 
-             y = succ $ largestNSqLTEOdd i 
+             y =  largestNSqLTEOdd i 
              IterRes !yc !y1 !remInteger = IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
           in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
  where 
@@ -315,13 +315,13 @@ intNormalizedFloatingX# i = normalizeFX# $ integer2FloatingX# (fromIntegral i)
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer
-optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTEEven i) --hndlOvflwW32 (largestNSqLTE (closeEnough i) i) -- overflow trap
+optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTEEven i)  -- overflow trap
 
 {-# INLINE largestNSqLTEOdd #-}
 {-# SPECIALIZE largestNSqLTEOdd :: Int64 -> Int64 #-}
 {-# SPECIALIZE largestNSqLTEOdd :: Integer -> Integer #-}
 largestNSqLTEOdd :: (Integral a) => a -> a
-largestNSqLTEOdd i = pred $ floorDouble (sqrt (fromIntegral i) :: Double)
+largestNSqLTEOdd i =  floorDouble (sqrt (fromIntegral i) :: Double)
 
 {-# INLINE largestNSqLTEEven #-}
 {-# SPECIALIZE largestNSqLTEEven :: Int64 -> Int64 #-}
