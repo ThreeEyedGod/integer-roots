@@ -278,10 +278,6 @@ mkIW32Lst :: Integer -> Word -> [Word32]
 mkIW32Lst 0 _ = [0] -- safety
 mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b)
 
-evenizeLstRvrsdDgts :: [Word32] -> ([Word32], Int)
-evenizeLstRvrsdDgts [] = ([0], 1)
-evenizeLstRvrsdDgts xs = let l = length xs in if even l then (xs, l) else (xs ++ [0], succ l)
-
 --- END helpers
 --- BEGIN Core numeric helper functions
 --- ***********************************
