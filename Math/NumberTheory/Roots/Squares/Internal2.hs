@@ -131,7 +131,7 @@ theFi v
              IterRes !yc !y1 !remInteger =  fstDgtRem i
           in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
     | otherwise = let 
-             y = succ $ startAt i 
+             y = succ $ largestNSqLTEOdd i 
              IterRes !yc !y1 !remInteger = IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
           in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
  where 
@@ -315,19 +315,19 @@ intNormalizedFloatingX# i = normalizeFX# $ integer2FloatingX# (fromIntegral i)
 
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer
-optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTE (closeEnough i) i) -- overflow trap
+optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTEEven i) --hndlOvflwW32 (largestNSqLTE (closeEnough i) i) -- overflow trap
 
-{-# INLINE startAt #-}
-{-# SPECIALIZE startAt :: Int64 -> Int64 #-}
-{-# SPECIALIZE startAt :: Integer -> Integer #-}
-startAt :: (Integral a) => a -> a
-startAt i = pred $ floorDouble (sqrt (fromIntegral i) :: Double)
+{-# INLINE largestNSqLTEOdd #-}
+{-# SPECIALIZE largestNSqLTEOdd :: Int64 -> Int64 #-}
+{-# SPECIALIZE largestNSqLTEOdd :: Integer -> Integer #-}
+largestNSqLTEOdd :: (Integral a) => a -> a
+largestNSqLTEOdd i = pred $ floorDouble (sqrt (fromIntegral i) :: Double)
 
-{-# INLINE closeEnough #-}
-{-# SPECIALIZE closeEnough :: Int64 -> Int64 #-}
-{-# SPECIALIZE closeEnough :: Integer -> Integer #-}
-closeEnough :: (Integral a) => a -> a
-closeEnough i = let i_ = nextUp (fromIntegral i :: Double) in pred $ floorDouble (nextUp (sqrt i_)) 
+{-# INLINE largestNSqLTEEven #-}
+{-# SPECIALIZE largestNSqLTEEven :: Int64 -> Int64 #-}
+{-# SPECIALIZE largestNSqLTEEven :: Integer -> Integer #-}
+largestNSqLTEEven :: (Integral a) => a -> a
+largestNSqLTEEven i = let i_ = nextUp (fromIntegral i :: Double) in floorDouble (nextUp (sqrt i_)) 
 
 -- | handle overflow
 {-# INLINE hndlOvflwW32 #-}
@@ -352,17 +352,6 @@ iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reverse
 convertBase :: Word -> Word -> [Word] -> [Word]
 convertBase _ _ [] = []
 convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs)
-
-{-# INLINE largestNSqLTE #-}
-largestNSqLTE :: Integer -> Integer -> Integer
-largestNSqLTE bot n = go bot (n + 1)
-  where
-    go a b
-      | a + 1 == b = a
-      | m * m <= n = go m b
-      | otherwise = go a m
-      where
-        !m = (a + b) `div` 2
 
 {-# INLINE intgrFrom3DigitsBase32 #-}
 
