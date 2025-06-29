@@ -115,7 +115,7 @@ isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromInteg
 {-# INLINEABLE isqrtB #-}
 
 -- | Iteration loop data - these records have vectors / lists in them
-data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: FloatingX#} deriving (Eq)
+data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)
 
@@ -241,11 +241,12 @@ dgtsVecBase32__ n | n < 0 = error "dgtsVecBase32_: Invalid negative argument"
 dgtsVecBase32__ 0 = VU.singleton 0
 dgtsVecBase32__ n = mkIW32Vec n radixW32
 
+{-# INLINE brkVec #-}
 brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
 -- brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
 brkVec v loc = VU.splitAt loc v
-{-# INLINE brkVec #-}
 
+{-# INLINE brkVecPv #-}
 brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
 brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
 
