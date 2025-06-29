@@ -128,11 +128,10 @@ theFi v
     | VU.null v = error "theFI: Invalid Argument null vector "
     | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 w32Vec l'# 0 0 zero#
     | evenLen = let 
-             IterRes !yc !y1 !remInteger =  fstDgtRem i
+             IterRes !yc !y1 !remInteger = let !y = hndlOvflwW32 (largestNSqLTEEven i) in handleRems_ $ IterRes 0 (fromIntegral y) (i - y * y) -- set 0 for starting cumulative yc--fstDgtRem i
           in Itr 1 w32Vec l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
-    | otherwise = let 
-             y =  largestNSqLTEOdd i 
-             IterRes !yc !y1 !remInteger = IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
+    | otherwise = let              
+             IterRes !yc !y1 !remInteger = let y = largestNSqLTEOdd i in IterRes y (fromIntegral y) (i - y * y)
           in Itr 1 w32Vec l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
  where 
       !l = VU.length v 
@@ -178,10 +177,6 @@ data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq)
 data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-} !Int64, ri :: Integer} deriving (Eq)
 
 data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
-
--- | core of computations. Functions from this point on are doing only number crunching
-fstDgtRem :: Integer -> IterRes
-fstDgtRem i = let !y = hndlOvflwW32 (optmzedLrgstSqrtN i) in handleRems_ $ IterRes 0 (fromIntegral y) (i - y * y) -- set 0 for starting cumulative yc
 
 nxtDgtRem :: Integer -> IterArgs_ -> IterRes
 nxtDgtRem yCumulat iterargs_ = let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ (yCumulat * radixW32) iterargs_ yTilde_
@@ -296,10 +291,6 @@ intgrFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral 
 -- | double from a "reversed" tuple of Word32 digits
 doubleFromRvsrdTuple :: (Word32, Word32) -> Integer -> Double
 doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromIntegral l1
-
-{-# INLINE optmzedLrgstSqrtN #-}
-optmzedLrgstSqrtN :: Integer -> Integer
-optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTEEven i)  -- overflow trap
 
 {-# INLINE largestNSqLTEOdd #-}
 {-# SPECIALIZE largestNSqLTEOdd :: Int64 -> Int64 #-}
