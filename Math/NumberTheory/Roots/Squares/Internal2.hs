@@ -39,7 +39,7 @@ import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import qualified Data.Bits.Floating as DB (nextDown, nextUp)
-import Data.FastDigits (digits, digitsUnsigned, undigits)
+import Data.FastDigits (digitsUnsigned, undigits)
 import Data.Int (Int64)
 import qualified Data.Vector.Unboxed as VU (Vector, empty, force, fromList, head, ifoldl', length, null, replicate, singleton, snoc, splitAt, toList, uncons, unsafeHead, unsafeLast, unsafeSlice, unsnoc, (!), (//))
 import Data.Word (Word32)
@@ -76,7 +76,7 @@ import GHC.Exts
     (==##),
     (>=##),
   )
-import GHC.Float (ceilingDouble, divideDouble, floorDouble, isDoubleDenormalized)
+import GHC.Float ( divideDouble, floorDouble)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.Integer
   ( Integer (..),
@@ -129,11 +129,11 @@ theFi v
     | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 w32Vec l'# 0 0 zero#
     | evenLen = let 
              IterRes !yc !y1 !remInteger =  fstDgtRem i
-          in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
+          in Itr 1 w32Vec l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
     | otherwise = let 
              y =  largestNSqLTEOdd i 
              IterRes !yc !y1 !remInteger = IterRes y (fromIntegral y) (hndlOvflwW32 $ i - y * y)
-          in Itr 1 w32Vec l'# yc remInteger (intNormalizedFloatingX# y1)
+          in Itr 1 w32Vec l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
  where 
       !l = VU.length v 
       !evenLen = even l 
@@ -201,7 +201,7 @@ nxtDgt_# iax = comput (preComput iax)
 
 preComput :: IterArgs_ -> CoreArgs
 preComput (IterArgs_ tA__ tCFX#) =
-  let !tAFX# = intNormalizedFloatingX# tA__
+  let !tAFX# = integer2FloatingX# tA__ 
       !radFX# = tCFX# !*## tCFX# !+## tAFX#
    in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}
@@ -297,13 +297,6 @@ intgrFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral 
 doubleFromRvsrdTuple :: (Word32, Word32) -> Integer -> Double
 doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromIntegral l1
 
-{-# INLINE intNormalizedFloatingX# #-}
-{-# SPECIALIZE intNormalizedFloatingX# :: Int64 -> FloatingX# #-}
-{-# SPECIALIZE intNormalizedFloatingX# :: Integer -> FloatingX# #-}
-intNormalizedFloatingX# :: (Integral a) => a -> FloatingX#
-intNormalizedFloatingX# 0 = zero#
-intNormalizedFloatingX# i = normalizeFX# $ integer2FloatingX# (fromIntegral i)
-
 {-# INLINE optmzedLrgstSqrtN #-}
 optmzedLrgstSqrtN :: Integer -> Integer
 optmzedLrgstSqrtN i = hndlOvflwW32 (largestNSqLTEEven i)  -- overflow trap
@@ -327,7 +320,7 @@ hndlOvflwW32 :: (Integral a) => a -> a
 hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 scaleByPower2 :: Int64# -> FloatingX# -> FloatingX#
-scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
+scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else FloatingX# s# (e# `plusInt64#` n#)--normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
 {-# INLINE scaleByPower2 #-}
 
 {-# INLINE wrd2wrd32 #-}
@@ -512,6 +505,10 @@ integer2FloatingX# i
     !(D# iDouble#) = fromIntegral i
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
+
+-- The maximum integral value that can be unambiguously represented as a
+-- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
+{-# INLINE cI2D2_ #-}
 cI2D2_ :: Integer -> (Integer, Int)
 cI2D2_ i@(IS i#) = (i, 0)
 cI2D2_ n@(IP bn#)
@@ -535,24 +532,6 @@ cI2D2_ n@(IP bn#)
 -- but integerSquareRoot' is exported directly too.
 cI2D2_ _ = error "cI2D2_': negative argument"
 
-
--- The maximum integral value that can be unambiguously represented as a
--- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
-{-# INLINE cI2D2 #-}
-cI2D2 :: Integer -> (Integer, Int)
-cI2D2 = cI2D2'
-  where
-    cI2D2' 0 = (0, 0)
-    cI2D2' i | i <= maxSafeInteger = (i, 0)
-    cI2D2' i = go 0 i
-      where
-        go e n
-          | n <= maxUnsafeInteger = (n, e)
-          | otherwise = go (e + shiftAmount) (n `unsafeShiftR` shiftAmount)
-          where
-            exPlus = fromIntegral (integerLogBase 10 n - 308 `quot` 100) -- would be dynamic (100-10)
-            shiftAmount = max 1 exPlus
-
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
 split (D# d#) =
@@ -567,38 +546,6 @@ split# d# =
       !ex# = intToInt64# expInt#
    in (# s#, ex# #)
 
--- \| Normalising functions for our custom double
-{-# INLINE normalize #-}
-normalize :: Double -> Double
-normalize x
-  -- \| NFI.isNormal x = x
-  | x == 0 || isNegativeZero x = minDouble
-  | isInfinite x || isNaN x = error "normalize: Infinite or NaN "
-  | isDoubleDenormalized x == 1 = x
-  | isIEEE x = x
-  | otherwise =
-      let !(# m, e# #) = integerDecodeDouble# x#
-          !n = floatRadix x
-          !(mantissa, expo) = normalizeIter (abs (fromIntegral m)) (fromIntegral (I# e#)) n
-       in case fx2Double (FloatingX mantissa expo) of
-            Just result -> result -- normalized
-            _ -> x -- return as-is
-  where
-    !(D# x#) = x
-    normalizeIter = go
-      where
-        go m' e' n'
-          | m' >= fromIntegral n' = go (m' / fromIntegral n') (e' + 1) n'
-          | m' < 1 = go (m' * fromIntegral n') (e' - 1) n'
-          | otherwise = (m', e')
-
-{-# INLINE normalizeFX# #-}
-normalizeFX# :: FloatingX# -> FloatingX#
-normalizeFX# (FloatingX# d# ex#) =
-  let !(D# nd#) = normalize (D# d#)
-      !(# s#, e# #) = split# nd#
-      !expF# = ex# `plusInt64#` e#
-   in FloatingX# s# expF#
 
 -- | Some Constants
 radixW32 :: (Integral a) => a
