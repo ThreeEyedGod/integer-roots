@@ -119,25 +119,24 @@ data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector
 
 data LoopArgs = LoopArgs {position :: {-# UNPACK #-} !Int#, inArgs_ :: !IterArgs_, residuali32Vec :: !(VU.Vector Word32)} deriving (Eq)
 
-data ProcessedVec = ProcessedVec {theRest :: !(VU.Vector Word32), firstTwo :: !(VU.Vector Word32), len :: !Int} deriving (Eq)
+data ProcessedVec = ProcessedVec {firstTwo :: !(VU.Vector Word32), len :: !Int} deriving (Eq)
 
 data RestNextTwo = RestNextTwo {theRestVec :: !(VU.Vector Word32), firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving (Eq)
 
 theFi :: VU.Vector Word32 -> Itr 
 theFi v 
     | VU.null v = error "theFI: Invalid Argument null vector "
-    | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 w32Vec l'# 0 0 zero#
+    | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 v l'# 0 0 zero#
     | evenLen = let 
              IterRes !yc !y1 !remInteger = let !y = hndlOvflwW32 (largestNSqLTEEven i) in handleRems_ $ IterRes 0 (fromIntegral y) (i - y * y) -- set 0 for starting cumulative yc--fstDgtRem i
-          in Itr 1 w32Vec l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
+          in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
     | otherwise = let              
              IterRes !yc !y1 !remInteger = let y = largestNSqLTEOdd i in IterRes y (fromIntegral y) (i - y * y)
-          in Itr 1 w32Vec l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
+          in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
  where 
       !l = VU.length v 
       !evenLen = even l 
-      !(ProcessedVec w32Vec dxsVec' (I# l'#)) = if evenLen then brkVecPv v (l-2) else brkVecPv v (l-1) 
-      -- !(ProcessedVec w32Vec dxsVec' (I# l'#)) = if evenLen then ProcessedVec v (VU.fromList [v VU.! l-2, v VU.! l-1]) (l-2) else ProcessedVec v (VU.fromList [v VU.! l-1]) (l-1) 
+      !(ProcessedVec dxsVec' (I# l'#)) = if evenLen then brkVecPv v (l-2) else brkVecPv v (l-1) 
       !i = intgrFromRvsrd2ElemVec dxsVec' radixW32
 
 {-# INLINE prepA_ #-}
@@ -243,14 +242,14 @@ dgtsVecBase32__ 0 = VU.singleton 0
 dgtsVecBase32__ n = mkIW32Vec n radixW32
 
 {-# INLINE brkVec #-}
-brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
+brkVec :: VU.Vector Word32 -> Int -> VU.Vector Word32
 -- brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
 -- brkVec v loc = VU.splitAt loc v
-brkVec v loc = (v, VU.drop loc v) 
+brkVec v loc = VU.drop loc v
 
 {-# INLINE brkVecPv #-}
 brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
-brkVecPv v loc = let !(hd, rst) = brkVec v loc in ProcessedVec hd rst loc
+brkVecPv v loc = let !rst = brkVec v loc in ProcessedVec rst loc
 
 {-# INLINE mkIW32Vec #-}
 
