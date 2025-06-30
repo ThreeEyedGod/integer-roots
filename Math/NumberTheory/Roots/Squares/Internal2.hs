@@ -141,7 +141,7 @@ theFi v
 
 {-# INLINE prepA_ #-}
 prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
-prepA_ l# w32Vec = let (rst, nxt2) = brkVec w32Vec (I# l# - 2) in RestNextTwo rst (VU.unsafeHead nxt2) (VU.unsafeLast nxt2)
+prepA_ l# w32Vec = RestNextTwo w32Vec (w32Vec VU.! (I# l# - 2)) (w32Vec VU.! (I# l# - 1)) 
 
 prepB_ :: Integer -> FloatingX# -> RestNextTwo -> IterArgs_
 prepB_ iRem tBFX# (RestNextTwo _ !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX#) -- sqrtF previous digits being scaled right here
@@ -156,7 +156,7 @@ theNextIterations :: Itr -> Integer
 theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx#
   where
     tni cl v l# yC iR t# =
-      if VU.null v
+      if I# l# == 0 || VU.null v
         then yC
         else
           let (LoopArgs _ !inA_ !ri32V) = prepArgs_ (Itr cl v l# yC iR t#)
