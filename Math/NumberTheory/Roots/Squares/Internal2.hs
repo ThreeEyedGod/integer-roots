@@ -41,7 +41,7 @@ import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import qualified Data.Bits.Floating as DB (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
 import Data.Int (Int64)
-import qualified Data.Vector.Unboxed as VU (Vector, drop, empty, force, fromList, head, ifoldl', length, null, replicate, singleton, snoc, splitAt, toList, uncons, unsafeHead, unsafeLast, unsafeSlice, unsnoc, (!), (//))
+import qualified Data.Vector.Unboxed as VU (Vector, drop, empty, force, fromList, head, ifoldl', length, null, replicate, singleton, snoc, splitAt, toList, uncons, unsafeHead, unsafeLast, unsafeSlice, unsnoc, unsafeIndex, unsafeDrop, (!), (//))
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
@@ -141,7 +141,7 @@ theFi v
 
 {-# INLINE prepA_ #-}
 prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
-prepA_ l# w32Vec = RestNextTwo w32Vec (w32Vec VU.! (I# l# - 2)) (w32Vec VU.! (I# l# - 1)) 
+prepA_ l# w32Vec = RestNextTwo w32Vec (VU.unsafeIndex w32Vec (I# l# - 2)) (VU.unsafeIndex w32Vec(I# l# - 1)) 
 
 prepB_ :: Integer -> FloatingX# -> RestNextTwo -> IterArgs_
 prepB_ iRem tBFX# (RestNextTwo _ !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX#) -- sqrtF previous digits being scaled right here
@@ -243,9 +243,7 @@ dgtsVecBase32__ n = mkIW32Vec n radixW32
 
 {-# INLINE brkVec #-}
 brkVec :: VU.Vector Word32 -> Int -> VU.Vector Word32
--- brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
--- brkVec v loc = VU.splitAt loc v
-brkVec v loc = VU.drop loc v
+brkVec v loc = VU.unsafeDrop loc v
 
 {-# INLINE brkVecPv #-}
 brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
