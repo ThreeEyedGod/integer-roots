@@ -41,7 +41,7 @@ import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import qualified Data.Bits.Floating as DB (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
 import Data.Int (Int64)
-import qualified Data.Vector.Unboxed as VU (Vector, empty, force, fromList, head, ifoldl', length, null, replicate, singleton, snoc, splitAt, toList, uncons, unsafeHead, unsafeLast, unsafeSlice, unsnoc, (!), (//))
+import qualified Data.Vector.Unboxed as VU (Vector, drop, empty, force, fromList, head, ifoldl', length, null, replicate, singleton, snoc, splitAt, toList, uncons, unsafeHead, unsafeLast, unsafeSlice, unsnoc, (!), (//))
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
@@ -137,6 +137,7 @@ theFi v
       !l = VU.length v 
       !evenLen = even l 
       !(ProcessedVec w32Vec dxsVec' (I# l'#)) = if evenLen then brkVecPv v (l-2) else brkVecPv v (l-1) 
+      -- !(ProcessedVec w32Vec dxsVec' (I# l'#)) = if evenLen then ProcessedVec v (VU.fromList [v VU.! l-2, v VU.! l-1]) (l-2) else ProcessedVec v (VU.fromList [v VU.! l-1]) (l-1) 
       !i = intgrFromRvsrd2ElemVec dxsVec' radixW32
 
 {-# INLINE prepA_ #-}
@@ -244,7 +245,8 @@ dgtsVecBase32__ n = mkIW32Vec n radixW32
 {-# INLINE brkVec #-}
 brkVec :: VU.Vector Word32 -> Int -> (VU.Vector Word32, VU.Vector Word32)
 -- brkVec v loc = let !(hd, rst) = VU.splitAt loc v in (VU.force hd, VU.force rst)
-brkVec v loc = VU.splitAt loc v
+-- brkVec v loc = VU.splitAt loc v
+brkVec v loc = (v, VU.drop loc v) 
 
 {-# INLINE brkVecPv #-}
 brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
