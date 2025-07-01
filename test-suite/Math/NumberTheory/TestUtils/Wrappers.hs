@@ -23,6 +23,7 @@ module Math.NumberTheory.TestUtils.Wrappers
   , Power(..)
   , Huge(..)
   , Humoungous(..)
+  , Gargantuan(..)
   ) where
 
 import Control.Applicative
@@ -103,6 +104,30 @@ instance Show1 Huge where
   liftShowsPrec shw _ p (Huge a) = shw p a
 
 -------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+-- Gargantuan
+
+newtype Gargantuan a = Gargantuan { getGargantuan :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (Gargantuan a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ Gargantuan $ foldl1 (\acc n -> acc * 2 ^ (255 :: Int) + n) ds
+
+instance Eq1 Gargantuan where
+  liftEq eq (Gargantuan a) (Gargantuan b) = a `eq` b
+
+instance Ord1 Gargantuan where
+  liftCompare cmp (Gargantuan a) (Gargantuan b) = a `cmp` b
+
+instance Show1 Gargantuan where
+  liftShowsPrec shw _ p (Gargantuan a) = shw p a
+
+-------------------------------------------------------------------------------
+
 
 -------------------------------------------------------------------------------
 -- Humoungous

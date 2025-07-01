@@ -32,6 +32,7 @@ module Math.NumberTheory.TestUtils
   , Power(..)
   , Huge(..)
   , Humoungous(..)
+  , Gargantuan(..)
   , testIntegralProperty
   , testIntegral2Property
   , testSmallAndQuick
@@ -49,7 +50,7 @@ import Data.Word
 import Numeric.Natural
 
 import Math.NumberTheory.TestUtils.Wrappers
-    ( AnySign(..), Huge(..), Power(..), Humoungous(..) )
+    ( AnySign(..), Huge(..), Power(..), Humoungous(..), Gargantuan(..) )
 
 instance Arbitrary Natural where
   arbitrary = fromInteger <$> (arbitrary `suchThat` (>= 0))
@@ -123,6 +124,8 @@ testIntegralProperty name f = testGroup name
   , QC.testProperty "quickcheck Huge  Natural" ((f :: wrapper Natural -> bool) . getHuge)
   , QC.testProperty "quickcheck Humoungous  Integer" ((f :: wrapper Integer -> bool) . getHumoungous)
   , QC.testProperty "quickcheck Humoungous  Natural" ((f :: wrapper Natural -> bool) . getHumoungous)
+  , QC.testProperty "quickcheck Gargantuan  Integer" ((f :: wrapper Integer -> bool) . getGargantuan)
+  , QC.testProperty "quickcheck Gargantuan  Natural" ((f :: wrapper Natural -> bool) . getGargantuan)
   ]
 
 testIntegral2Property
@@ -201,6 +204,8 @@ testIntegral2Property name f = testGroup name
   , QC.testProperty "quickcheck Huge  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . fmap getHuge)
   , QC.testProperty "quickcheck Humoungous  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getHumoungous)
   , QC.testProperty "quickcheck Humoungous  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getHumoungous)
+  , QC.testProperty "quickcheck Gargantuan  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getGargantuan)
+  , QC.testProperty "quickcheck Gargantuan  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getGargantuan)
   ]
 
 testSmallAndQuick
