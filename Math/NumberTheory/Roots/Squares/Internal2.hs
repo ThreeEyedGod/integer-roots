@@ -32,7 +32,7 @@ import GHC.Integer.Logarithms (integerLog2#)
 #define IP Jp#
 #define bigNatSize sizeofBigNat
 #else
-import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#, (*#))
+import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#, (*#),fmaddDouble#)
 import GHC.Num.BigNat (bigNatSize#)
 import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
 #endif
@@ -43,6 +43,7 @@ import Data.FastDigits (digitsUnsigned, undigits)
 import Data.Int (Int64)
 import qualified Data.Vector.Unboxed as VU (Vector, drop, empty, force, fromList, head, ifoldl', length, null, replicate, singleton, snoc, splitAt, toList, uncons, unsafeHead, unsafeLast, unsafeSlice, unsnoc, unsafeIndex, unsafeDrop, (!), (//))
 import Data.Word (Word32)
+import Data.Maybe (fromMaybe)
 import GHC.Exts
   ( Double (..),
     Double#,
@@ -191,8 +192,26 @@ fixTCFX# ia currlen yTildeFinal = let !tcfx# = tC_ ia in if currlen <= 2 && yTil
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_# :: IterArgs_ -> Int64
 nxtDgt_# (IterArgs_ 0 !_) = 0
-nxtDgt_# iax = comput (preComput iax)
+nxtDgt_# iax = case byPass iax of 
+    Left _ -> comput (preComput iax)
+    Right res -> res
 {-# INLINE nxtDgt_# #-}
+
+{-# INLINE byPass #-}
+byPass :: IterArgs_ -> Either IterArgs_ Int64
+byPass iax@(IterArgs_ tA__ tCFX#) 
+    | tA__ < 2^512-1 && c > 0 = let 
+            !(D# a#) = fromIntegral tA__ 
+            !r# = fmaddDouble# c# c# a#
+          in 
+             Right $ computDouble# a# c# r#
+    | otherwise = Left iax 
+  where 
+      !c@(D# c#) = fromMaybe 0 (fx2Double# tCFX#) 
+
+{-# INLINE computDouble# #-}
+computDouble# :: Double# -> Double# -> Double# -> Int64
+computDouble# !tAFX# !tCFX# !radFX# = hndlOvflwW32 (floor (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))))
 
 preComput :: IterArgs_ -> CoreArgs
 preComput (IterArgs_ tA__ tCFX#) =
@@ -456,6 +475,10 @@ sqrtDX d
   | d == 1 = 1
   | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 {-# INLINE sqrtDX #-}
+
+fx2Double# :: FloatingX# -> Maybe Double
+fx2Double# x@(FloatingX# s# e#) = let ei64 = fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
+{-# INLINE fx2Double# #-}
 
 fx2Double :: FloatingX -> Maybe Double
 fx2Double (FloatingX d@(D# d#) e)
