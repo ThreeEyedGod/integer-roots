@@ -316,15 +316,11 @@ doubleFromRvsrdTuple :: (Word32, Word32) -> Integer -> Double
 doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromIntegral l1
 
 {-# INLINE largestNSqLTEOdd #-}
-{-# SPECIALIZE largestNSqLTEOdd :: Int64 -> Int64 #-}
-{-# SPECIALIZE largestNSqLTEOdd :: Integer -> Integer #-}
-largestNSqLTEOdd :: (Integral a) => a -> a
+largestNSqLTEOdd :: Integer -> Integer
 largestNSqLTEOdd i =  floorDouble (sqrt (fromIntegral i) :: Double)
 
 {-# INLINE largestNSqLTEEven #-}
-{-# SPECIALIZE largestNSqLTEEven :: Int64 -> Int64 #-}
-{-# SPECIALIZE largestNSqLTEEven :: Integer -> Integer #-}
-largestNSqLTEEven :: (Integral a) => a -> a
+largestNSqLTEEven :: Integer -> Integer
 largestNSqLTEEven i = let i_ = nextUp (fromIntegral i :: Double) in floorDouble (nextUp (sqrt i_)) 
 
 -- | handle overflow
