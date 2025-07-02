@@ -477,6 +477,7 @@ sqrtDX d
 
 toInt64 :: Int64# -> Int64
 toInt64 x# = I64# x#
+{-# INLINE toInt64 #-}
 
 fx2Double# :: FloatingX# -> Maybe Double
 fx2Double# x@(FloatingX# s# e#) = let ei64 = toInt64 e# in fx2Double $ FloatingX (D# s#) ei64--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
