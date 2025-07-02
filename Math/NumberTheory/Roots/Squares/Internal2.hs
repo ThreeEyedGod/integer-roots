@@ -159,6 +159,7 @@ prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let !rnxt2@(RestNextTwo _ _) = prepA
 theNextIterations :: Itr -> Integer
 theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx#
   where
+    tni :: Int -> VU.Vector Word32 -> Int# -> Integer -> Integer -> FloatingX# -> Integer 
     tni cl v l# yC iR t# =
       if I# l# == 0 || VU.null v
         then yC
@@ -176,9 +177,9 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
 --        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
 
 -- | numeric loop records
-data IterArgs_ = IterArgs_ {tA_ :: Integer, tC_ :: FloatingX#} deriving (Eq)
+data IterArgs_ = IterArgs_ {tA_ :: !Integer, tC_ :: !FloatingX#} deriving (Eq)
 
-data IterRes = IterRes {yCum :: Integer, yTilde :: {-# UNPACK #-} !Int64, ri :: Integer} deriving (Eq)
+data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64, ri :: !Integer} deriving (Eq)
 
 data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
