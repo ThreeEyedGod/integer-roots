@@ -326,6 +326,7 @@ largestNSqLTEEven i = let i_ = nextUp (fromIntegral i :: Double) in floorDouble 
 -- | handle overflow
 {-# INLINE hndlOvflwW32 #-}
 {-# SPECIALIZE hndlOvflwW32 :: Int64 -> Int64 #-}
+{-# SPECIALIZE hndlOvflwW32 :: Integer -> Integer #-}
 hndlOvflwW32 :: (Integral a) => a -> a
 hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
