@@ -361,9 +361,7 @@ data FloatingX = FloatingX !Double !Int64 deriving (Eq, Show) -- ! for strict da
 data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-# UNPACK #-} !Int64#} deriving (Eq) -- ! for strict data type
 
 {-# INLINE floorX# #-}
-{-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}
-{-# SPECIALIZE floorX# :: FloatingX# -> Int64 #-}
-floorX# :: (Integral a) => FloatingX# -> a
+floorX# :: FloatingX# -> Int64
 floorX# (FloatingX# s# e#) =
   let e = toInt64 e# 
    in case fx2Double (FloatingX (D# s#) e) of

@@ -40,7 +40,7 @@ import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL
 {-# SPECIALIZE isqrtA :: Integer -> Integer #-}
 isqrtA :: (Integral a) => a -> a
 isqrtA 0 = 0
-isqrtA n = isqrtB n --heron n (fromInteger . appSqrt . fromIntegral $ n)
+isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n)
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
