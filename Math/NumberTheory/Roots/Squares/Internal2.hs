@@ -24,6 +24,9 @@ where
 
 -- *********** BEGIN NEW IMPORTS
 
+import GHC.Int      (Int64(I64#))
+import GHC.Prim     (Int64#)
+
 #ifdef MIN_VERSION_integer_gmp
 import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
 import GHC.Integer.GMP.Internals (Integer(..), shiftLInteger, shiftRInteger, sizeofBigNat#)
@@ -364,7 +367,7 @@ data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-#
 {-# SPECIALIZE floorX# :: FloatingX# -> Int64 #-}
 floorX# :: (Integral a) => FloatingX# -> a
 floorX# (FloatingX# s# e#) =
-  let e = fromIntegral (I# $ int64ToInt# e#)
+  let e = toInt64 e# 
    in case fx2Double (FloatingX (D# s#) e) of
         Just d -> floor d
         _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
@@ -453,7 +456,7 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# (FloatingX# s# e#) =
-  let !(D# sX#, eX) = sqrtSplitDbl (FloatingX (D# s#) (fromIntegral (I# (int64ToInt# e#))))
+  let !(D# sX#, eX) = sqrtSplitDbl (FloatingX (D# s#) (toInt64 e#))
       !(I# eX#) = fromIntegral eX
    in FloatingX# sX# (intToInt64# eX#)
 
@@ -476,8 +479,11 @@ sqrtDX d
   | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 {-# INLINE sqrtDX #-}
 
+toInt64 :: Int64# -> Int64
+toInt64 x# = I64# x#
+
 fx2Double# :: FloatingX# -> Maybe Double
-fx2Double# x@(FloatingX# s# e#) = let ei64 = fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
+fx2Double# x@(FloatingX# s# e#) = let ei64 = toInt64 e# in fx2Double $ FloatingX (D# s#) ei64--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
 {-# INLINE fx2Double# #-}
 
 fx2Double :: FloatingX -> Maybe Double
