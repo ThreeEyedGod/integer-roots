@@ -130,17 +130,19 @@ data RestNextTwo = RestNextTwo {firstWord32 :: {-# UNPACK #-} !Word32, secondWor
 theFi :: VU.Vector Word32 -> Itr 
 theFi v 
     | VU.null v = error "theFI: Invalid Argument null vector "
-    | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 v l'# 0 0 zero#
+    | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 v 0# 0 0 zero#
     | evenLen = let 
+             !(I# l'#) = l-2
              IterRes !yc !y1 !remInteger = let !y = hndlOvflwW32 (largestNSqLTEEven i) in handleRems_ $ IterRes 0 (fromIntegral y) (i - y * y) -- set 0 for starting cumulative yc--fstDgtRem i
           in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
-    | otherwise = let              
+    | otherwise = let 
+             !(I# l'#) = l-1
              IterRes !yc !y1 !remInteger = let y = largestNSqLTEOdd i in IterRes y (fromIntegral y) (i - y * y)
           in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
  where 
       !l = VU.length v 
       !evenLen = even l 
-      !(ProcessedVec dxsVec' (I# l'#)) = if evenLen then brkVecPv v (l-2) else brkVecPv v (l-1) 
+      !dxsVec' = if evenLen then brkVec v (l-2) else brkVec v (l-1) 
       !i = intgrFromRvsrd2ElemVec dxsVec' radixW32
 
 {-# INLINE prepA_ #-}
@@ -164,8 +166,8 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
       if I# l# == 0 || VU.null v
         then yC
         else
-          let (LoopArgs _ !inA_) = prepArgs_ (Itr cl v l# yC iR t#)
-              (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yC inA_ -- number crunching only
+          let !(LoopArgs _ !inA_) = prepArgs_ (Itr cl v l# yC iR t#)
+              !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yC inA_ -- number crunching only
            in tni (succ cl) v (l# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal) -- do not VU.force ri32V
 
 -- theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
