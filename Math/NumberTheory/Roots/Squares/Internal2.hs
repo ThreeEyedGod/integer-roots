@@ -121,8 +121,6 @@ isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromInteg
 -- | Iteration loop data - these records have vectors / lists in them
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
-data LoopArgs = LoopArgs {inArgs_ :: !IterArgs_} deriving (Eq)
-
 data ProcessedVec = ProcessedVec {firstTwo :: !(VU.Vector Word32), len :: !Int} deriving (Eq)
 
 data RestNextTwo = RestNextTwo {firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving (Eq)
@@ -154,8 +152,8 @@ prepB_ iRem tBFX# (RestNextTwo !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 iR
 {-# INLINE prepB_ #-}
 
 {-# INLINE prepArgs_ #-}
-prepArgs_ :: Itr -> LoopArgs
-prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let !rnxt2@(RestNextTwo _ _) = prepA_ l# w32Vec in LoopArgs (prepB_ iRem tBFX_# rnxt2) 
+prepArgs_ :: Itr -> IterArgs_
+prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let !rnxt2 = prepA_ l# w32Vec in prepB_ iRem tBFX_# rnxt2
 
 -- Keep it this way: Inlining this lowers performance.
 theNextIterations :: Itr -> Integer
@@ -166,7 +164,7 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
       if I# l# == 0 || VU.null v
         then yC
         else
-          let !(LoopArgs !inA_) = prepArgs_ (Itr cl v l# yC iR t#)
+          let !inA_ = prepArgs_ (Itr cl v l# yC iR t#)
               !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yC inA_ -- number crunching only
            in tni (succ cl) v (l# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal) -- do not VU.force ri32V
 
