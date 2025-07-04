@@ -186,7 +186,7 @@ data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64, ri ::
 data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
 nxtDgtRem :: Integer -> IterArgs_ -> IterRes
-nxtDgtRem yCumulat iterargs_ = let !yTilde_# = nxtDgt_# iterargs_ in computeRem_ (yCumulat * radixW32) iterargs_ (I64# yTilde_#)
+nxtDgtRem yCumulat iterargs_ = let !yTilde_# = nxtDgt_# iterargs_ in computeRem_ (yCumulat * radixW32) iterargs_ yTilde_#
 {-# INLINE nxtDgtRem #-}
 
 -- |Early termination if more than the 3rd digit or if digit is 0 
@@ -234,8 +234,8 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (ne
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
 -- that happens in handleRems_
 -- if the trial digit is zero skip computing remainder
-computeRem_ :: Integer -> IterArgs_ -> Int64 -> IterRes
-computeRem_ tc iArgs_ yTilde_ = let !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_ in handleRems_ (IterRes tc yTilde_ rTrial)
+computeRem_ :: Integer -> IterArgs_ -> Int64# -> IterRes
+computeRem_ tc iArgs_ yTilde_# = let !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_# in handleRems_ (IterRes tc (I64# yTilde_#) rTrial)
 {-# INLINE computeRem_ #-}
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
@@ -250,9 +250,9 @@ handleRems_ (IterRes yc yi ri_)
 {-# INLINE handleRems_ #-}
 
 -- Calculate remainder accompanying a 'digit'
-calcRemainder :: Integer -> Integer -> Int64 -> Integer
-calcRemainder tAI !_ 0 = tAI
-calcRemainder tAI tc dgt = let !i = fromIntegral dgt in tAI - i * (double tc + i) --tAI - ((double i * tc) + i * i)
+calcRemainder :: Integer -> Integer -> Int64# -> Integer
+calcRemainder tAI !_ 0#Int64 = tAI
+calcRemainder tAI tc dgt64# = let !i = fromIntegral (I64# dgt64#) in tAI - i * (double tc + i) --tAI - ((double i * tc) + i * i)
 {-# INLINE calcRemainder #-}
 
 -- Fix remainder accompanying a 'next downed digit'
