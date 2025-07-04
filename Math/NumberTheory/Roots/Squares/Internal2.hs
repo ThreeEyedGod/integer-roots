@@ -378,8 +378,7 @@ zero# =
 
 minValue# :: FloatingX#
 minValue# =
-  let !(I# zeroInt#) = fromIntegral (0 :: Int64)
-      !zero64# = intToInt64# zeroInt#
+  let !zero64# = fromInt64 (0 :: Int64)
    in FloatingX# 1.0## zero64#
 
 {-# INLINE (!+##) #-}
@@ -454,8 +453,7 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# (FloatingX# s# e#) =
   let !(D# sX#, eX) = sqrtSplitDbl (FloatingX (D# s#) (toInt64 e#))
-      !(I# eX#) = fromIntegral eX
-   in FloatingX# sX# (intToInt64# eX#)
+   in FloatingX# sX# (fromInt64 eX)
 
 sqrtSplitDbl :: FloatingX -> (Double, Int64)
 sqrtSplitDbl (FloatingX d e)
@@ -480,6 +478,11 @@ toInt64 :: Int64# -> Int64
 toInt64 x# = I64# x#
 {-# INLINE toInt64 #-}
 
+fromInt64 :: Int64 -> Int64#
+fromInt64 (I64# x#) = x#
+{-# INLINE fromInt64 #-}
+
+
 fx2Double# :: FloatingX# -> Maybe Double
 fx2Double# x@(FloatingX# s# e#) = let ei64 = toInt64 e# in fx2Double $ FloatingX (D# s#) ei64--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
 {-# INLINE fx2Double# #-}
@@ -503,8 +506,7 @@ fx2Double (FloatingX d@(D# d#) e)
 double2FloatingX# :: Double -> FloatingX#
 double2FloatingX# d =
   let !(D# s#, e) = split d
-      !(I# eInt#) = fromIntegral e
-      !e# = intToInt64# eInt#
+      !e# = fromInt64 e
    in FloatingX# s# e#
 
 {-# INLINE integer2FloatingX# #-}
@@ -554,7 +556,7 @@ cI2D2_ _ = error "cI2D2_': negative argument"
 split :: Double -> (Double, Int64)
 split (D# d#) =
   case split# d# of
-    (# s#, ex# #) -> (D# s#, fromIntegral (integerFromInt64# ex#))
+    (# s#, ex# #) -> (D# s#, toInt64 ex#)
 
 {-# INLINE split# #-}
 split# :: Double# -> (# Double#, Int64# #)
