@@ -133,12 +133,18 @@ theFi v
     | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 v 0# 0 0 zero#
     | evenLen = let 
              !(I# l'#) = l-2
-             IterRes !yc !y1 !remInteger = let !y = hndlOvflwW32 (largestNSqLTEEven i) in handleRems_ $ IterRes 0 (fromIntegral y) (i - y * y) -- set 0 for starting cumulative yc--fstDgtRem i
-          in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
+             !(IterRes !yc !y1 !remInteger) = let 
+                  !y = hndlOvflwW32 (largestNSqLTEEven i) 
+                  !(I64# yT64#) = fromIntegral y 
+                in handleRems_ $ IterRes 0 yT64#(i - y * y) -- set 0 for starting cumulative yc--fstDgtRem i
+          in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral (I64# y1)) 
     | otherwise = let 
              !(I# l'#) = l-1
-             IterRes !yc !y1 !remInteger = let y = largestNSqLTEOdd i in IterRes y (fromIntegral y) (i - y * y)
-          in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral y1) 
+             !(IterRes !yc !y1 !remInteger) = let 
+                    y = largestNSqLTEOdd i 
+                    !(I64# yT64#) = fromIntegral y 
+                  in IterRes y yT64# (i - y * y)
+          in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral (I64# y1)) 
  where 
       !l = VU.length v 
       !evenLen = even l 
@@ -167,8 +173,8 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
         then yC
         else
           let !inA_ = prepArgs_ (Itr cl v l_# yC iR t#)
-              !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yC inA_ -- number crunching only
-           in tni (succ cl) v (l_# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal) -- do not VU.force ri32V
+              !(IterRes !yc !yTildeFinal# !remFinal) = nxtDgtRem yC inA_ -- number crunching only
+           in tni (succ cl) v (l_# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal#) -- do not VU.force ri32V
 
 -- theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
 --   | VU.null w32Vec = yCumulated
@@ -181,7 +187,7 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
 -- | numeric loop records
 data IterArgs_ = IterArgs_ {tA_ :: !Integer, tC_ :: !FloatingX#} deriving (Eq)
 
-data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64, ri :: !Integer} deriving (Eq)
+data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64#, ri :: !Integer} deriving (Eq)
 
 data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
@@ -190,8 +196,8 @@ nxtDgtRem yCumulat iterargs_ = let !yTilde_# = nxtDgt_# iterargs_ in computeRem_
 {-# INLINE nxtDgtRem #-}
 
 -- |Early termination if more than the 3rd digit or if digit is 0 
-fixTCFX# :: IterArgs_ -> Int -> Int64 -> FloatingX#
-fixTCFX# ia currlen yTildeFinal = let !tcfx# = tC_ ia in if currlen <= 2 && yTildeFinal > 0 then nextDownFX# $ tcfx# !+## integer2FloatingX# (fromIntegral yTildeFinal) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
+fixTCFX# :: IterArgs_ -> Int -> Int64# -> FloatingX#
+fixTCFX# ia currlen yTildeFinal# = let !tcfx# = tC_ ia in if currlen <= 2 && isTrue# (yTildeFinal# `gtInt64#` 0#Int64) then nextDownFX# $ tcfx# !+## integer2FloatingX# (fromIntegral (I64# yTildeFinal#)) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
 {-# INLINE fixTCFX# #-}
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
@@ -235,18 +241,20 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (ne
 -- that happens in handleRems_
 -- if the trial digit is zero skip computing remainder
 computeRem_ :: Integer -> IterArgs_ -> Int64# -> IterRes
-computeRem_ tc iArgs_ yTilde_# = let !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_# in handleRems_ (IterRes tc (I64# yTilde_#) rTrial)
+computeRem_ tc iArgs_ yTilde_# = let !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_# in handleRems_ (IterRes tc yTilde_# rTrial)
 {-# INLINE computeRem_ #-}
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework
 -- if it's positive and far larger in size then also the current digit rework
 handleRems_ :: IterRes -> IterRes
-handleRems_ (IterRes yc yi ri_)
-  | (ri_ < 0) && (yi > 0) = let rdr = fixRemainder yc ri_ (yi - 1) in IterRes (ycyi - 1) (yi - 1) rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | otherwise = IterRes ycyi yi ri_
+handleRems_ (IterRes yc yi64# ri_)
+  | (ri_ < 0) && isTrue# (yi64# `gtInt64#` 0#Int64) = let 
+                yAdj# = yi64# `subInt64#` 1#Int64 
+                rdr = fixRemainder yc ri_ yAdj#in IterRes (ycyi - 1) yAdj# rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | otherwise = IterRes ycyi yi64# ri_
   where
-    !ycyi = yc + fromIntegral yi -- accumulating the growing square root
+    !ycyi = yc + fromIntegral (I64# yi64#) -- accumulating the growing square root
 {-# INLINE handleRems_ #-}
 
 -- Calculate remainder accompanying a 'digit'
@@ -256,8 +264,8 @@ calcRemainder tAI tc dgt64# = let !i = fromIntegral (I64# dgt64#) in tAI - i * (
 {-# INLINE calcRemainder #-}
 
 -- Fix remainder accompanying a 'next downed digit'
-fixRemainder :: Integer -> Integer -> Int64 -> Integer
-fixRemainder tc rdr dgt = rdr + double (tc + fromIntegral dgt) + 1
+fixRemainder :: Integer -> Integer -> Int64# -> Integer
+fixRemainder tc rdr dgt64# = rdr + double (tc + fromIntegral (I64# dgt64#)) + 1
 {-# INLINE fixRemainder #-}
 
 -- | HELPER functions
