@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 -- addition
 {-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 -- addition
 {-# LANGUAGE UnboxedTuples #-}
@@ -23,7 +24,7 @@ module Math.NumberTheory.Roots.Squares.Internal2
 where
 
 -- *********** BEGIN NEW IMPORTS
-
+import GHC.Exts (Int64#)
 import GHC.Int      (Int64(I64#))
 import GHC.Prim     (Int64#)
 
@@ -58,6 +59,7 @@ import GHC.Exts
     int2Double#,
     int64ToInt#,
     intToInt64#,
+    eqInt64#,
     isTrue#,
     leInt64#,
     ltInt64#,
@@ -377,9 +379,7 @@ zero# =
    in FloatingX# 0.0## minBound64#
 
 minValue# :: FloatingX#
-minValue# =
-  let !zero64# = fromInt64 (0 :: Int64)
-   in FloatingX# 1.0## zero64#
+minValue# = FloatingX# 1.0## 0#Int64
 
 {-# INLINE (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
@@ -404,11 +404,12 @@ add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
   where
     combine big@(FloatingX# sBig# expBig#) little@(FloatingX# sLittle# expLittle#) =
       let !scale# = expLittle# `subInt64#` expBig#
-          !scaleD# = int2Double# (int64ToInt# scale#)
+          -- !scaleD# = int2Double# (int64ToInt# scale#)
+          !(D# !scaleD#) = fromIntegral (I64# scale#) 
           !scaledLittle# = sLittle# *## (2.00## **## scaleD#)
           !resSignif# = sBig# +## scaledLittle#
        in if isTrue# (resSignif# >=## 2.0##)
-            then FloatingX# (resSignif# /## 2.0##) (expBig# `plusInt64#` intToInt64# 1#)
+            then FloatingX# (resSignif# /## 2.0##) (expBig# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# expBig#
 
 {-# INLINE mul# #-}
@@ -418,19 +419,19 @@ mul# :: FloatingX# -> FloatingX# -> FloatingX#
 mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
   | isTrue# (sA# ==## 0.00##) = zero#
   | isTrue# (sB# ==## 0.00##) = zero#
-  | isTrue# (sA# ==## 1.00##) && (integerFromInt64# expA# == 0) = b
-  | isTrue# (sB# ==## 1.00##) && (integerFromInt64# expB# == 0) = a
+  | isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = b
+  | isTrue# (sB# ==## 1.00##) && isTrue# (expB# `eqInt64#` 0#Int64) = a
   | otherwise =
       let !resExp# = expA# `plusInt64#` expB#
           !resSignif# = sA# *## sB#
        in if isTrue# (resSignif# >=## 2.0##)
-            then FloatingX# (resSignif# /## 2.0##) (resExp# `plusInt64#` intToInt64# 1#)
+            then FloatingX# (resSignif# /## 2.0##) (resExp# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# resExp#
 
 {-# INLINE divide# #-}
 divide# :: FloatingX# -> FloatingX# -> FloatingX#
 divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
-  | d == FloatingX# 1.0## (intToInt64# 0#) = n
+  | d == FloatingX# 1.0## (fromInt64 0) = n
   | isTrue# (s1# ==## 0.0##) = zero#
   | isTrue# (s2# ==## 0.0##) = error "divide#: error divide by zero "
   | otherwise =
@@ -440,12 +441,12 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
           -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
           !(# finalSignif#, finalExp# #) =
             if isTrue# (resSignif# <## 1.0##)
-              then (# resSignif# *## 2.0##, resExp# `subInt64#` intToInt64# 1# #)
+              then (# resSignif# *## 2.0##, resExp# `subInt64#` 1#Int64 #)
               else (# resSignif#, resExp# #)
        in -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
           -- //TODO fix this next line
           -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
-          if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#)
+          if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` 0#Int64)
             then zero#
             else FloatingX# finalSignif# finalExp#
 
@@ -482,9 +483,8 @@ fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
 {-# INLINE fromInt64 #-}
 
-
 fx2Double# :: FloatingX# -> Maybe Double
-fx2Double# x@(FloatingX# s# e#) = let ei64 = toInt64 e# in fx2Double $ FloatingX (D# s#) ei64--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
+fx2Double# x@(FloatingX# s# e#) = fx2Double $ FloatingX (D# s#) (toInt64 e#)--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
 {-# INLINE fx2Double# #-}
 
 fx2Double :: FloatingX -> Maybe Double
@@ -493,8 +493,9 @@ fx2Double (FloatingX d@(D# d#) e)
   | isInfinite d = Nothing -- error "Input is Infinity"
   | ex < 0 = Just $ fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary
   | otherwise =
-      let result# = encodeDoubleInteger m ex#
+      let 
           !(I# ex#) = ex
+          result# = encodeDoubleInteger m ex#
           !result = D# result#
        in if isInfinite result || isNaN result then Nothing else Just result
   where
@@ -564,8 +565,8 @@ split# d# =
       !ex# = intToInt64# expInt#
    in (# s#, ex# #)
 
-
 -- | Some Constants
+
 radixW32 :: (Integral a) => a
 radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
 
@@ -634,8 +635,7 @@ nextUpFX# (FloatingX# s# e#)
   | isTrue# (s# ==## 0.0##) = minValue#
   | otherwise =
       let !interimS# = nextUp# s#
-          !(I64# one64#) = 1
-       in if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` one64#) else FloatingX# interimS# e#
+       in if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
 
 {-# INLINE nextDownFX# #-}
 nextDownFX# :: FloatingX# -> FloatingX#
@@ -643,5 +643,4 @@ nextDownFX# x@(FloatingX# s# e#)
   | isTrue# (s# ==## 0.0##) || x == minValue# = zero#
   | otherwise =
       let !interimS# = nextDown# s#
-          !(I64# one64#) = 1
-       in if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` one64#) else FloatingX# interimS# e#
+       in if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#
