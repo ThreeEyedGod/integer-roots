@@ -365,18 +365,13 @@ data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-#
 
 {-# INLINE floorX# #-}
 floorX# :: FloatingX# -> Int64
-floorX# (FloatingX# s# e#) =
-  let e = toInt64 e# 
-   in case fx2Double (FloatingX (D# s#) e) of
+floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
         Just d -> floor d
         _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE zero# #-}
 zero# :: FloatingX#
-zero# =
-  let !(I# minBoundInt#) = fromIntegral (minBound :: Int64)
-      !minBound64# = intToInt64# minBoundInt#
-   in FloatingX# 0.0## minBound64#
+zero# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 
 minValue# :: FloatingX#
 minValue# = FloatingX# 1.0## 0#Int64
@@ -404,7 +399,6 @@ add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
   where
     combine big@(FloatingX# sBig# expBig#) little@(FloatingX# sLittle# expLittle#) =
       let !scale# = expLittle# `subInt64#` expBig#
-          -- !scaleD# = int2Double# (int64ToInt# scale#)
           !(D# !scaleD#) = fromIntegral (I64# scale#) 
           !scaledLittle# = sLittle# *## (2.00## **## scaleD#)
           !resSignif# = sBig# +## scaledLittle#
@@ -453,8 +447,8 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# (FloatingX# s# e#) =
-  let !(D# sX#, eX) = sqrtSplitDbl (FloatingX (D# s#) (toInt64 e#))
-   in FloatingX# sX# (fromInt64 eX)
+  let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (toInt64 e#))
+   in FloatingX# sX# eX#
 
 sqrtSplitDbl :: FloatingX -> (Double, Int64)
 sqrtSplitDbl (FloatingX d e)
@@ -484,7 +478,7 @@ fromInt64 (I64# x#) = x#
 {-# INLINE fromInt64 #-}
 
 fx2Double# :: FloatingX# -> Maybe Double
-fx2Double# x@(FloatingX# s# e#) = fx2Double $ FloatingX (D# s#) (toInt64 e#)--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
+fx2Double# x@(FloatingX# s# e#) = fx2Double $ FloatingX (D# s#) (I64# e#)--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
 {-# INLINE fx2Double# #-}
 
 fx2Double :: FloatingX -> Maybe Double
@@ -506,8 +500,7 @@ fx2Double (FloatingX d@(D# d#) e)
 {-# INLINE double2FloatingX# #-}
 double2FloatingX# :: Double -> FloatingX#
 double2FloatingX# d =
-  let !(D# s#, e) = split d
-      !e# = fromInt64 e
+  let !(D# s#, I64# e#) = split d
    in FloatingX# s# e#
 
 {-# INLINE integer2FloatingX# #-}
@@ -555,7 +548,7 @@ cI2D2_ _ = error "cI2D2_': negative argument"
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
-split (D# d#) = let !(# s#, ex# #) = split# d# in (D# s#, toInt64 ex#)
+split (D# d#) = let !(# s#, ex# #) = split# d# in (D# s#, I64# ex#)
 
 {-# INLINE split# #-}
 split# :: Double# -> (# Double#, Int64# #)
@@ -617,17 +610,11 @@ nextDown = DB.nextDown -- NFI.nextDown
 
 {-# INLINE nextUp# #-}
 nextUp# :: Double# -> Double#
-nextUp# dIn# =
-  let !d = D# dIn#
-      !(D# dOut#) = nextUp d
-   in dOut#
+nextUp# dIn# = let !(D# dOut#) = nextUp (D# dIn#) in dOut#
 
 {-# INLINE nextDown# #-}
 nextDown# :: Double# -> Double#
-nextDown# dIn# =
-  let !d = D# dIn#
-      !(D# dOut#) = nextDown d
-   in dOut#
+nextDown# dIn# = let !(D# dOut#) = nextDown (D# dIn#) in dOut#
 
 {-# INLINE nextUpFX# #-}
 nextUpFX# :: FloatingX# -> FloatingX#
