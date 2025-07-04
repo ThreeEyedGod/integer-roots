@@ -186,7 +186,7 @@ data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64, ri ::
 data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
 nxtDgtRem :: Integer -> IterArgs_ -> IterRes
-nxtDgtRem yCumulat iterargs_ = let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ (yCumulat * radixW32) iterargs_ yTilde_
+nxtDgtRem yCumulat iterargs_ = let !yTilde_# = nxtDgt_# iterargs_ in computeRem_ (yCumulat * radixW32) iterargs_ (I64# yTilde_#)
 {-# INLINE nxtDgtRem #-}
 
 -- |Early termination if more than the 3rd digit or if digit is 0 
@@ -197,11 +197,11 @@ fixTCFX# ia currlen yTildeFinal = let !tcfx# = tC_ ia in if currlen <= 2 && yTil
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
-nxtDgt_# :: IterArgs_ -> Int64
-nxtDgt_# (IterArgs_ 0 !_) = 0
+nxtDgt_# :: IterArgs_ -> Int64#
+nxtDgt_# (IterArgs_ 0 !_) = 0#Int64
 nxtDgt_# iax = case byPass iax of 
     Left _ -> comput (preComput iax)
-    Right res -> res
+    Right resBy@(I64# resBy#) -> resBy#
 {-# INLINE nxtDgt_# #-}
 
 {-# INLINE byPass #-}
@@ -211,14 +211,14 @@ byPass iax@(IterArgs_ tA__ tCFX#)
             !(D# a#) = fromIntegral tA__ 
             !r# = fmaddDouble# c# c# a#
           in 
-             Right $ computDouble# a# c# r#
+             Right (I64# $ computDouble# a# c# r#)
     | otherwise = Left iax 
   where 
       !c@(D# c#) = fromMaybe 0 (fx2Double# tCFX#) 
 
 {-# INLINE computDouble# #-}
-computDouble# :: Double# -> Double# -> Double# -> Int64
-computDouble# !tAFX# !tCFX# !radFX# = hndlOvflwW32 (floor (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))))
+computDouble# :: Double# -> Double# -> Double# -> Int64#
+computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) in hndlOvflwW32# i#
 
 preComput :: IterArgs_ -> CoreArgs
 preComput (IterArgs_ tA__ tCFX#) =
@@ -227,8 +227,8 @@ preComput (IterArgs_ tA__ tCFX#) =
    in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}
 
-comput :: CoreArgs -> Int64
-comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+comput :: CoreArgs -> Int64#
+comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE comput #-}
 
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
@@ -333,6 +333,10 @@ largestNSqLTEEven i = let i_ = nextUp (fromIntegral i :: Double) in floorDouble 
 hndlOvflwW32 :: (Integral a) => a -> a
 hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
+{-# INLINE hndlOvflwW32# #-}
+hndlOvflwW32# :: Int64# -> Int64#
+hndlOvflwW32# i# = if I64# i# == maxW32 then fromInt64 $ pred maxW32 else i# where maxW32 = radixW32
+
 scaleByPower2 :: Int64# -> FloatingX# -> FloatingX#
 scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else FloatingX# s# (e# `plusInt64#` n#)--normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
 {-# INLINE scaleByPower2 #-}
@@ -367,6 +371,12 @@ data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-#
 floorX# :: FloatingX# -> Int64
 floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
         Just d -> floor d
+        _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
+
+{-# INLINE floorX## #-}
+floorX## :: FloatingX# -> Int64#
+floorX## (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
+        Just d -> let !(I64# d#) = floor d in d# 
         _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE zero# #-}
