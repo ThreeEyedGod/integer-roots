@@ -40,7 +40,7 @@ import GHC.Num.BigNat (bigNatSize#)
 import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
 #endif
 
-import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
+import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, shiftR, (.&.), (.|.))
 import qualified Data.Bits.Floating as DB (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
 import Data.Int (Int64)
@@ -160,13 +160,13 @@ theNextIterations :: Itr -> Integer
 theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx#
   where
     tni :: Int -> VU.Vector Word32 -> Int# -> Integer -> Integer -> FloatingX# -> Integer 
-    tni cl v l# yC iR t# =
-      if I# l# == 0 || VU.null v
+    tni cl v l_# yC iR t# =
+      if I# l_# == 0 || VU.null v
         then yC
         else
-          let !inA_ = prepArgs_ (Itr cl v l# yC iR t#)
+          let !inA_ = prepArgs_ (Itr cl v l_# yC iR t#)
               !(IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yC inA_ -- number crunching only
-           in tni (succ cl) v (l# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal) -- do not VU.force ri32V
+           in tni (succ cl) v (l_# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal) -- do not VU.force ri32V
 
 -- theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
 --   | VU.null w32Vec = yCumulated
@@ -190,6 +190,7 @@ nxtDgtRem yCumulat iterargs_ = let !yTilde_ = nxtDgt_# iterargs_ in computeRem_ 
 -- |Early termination if more than the 3rd digit or if digit is 0 
 fixTCFX# :: IterArgs_ -> Int -> Int64 -> FloatingX#
 fixTCFX# ia currlen yTildeFinal = let !tcfx# = tC_ ia in if currlen <= 2 && yTildeFinal > 0 then nextDownFX# $ tcfx# !+## integer2FloatingX# (fromIntegral yTildeFinal) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
+{-# INLINE fixTCFX# #-}
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
@@ -460,8 +461,8 @@ sqrtSplitDbl :: FloatingX -> (Double, Int64)
 sqrtSplitDbl (FloatingX d e)
   | d == 0 = (0, 0)
   | d == 1 = (1, 0)
-  | even e = (s, fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e) 1##) -- even
-  | otherwise = (sqrtOf2 * s, fromIntegral $ integerShiftR# (integerFromInt $ fromIntegral e - 1) 1##) -- odd
+  | even e = (s, shiftR e 1) -- even
+  | otherwise = (sqrtOf2 * s, shiftR (e - 1) 1) -- odd
   where
     !s = sqrtDX d
 {-# INLINE sqrtSplitDbl #-}
