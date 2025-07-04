@@ -192,7 +192,7 @@ data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64#, ri :
 data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
 nxtDgtRem :: Integer -> IterArgs_ -> IterRes
-nxtDgtRem yCumulat iterargs_ = let !yTilde_# = nxtDgt_# iterargs_ in computeRem_ (yCumulat * radixW32) iterargs_ yTilde_#
+nxtDgtRem yCumulat iterargs_ = let !yTilde_# = nxtDgt_# iterargs_ in computeRem_ yCumulat iterargs_ yTilde_#
 {-# INLINE nxtDgtRem #-}
 
 -- |Early termination if more than the 3rd digit or if digit is 0 
@@ -211,14 +211,14 @@ nxtDgt_# iax = case byPass iax of
 {-# INLINE nxtDgt_# #-}
 
 {-# INLINE byPass #-}
-byPass :: IterArgs_ -> Either IterArgs_ Int64
+byPass :: IterArgs_ -> Either Int Int64
 byPass iax@(IterArgs_ tA__ tCFX#) 
     | tA__ < 2^512-1 && c > 0 = let 
             !(D# a#) = fromIntegral tA__ 
             !r# = fmaddDouble# c# c# a#
           in 
              Right (I64# $ computDouble# a# c# r#)
-    | otherwise = Left iax 
+    | otherwise = Left 0 
   where 
       !c@(D# c#) = fromMaybe 0 (fx2Double# tCFX#) 
 
@@ -248,19 +248,23 @@ computeRem_ tc iArgs_ yTilde_# = let !rTrial = calcRemainder (tA_ iArgs_) tc yTi
 -- if it's positive but far larger in length of the current accumulated root, then also it signals a need for current digit rework
 -- if it's positive and far larger in size then also the current digit rework
 handleRems_ :: IterRes -> IterRes
-handleRems_ (IterRes yc yi64# ri_)
+handleRems_ (IterRes yc_ yi64# ri_)
   | (ri_ < 0) && isTrue# (yi64# `gtInt64#` 0#Int64) = let 
                 yAdj# = yi64# `subInt64#` 1#Int64 
                 rdr = fixRemainder yc ri_ yAdj#in IterRes (ycyi - 1) yAdj# rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = IterRes ycyi yi64# ri_
   where
+    !yc = yc_ * radixW32
     !ycyi = yc + fromIntegral (I64# yi64#) -- accumulating the growing square root
 {-# INLINE handleRems_ #-}
 
 -- Calculate remainder accompanying a 'digit'
 calcRemainder :: Integer -> Integer -> Int64# -> Integer
 calcRemainder tAI !_ 0#Int64 = tAI
-calcRemainder tAI tc dgt64# = let !i = fromIntegral (I64# dgt64#) in tAI - i * (double tc + i) --tAI - ((double i * tc) + i * i)
+calcRemainder tAI tc_ dgt64# = let 
+        !i = fromIntegral (I64# dgt64#) 
+        !tc = tc_ * radixW32
+    in tAI - i * (double tc + i) --tAI - ((double i * tc) + i * i)
 {-# INLINE calcRemainder #-}
 
 -- Fix remainder accompanying a 'next downed digit'
