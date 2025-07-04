@@ -475,7 +475,7 @@ sqrtDX d
 {-# INLINE sqrtDX #-}
 
 toInt64 :: Int64# -> Int64
-toInt64 x# = I64# x#
+toInt64 = I64#
 {-# INLINE toInt64 #-}
 
 fromInt64 :: Int64 -> Int64#
@@ -554,9 +554,7 @@ cI2D2_ _ = error "cI2D2_': negative argument"
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
-split (D# d#) =
-  case split# d# of
-    (# s#, ex# #) -> (D# s#, toInt64 ex#)
+split (D# d#) = let !(# s#, ex# #) = split# d# in (D# s#, toInt64 ex#)
 
 {-# INLINE split# #-}
 split# :: Double# -> (# Double#, Int64# #)
@@ -636,7 +634,8 @@ nextUpFX# (FloatingX# s# e#)
   | isTrue# (s# ==## 0.0##) = minValue#
   | otherwise =
       let !interimS# = nextUp# s#
-       in if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` intToInt64# 1#) else FloatingX# interimS# e#
+          !(I64# one64#) = 1
+       in if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` one64#) else FloatingX# interimS# e#
 
 {-# INLINE nextDownFX# #-}
 nextDownFX# :: FloatingX# -> FloatingX#
@@ -644,4 +643,5 @@ nextDownFX# x@(FloatingX# s# e#)
   | isTrue# (s# ==## 0.0##) || x == minValue# = zero#
   | otherwise =
       let !interimS# = nextDown# s#
-       in if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` intToInt64# 1#) else FloatingX# interimS# e#
+          !(I64# one64#) = 1
+       in if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` one64#) else FloatingX# interimS# e#
