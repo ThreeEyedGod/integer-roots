@@ -148,7 +148,7 @@ prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
 prepA_ l# w32Vec = RestNextTwo (VU.unsafeIndex w32Vec (I# l# - 2)) (VU.unsafeIndex w32Vec(I# l# - 1)) 
 
 prepB_ :: Integer -> FloatingX# -> RestNextTwo -> IterArgs_
-prepB_ iRem tBFX# (RestNextTwo !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (intToInt64# 32#) tBFX#) -- sqrtF previous digits being scaled right here
+prepB_ iRem tBFX# (RestNextTwo !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (fromInt64 32) tBFX#) -- sqrtF previous digits being scaled right here
 {-# INLINE prepB_ #-}
 
 {-# INLINE prepArgs_ #-}
