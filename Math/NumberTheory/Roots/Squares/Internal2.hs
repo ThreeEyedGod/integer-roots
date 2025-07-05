@@ -136,15 +136,13 @@ theFi v
              !(IterRes !yc !y1 !remInteger) = let 
                   !y = hndlOvflwW32 (largestNSqLTEEven i) 
                   !(I64# yT64#) = fromIntegral y 
-                in handleRems_ $ IterRes 0 yT64#(i - y * y) -- set 0 for starting cumulative yc--fstDgtRem i
+                in handleRems_ $ IterRes 0 yT64# (i - y * y) -- set 0 for starting cumulative yc--fstDgtRem i
           in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral (I64# y1)) 
     | otherwise = let 
              !(I# l'#) = l-1
-             !(IterRes !yc !y1 !remInteger) = let 
-                    y = largestNSqLTEOdd i 
-                    !(I64# yT64#) = fromIntegral y 
-                  in IterRes y yT64# (i - y * y)
-          in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral (I64# y1)) 
+             !y = largestNSqLTEOdd i 
+             !remInteger = (i - y * y)
+          in Itr 1 v l'# y remInteger (integer2FloatingX# y) 
  where 
       !l = VU.length v 
       !evenLen = even l 
@@ -161,7 +159,7 @@ prepB_ iRem tBFX# (RestNextTwo !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 iR
 
 {-# INLINE prepArgs_ #-}
 prepArgs_ :: Itr -> IterArgs_
-prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = let !rnxt2 = prepA_ l# w32Vec in prepB_ iRem tBFX_# rnxt2
+prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = prepB_ iRem tBFX_# (prepA_ l# w32Vec)
 
 -- Keep it this way: Inlining this lowers performance.
 theNextIterations :: Itr -> Integer
@@ -543,6 +541,12 @@ integer2FloatingX# i
     !(D# iDouble#) = fromIntegral i
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
+{-# INLINE int64ToFloatingX# #-}
+int64ToFloatingX# :: Int64 -> FloatingX#
+int64ToFloatingX# i
+  | i == 0 = zero#
+  | i < 0 = error "int64ToFloatingX# : invalid negative argument"
+  | otherwise = double2FloatingX# (fromIntegral i)
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
