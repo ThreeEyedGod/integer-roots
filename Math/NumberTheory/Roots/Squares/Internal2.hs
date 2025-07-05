@@ -469,7 +469,7 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# (FloatingX# s# e#) =
-  let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (toInt64 e#))
+  let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#))
    in FloatingX# sX# eX#
 
 sqrtSplitDbl :: FloatingX -> (Double, Int64)
