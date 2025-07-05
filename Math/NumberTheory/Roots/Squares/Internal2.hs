@@ -59,6 +59,7 @@ import GHC.Exts
     int2Double#,
     int64ToInt#,
     intToInt64#,
+    timesInt64#,
     eqInt64#,
     isTrue#,
     leInt64#,
@@ -174,14 +175,6 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
               !(IterRes !yc !yTildeFinal# !remFinal) = nxtDgtRem yC inA_ -- number crunching only
            in tni (succ cl) v (l_# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal#) -- do not VU.force ri32V
 
--- theNextIterations itr@(Itr currlen w32Vec l# yCumulated iRem tbfx#)
---   | VU.null w32Vec = yCumulated
---   | otherwise =
---       let
---           (LoopArgs _ !inA_ !ri32V ) = prepArgs_ itr
---           (IterRes !yc !yTildeFinal !remFinal) = nxtDgtRem yCumulated inA_ -- number crunching only
---        in theNextIterations $ Itr (succ currlen)(VU.force ri32V) (l# -# 2#) yc remFinal (fixTCFX# inA_ currlen yTildeFinal)
-
 -- | numeric loop records
 data IterArgs_ = IterArgs_ {tA_ :: !Integer, tC_ :: !FloatingX#} deriving (Eq)
 
@@ -193,7 +186,7 @@ nxtDgtRem :: Integer -> IterArgs_ -> IterRes
 nxtDgtRem yCumulat iterargs_ = let !yTilde_# = nxtDgt_# iterargs_ in computeRem_ yCumulat iterargs_ yTilde_#
 {-# INLINE nxtDgtRem #-}
 
--- |Early termination if more than the 3rd digit or if digit is 0 
+-- | Early termination if more than the 3rd digit or if digit is 0 
 fixTCFX# :: IterArgs_ -> Int -> Int64# -> FloatingX#
 fixTCFX# ia currlen yTildeFinal# = let !tcfx# = tC_ ia in if currlen <= 2 && isTrue# (yTildeFinal# `gtInt64#` 0#Int64) then nextDownFX# $ tcfx# !+## integer2FloatingX# (fromIntegral (I64# yTildeFinal#)) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
 {-# INLINE fixTCFX# #-}
@@ -227,7 +220,7 @@ computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# 
 preComput :: IterArgs_ -> CoreArgs
 preComput (IterArgs_ tA__ tCFX#) =
   let !tAFX# = integer2FloatingX# tA__ 
-      !radFX# = tCFX# !*## tCFX# !+## tAFX#
+      !radFX# = fmaddFloatingX# tCFX# tCFX# tAFX# -- //FIXME CAN USE FUSEDMULTADD?
    in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}
 
@@ -409,6 +402,12 @@ minValue# = FloatingX# 1.0## 0#Int64
 {-# INLINE (!/##) #-}
 (!/##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!/##) x y = x `divide#` y
+
+{-# INLINE fmaddFloatingX# #-}
+fmaddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX# -> FloatingX#
+fmaddFloatingX# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) c@(FloatingX# sC# expC#) 
+    | isTrue# (expA# `eqInt64#` expB#) && isTrue# (2#Int64 `timesInt64#` expA# `eqInt64#` expC#) = FloatingX# (fmaddDouble# sA# sB# sC#) expC#
+    | otherwise = a !*## b !+## c 
 
 {-# INLINE add# #-}
 add# :: FloatingX# -> FloatingX# -> FloatingX#
