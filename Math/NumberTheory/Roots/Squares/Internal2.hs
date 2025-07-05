@@ -251,7 +251,8 @@ handleRems_ :: IterRes -> IterRes
 handleRems_ (IterRes yc_ yi64# ri_)
   | (ri_ < 0) && isTrue# (yi64# `gtInt64#` 0#Int64) = let 
                 yAdj# = yi64# `subInt64#` 1#Int64 
-                rdr = fixRemainder yc ri_ yAdj#in IterRes (ycyi - 1) yAdj# rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+                -- rdr = fixRemainder yc ri_ yAdj# in IterRes (ycyi - 1) yAdj# rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+                rdr = fixRemainder (pred ycyi) ri_ in IterRes (ycyi - 1) yAdj# rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = IterRes ycyi yi64# ri_
   where
     !yc = yc_ * radixW32
@@ -268,8 +269,8 @@ calcRemainder tAI tc_ dgt64# = let
 {-# INLINE calcRemainder #-}
 
 -- Fix remainder accompanying a 'next downed digit'
-fixRemainder :: Integer -> Integer -> Int64# -> Integer
-fixRemainder tc rdr dgt64# = rdr + double (tc + fromIntegral (I64# dgt64#)) + 1
+fixRemainder :: Integer -> Integer -> Integer
+fixRemainder tcplusdgtadj rdr = rdr + double tcplusdgtadj + 1
 {-# INLINE fixRemainder #-}
 
 -- | HELPER functions
@@ -395,6 +396,7 @@ floorX## (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
 zero# :: FloatingX#
 zero# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 
+{-# INLINE minValue# #-}
 minValue# :: FloatingX#
 minValue# = FloatingX# 1.0## 0#Int64
 
