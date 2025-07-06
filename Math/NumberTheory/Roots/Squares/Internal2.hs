@@ -228,14 +228,14 @@ preComput (IterArgs_ tA__ tCFX#) =
 {-# INLINE preComput #-}
 
 comput :: CoreArgs -> Int64#
--- comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
-comput (CoreArgs !tAFX# !tCFX# !radFX#) = 
-  let 
-      !x = sqrtFX# (nextDownFX# radFX#) 
-      !y = nextDownFX# tCFX#
-      !z = x `fm1addFloatingX#` y -- x *## 1 + y 
-    in
-      hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# z)))
+comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+-- comput (CoreArgs !tAFX# !tCFX# !radFX#) = 
+--   let 
+--       !x = sqrtFX# (nextDownFX# radFX#) 
+--       !y = nextDownFX# tCFX#
+--       !z = x `fm1addFloatingX#` y -- x *## 1 + y 
+--     in
+--       hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# z)))
 {-# INLINE comput #-}
 
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
