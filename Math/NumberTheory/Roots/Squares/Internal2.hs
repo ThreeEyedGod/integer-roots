@@ -150,7 +150,7 @@ theFi v
       !l = VU.length v 
       !evenLen = even l 
       !dxsVec' = if evenLen then brkVec v (l-2) else brkVec v (l-1) 
-      !i = intgrFromRvsrd2ElemVec dxsVec' radixW32
+      !i = intgrFromRvsrd2ElemVec dxsVec'
 
 {-# INLINE prepA_ #-}
 prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
@@ -300,12 +300,12 @@ mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
 {-# INLINE intgrFromRvsrd2ElemVec #-}
 
 -- | Integer from a "reversed" Vector of Word32 digits
-intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer -> Integer
-intgrFromRvsrd2ElemVec v2ElemW32s base =
+intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer
+intgrFromRvsrd2ElemVec v2ElemW32s =
   let (llsb, lmsb) = case VU.uncons v2ElemW32s of
         Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
         Nothing -> error "intgrFromRvsrd2ElemVec : Invalid Vector - empty " 
-   in intgrFromRvsrdTuple (llsb, lmsb) base
+   in intgrFromRvsrdTuple (llsb, lmsb) radixW32
 
 {-# INLINE mkIW32Lst #-}
 
