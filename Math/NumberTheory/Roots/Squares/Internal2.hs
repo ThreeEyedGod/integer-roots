@@ -24,9 +24,9 @@ module Math.NumberTheory.Roots.Squares.Internal2
 where
 
 -- *********** BEGIN NEW IMPORTS
+
 import GHC.Exts (Int64#)
 import GHC.Int      (Int64(I64#))
-import GHC.Prim     (Int64#)
 
 #ifdef MIN_VERSION_integer_gmp
 import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
@@ -36,9 +36,9 @@ import GHC.Integer.Logarithms (integerLog2#)
 #define IP Jp#
 #define bigNatSize sizeofBigNat
 #else
-import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#, (*#),fmaddDouble#)
+import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#)
 import GHC.Num.BigNat (bigNatSize#)
-import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
+import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#)
 #endif
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, shiftR, (.&.), (.|.))
@@ -218,6 +218,7 @@ byPass iax@(IterArgs_ tA__ tCFX#)
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Int64#
 computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) in hndlOvflwW32# i#
+-- computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (fmaddDouble# (sqrtDouble# (nextDown# radFX#)) 1.00## (nextDown# tCFX#)) ))) in hndlOvflwW32# i#
 
 preComput :: IterArgs_ -> CoreArgs
 preComput (IterArgs_ tA__ tCFX#) =
@@ -454,6 +455,18 @@ mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
             then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# resExp#
 
+{-# INLINE sqr# #-}
+sqr# :: FloatingX# -> FloatingX#
+sqr# a@(FloatingX# sA# expA#) 
+  | isTrue# (sA# ==## 0.00##) = zero#
+  | isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = a
+  | otherwise =
+      let !resExp# = expA# `plusInt64#` expA#
+          !resSignif# = sA# *## sA#
+       in if isTrue# (resSignif# >=## 2.0##)
+            then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
+            else FloatingX# resSignif# resExp#
+
 {-# INLINE divide# #-}
 divide# :: FloatingX# -> FloatingX# -> FloatingX#
 divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
@@ -480,7 +493,7 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fsqraddFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#) 
     | isTrue# (cExcessa# `geInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) cExcessa#
-    | otherwise = a !*## a !+## c -- default custom mult and add
+    | otherwise =  sqr# a !+## c -- default custom mult and add
  where 
     !cExcessa# = expC# `subInt64#` (2#Int64 `timesInt64#` expA#)
 
@@ -660,6 +673,7 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
 -- | Floating Point nextUp/nextDown funxctions
+
 {-# INLINE nextUp #-}
 nextUp :: Double -> Double
 nextUp = DB.nextUp -- NFI.nextUp
