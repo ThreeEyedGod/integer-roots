@@ -7,8 +7,8 @@
 -- addition
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
--- addition
-{-# OPTIONS_GHC -fllvm -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
+-- addition (also note -mfma flag used to add in suppport for hardware fused ops)
+{-# OPTIONS_GHC -fllvm -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
 -- |
 -- Module:      Math.NumberTheory.Roots.Squares.Internal
@@ -190,7 +190,7 @@ nxtDgtRem yCumulat iterargs_ = let !yTilde_# = nxtDgt_# iterargs_ in computeRem_
 
 -- | Early termination if more than the 3rd digit or if digit is 0 
 fixTCFX# :: IterArgs_ -> Int -> Int64# -> FloatingX#
-fixTCFX# ia currlen yTildeFinal# = let !tcfx# = tC_ ia in if currlen <= 2 && isTrue# (yTildeFinal# `gtInt64#` 0#Int64) then nextDownFX# $ tcfx# !+## integer2FloatingX# (fromIntegral (I64# yTildeFinal#)) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
+fixTCFX# ia currlen yTildeFinal# = let !tcfx# = tC_ ia in if currlen <= 2 && isTrue# (yTildeFinal# `gtInt64#` 0#Int64) then nextDownFX# $ tcfx# !+## int64ToFloatingX# (I64# yTildeFinal#) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
 {-# INLINE fixTCFX# #-}
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
@@ -222,7 +222,7 @@ computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# 
 preComput :: IterArgs_ -> CoreArgs
 preComput (IterArgs_ tA__ tCFX#) =
   let !tAFX# = integer2FloatingX# tA__ 
-      !radFX# = tCFX# !**+## tAFX# -- fused multiply and add 
+      !radFX# = tCFX# !**+## tAFX# -- fused square (multiply) and add 
    in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}
 
@@ -232,7 +232,7 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) =
   let 
       !x = sqrtFX# (nextDownFX# radFX#) 
       !y = nextDownFX# tCFX#
-      !z = x `fm1addFloatingX#` y 
+      !z = x `fm1addFloatingX#` y -- x *## 1 + y 
     in
       hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# z)))
 {-# INLINE comput #-}
@@ -550,6 +550,12 @@ double2FloatingX# :: Double -> FloatingX#
 double2FloatingX# d =
   let !(D# s#, I64# e#) = split d
    in FloatingX# s# e#
+
+{-# INLINE double2FloatingX## #-}
+double2FloatingX## :: Double# -> FloatingX#
+double2FloatingX## d# =
+  case split# d# of
+    (# s#, e# #) -> FloatingX# s# e#
 
 {-# INLINE integer2FloatingX# #-}
 integer2FloatingX# :: Integer -> FloatingX#
