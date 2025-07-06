@@ -213,7 +213,7 @@ byPass iax@(IterArgs_ tA__ tCFX#)
              Right (I64# $ computDouble# a# c# r#)
     | otherwise = Left 0 
   where 
-      !c@(D# c#) = fromMaybe 0 (fx2Double# tCFX#) 
+      !c@(D# c#) = unsafefx2Double# tCFX# --fromMaybe 0 (fx2Double# tCFX#) 
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Int64#
@@ -250,7 +250,6 @@ computeRem_ tc iArgs_ yTilde_# = let !rTrial = calcRemainder (tA_ iArgs_) tc yTi
 -- if it's positive and far larger in size then also the current digit rework
 handleRems_ :: IterRes -> IterRes
 handleRems_ (IterRes yc_ yi64# ri_)
-  -- | (ri_ < 0) && isTrue# (yi64# `gtInt64#` 0#Int64) = let 
   | ri_ < 0 = let 
                 !yAdj# = yi64# `subInt64#` 1#Int64 
                 !adjYc = pred ycyi
@@ -392,7 +391,7 @@ floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
 floorX## :: FloatingX# -> Int64#
 floorX## (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
         Just d -> let !(I64# d#) = floor d in d# 
-        _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
+        _ -> error "floorX##: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE zero# #-}
 zero# :: FloatingX#
@@ -543,6 +542,10 @@ fx2Double# :: FloatingX# -> Maybe Double
 fx2Double# x@(FloatingX# s# e#) = fx2Double $ FloatingX (D# s#) (I64# e#)--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
 {-# INLINE fx2Double# #-}
 
+unsafefx2Double# :: FloatingX# -> Double
+unsafefx2Double# x@(FloatingX# s# e#) = unsafefx2Double $ FloatingX (D# s#) (I64# e#)--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
+{-# INLINE unsafefx2Double# #-}
+
 fx2Double :: FloatingX -> Maybe Double
 fx2Double (FloatingX d@(D# d#) e)
   | isNaN d = Nothing -- error "Input is NaN"
@@ -558,6 +561,20 @@ fx2Double (FloatingX d@(D# d#) e)
     !(# m, n# #) = decodeDoubleInteger d#
     !ex = I# n# + fromIntegral e
 {-# INLINE fx2Double #-}
+
+unsafefx2Double :: FloatingX -> Double
+unsafefx2Double (FloatingX d@(D# d#) e)
+  | ex < 0 = fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary
+  | otherwise =
+      let 
+          !(I# ex#) = ex
+          result# = encodeDoubleInteger m ex#
+          !result = D# result#
+       in result
+  where
+    !(# m, n# #) = decodeDoubleInteger d#
+    !ex = I# n# + fromIntegral e
+{-# INLINE unsafefx2Double #-}
 
 {-# INLINE double2FloatingX# #-}
 double2FloatingX# :: Double -> FloatingX#
