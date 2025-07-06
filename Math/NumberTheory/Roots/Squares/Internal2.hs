@@ -435,7 +435,7 @@ add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
           !scaledLittle# = sLittle# *## (2.00## **## scaleD#)
           !resSignif# = sBig# +## scaledLittle#
        in if isTrue# (resSignif# >=## 2.0##)
-            then FloatingX# (resSignif# /## 2.0##) (expBig# `plusInt64#` 1#Int64)
+            then FloatingX# (resSignif# *## 0.5##) (expBig# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# expBig#
 
 {-# INLINE mul# #-}
@@ -451,7 +451,7 @@ mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
       let !resExp# = expA# `plusInt64#` expB#
           !resSignif# = sA# *## sB#
        in if isTrue# (resSignif# >=## 2.0##)
-            then FloatingX# (resSignif# /## 2.0##) (resExp# `plusInt64#` 1#Int64)
+            then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# resExp#
 
 {-# INLINE divide# #-}
