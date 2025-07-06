@@ -56,6 +56,7 @@ import GHC.Exts
     Int64#,
     double2Int#,
     gtInt64#,
+    geInt64#, 
     int2Double#,
     int64ToInt#,
     intToInt64#,
@@ -82,6 +83,7 @@ import GHC.Exts
     (<##),
     (==##),
     (>=##),
+    quotInt64#
   )
 import GHC.Float ( divideDouble, floorDouble)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
@@ -220,12 +222,19 @@ computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# 
 preComput :: IterArgs_ -> CoreArgs
 preComput (IterArgs_ tA__ tCFX#) =
   let !tAFX# = integer2FloatingX# tA__ 
-      !radFX# = fmaddFloatingX# tCFX# tCFX# tAFX# -- //FIXME CAN USE FUSEDMULTADD?
+      !radFX# = tCFX# !**+## tAFX# -- fused multiply and add 
    in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}
 
 comput :: CoreArgs -> Int64#
-comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+-- comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+comput (CoreArgs !tAFX# !tCFX# !radFX#) = 
+  let 
+      !x = sqrtFX# (nextDownFX# radFX#) 
+      !y = nextDownFX# tCFX#
+      !z = x `fm1addFloatingX#` y 
+    in
+      hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# z)))
 {-# INLINE comput #-}
 
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
@@ -241,9 +250,9 @@ computeRem_ tc iArgs_ yTilde_# = let !rTrial = calcRemainder (tA_ iArgs_) tc yTi
 handleRems_ :: IterRes -> IterRes
 handleRems_ (IterRes yc_ yi64# ri_)
   | (ri_ < 0) && isTrue# (yi64# `gtInt64#` 0#Int64) = let 
-                yAdj# = yi64# `subInt64#` 1#Int64 
-                adjYc = pred ycyi
-                rdr = fixRemainder adjYc ri_ in IterRes adjYc yAdj# rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+                !yAdj# = yi64# `subInt64#` 1#Int64 
+                !adjYc = pred ycyi
+                !rdr = fixRemainder adjYc ri_ in IterRes adjYc yAdj# rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = IterRes ycyi yi64# ri_
   where
     !yc = yc_ * radixW32
@@ -387,6 +396,10 @@ floorX## (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
 zero# :: FloatingX#
 zero# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 
+{-# INLINE one# #-}
+one# :: FloatingX#
+one# = FloatingX# 1.0## 0#Int64
+
 {-# INLINE minValue# #-}
 minValue# :: FloatingX#
 minValue# = FloatingX# 1.0## 0#Int64
@@ -403,11 +416,9 @@ minValue# = FloatingX# 1.0## 0#Int64
 (!/##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!/##) x y = x `divide#` y
 
-{-# INLINE fmaddFloatingX# #-}
-fmaddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX# -> FloatingX#
-fmaddFloatingX# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) c@(FloatingX# sC# expC#) 
-    | isTrue# (expA# `eqInt64#` expB#) && isTrue# (2#Int64 `timesInt64#` expA# `eqInt64#` expC#) = FloatingX# (fmaddDouble# sA# sB# sC#) expC#
-    | otherwise = a !*## b !+## c 
+{-# INLINE (!**+##) #-}
+(!**+##) :: FloatingX# -> FloatingX# -> FloatingX#
+(!**+##) x y = x `fsqraddFloatingX#` y
 
 {-# INLINE add# #-}
 add# :: FloatingX# -> FloatingX# -> FloatingX#
@@ -464,6 +475,22 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
           if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` 0#Int64)
             then zero#
             else FloatingX# finalSignif# finalExp#
+
+{-# INLINE fsqraddFloatingX# #-}
+fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
+fsqraddFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#) 
+    | isTrue# (cExcessa# `geInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) cExcessa#
+    | otherwise = a !*## a !+## c -- default custom mult and add
+ where 
+    !cExcessa# = expC# `subInt64#` (2#Int64 `timesInt64#` expA#)
+
+{-# INLINE fm1addFloatingX# #-}
+fm1addFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
+fm1addFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#) 
+    | isTrue# (cExcessa# `geInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# 1.00## sC#) cExcessa#
+    | otherwise = a !*## one# !+## c -- default custom mult and add
+ where 
+    !cExcessa# = expC# `subInt64#` expA#
 
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
