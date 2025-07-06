@@ -1,9 +1,9 @@
-import Math.NumberTheory.Roots
-import Test.Tasty.Bench
+import Math.NumberTheory.Roots  
+import Criterion.Main
 
 main :: IO ()
 main =
-  Test.Tasty.Bench.defaultMain
+  defaultMain
     [ bgroup
         "IntegerSquare Roots"
         [ 

@@ -12,6 +12,10 @@ Implementation of this paper: [A square root algorithm faster than Newton's meth
 
 ### Code changes in Math.NumberTheory.Roots.Squares.Internal. Updated integer-roots.cabal. For 'Humongous' testing see note above.
 
+### Using Criterion for benchmarking
+cabal bench \
+  --benchmark-options "+RTS -I0 -A16m -N8 -H24m -T -w -RTS --output=integer-roots.html"
+
 
 ## Original readme
 Calculating integer roots and testing perfect powers of arbitrary precision.
