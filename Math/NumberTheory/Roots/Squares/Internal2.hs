@@ -9,6 +9,7 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 {-# OPTIONS_GHC -fllvm -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
+-- {-# OPTIONS_GHC -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
 -- |
 -- Module:      Math.NumberTheory.Roots.Squares.Internal

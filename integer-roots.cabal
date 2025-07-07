@@ -47,6 +47,7 @@ library
     Math.NumberTheory.Utils.FromIntegral
   default-language: Haskell2010
   ghc-options: -Wall -Widentities -Wcompat 
+
 test-suite integer-roots-tests
   build-depends:
     base >=4.9 && <5,
@@ -80,7 +81,6 @@ benchmark integer-roots-benchmark
   hs-source-dirs:      bench
   main-is:             BenchIntegerRoots.hs
   build-depends:       base
-                     , tasty-bench
                      , integer-roots
                      , criterion >= 1.6.4.0
   default-language:    Haskell2010
