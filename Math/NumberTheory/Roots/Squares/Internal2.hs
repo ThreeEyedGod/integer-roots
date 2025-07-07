@@ -343,9 +343,7 @@ largestNSqLTEEven i = let i_ = nextUp (fromIntegral i :: Double) in floorDouble 
 
 -- | handle overflow
 {-# INLINE hndlOvflwW32 #-}
-{-# SPECIALIZE hndlOvflwW32 :: Int64 -> Int64 #-}
-{-# SPECIALIZE hndlOvflwW32 :: Integer -> Integer #-}
-hndlOvflwW32 :: (Integral a) => a -> a
+hndlOvflwW32 :: Integer -> Integer
 hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 {-# INLINE hndlOvflwW32# #-}
@@ -377,7 +375,7 @@ intgrFrom3DigitsBase32 :: Integer -> (Word32, Word32) -> Integer
 intgrFrom3DigitsBase32 i (l1, l2) = (i * secndPlaceW32Radix) + intgrFromRvsrdTuple (l1, l2) radixW32
 
 -- | Custom Double Type and its arithmetic
-data FloatingX = FloatingX !Double !Int64 deriving (Eq, Show) -- ! for strict data type
+data FloatingX = FloatingX !Double !Int64 deriving (Eq) -- ! for strict data type
 
 -- | Custom double "unboxed" and its arithmetic
 data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-# UNPACK #-} !Int64#} deriving (Eq) -- ! for strict data type
