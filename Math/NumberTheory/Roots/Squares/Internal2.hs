@@ -491,10 +491,13 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 {-# INLINE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fsqraddFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#) 
-    | isTrue# (cExcessa# `geInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) cExcessa#
-    | otherwise =  sqr# a !+## c -- default custom mult and add
+    | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
+    | isTrue# (diff# `gtInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+    | isTrue# (diff# `ltInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+   | otherwise =  sqr# a !+## c -- default custom mult and add
  where 
-    !cExcessa# = expC# `subInt64#` (2#Int64 `timesInt64#` expA#)
+    !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
+    !diff# = expC# `subInt64#` twoTimesExpA#
 
 {-# INLINE fm1addFloatingX# #-}
 fm1addFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
@@ -560,6 +563,14 @@ fx2Double (FloatingX d@(D# d#) e)
     !(# m, n# #) = decodeDoubleInteger d#
     !ex = I# n# + fromIntegral e
 {-# INLINE fx2Double #-}
+
+{-# INLINE updateDouble# #-}
+updateDouble# :: Double# -> Int# -> Double#
+updateDouble# d# ex# = let 
+    !(# m, n# #) = decodeDoubleInteger d#
+    !exUpd# = n# +# ex# 
+  in 
+    encodeDoubleInteger m exUpd#
 
 unsafefx2Double :: FloatingX -> Double
 unsafefx2Double (FloatingX d@(D# d#) e)
