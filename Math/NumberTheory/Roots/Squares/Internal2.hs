@@ -8,7 +8,8 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
-{-# OPTIONS_GHC -fllvm -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
+-- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
+{-# OPTIONS_GHC -O2 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 -- {-# OPTIONS_GHC -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
 -- |
@@ -26,7 +27,6 @@ where
 
 -- *********** BEGIN NEW IMPORTS
 
-import GHC.Exts (Int64#)
 import GHC.Int      (Int64(I64#))
 
 #ifdef MIN_VERSION_integer_gmp
@@ -37,18 +37,15 @@ import GHC.Integer.Logarithms (integerLog2#)
 #define IP Jp#
 #define bigNatSize sizeofBigNat
 #else
-import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#)
+import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#, Int64#)
 import GHC.Num.BigNat (bigNatSize#)
-import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#)
 #endif
 
-import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, shiftR, (.&.), (.|.))
+import Data.Bits (finiteBitSize, unsafeShiftL,  shiftR)
 import qualified Data.Bits.Floating as DB (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
-import Data.Int (Int64)
-import qualified Data.Vector.Unboxed as VU (Vector, drop, empty, force, fromList, head, ifoldl', length, null, replicate, singleton, snoc, splitAt, toList, uncons, unsafeHead, unsafeLast, unsafeSlice, unsnoc, unsafeIndex, unsafeDrop, (!), (//))
+import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length)
 import Data.Word (Word32)
-import Data.Maybe (fromMaybe)
 import GHC.Exts
   ( Double (..),
     Double#,
