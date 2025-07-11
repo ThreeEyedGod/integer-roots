@@ -172,8 +172,32 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt_# :: Integer -> FloatingX# -> Int64#
+nxtDgt_# (IN _) !_ = error "nxtDgt_ :: Invalid negative integer argument"
 nxtDgt_# 0 !_ = 0#Int64
-nxtDgt_# ta tcfx# = case byPass ta tcfx# of 
+nxtDgt_# (IS ta#) tcfx# = let 
+            !c@(D# c#) = unsafefx2Double# tcfx# --fromMaybe 0 (fx2Double# tCFX#) 
+            a# = int2Double# ta#
+            !r# = fmaddDouble# c# c# a#
+          in 
+            computDouble# a# c# r#
+nxtDgt_# ta@(IP bn#) tcfx#
+    | isTrue# ((bigNatSize# bn#) <# thresh#) = let 
+            !c@(D# c#) = unsafefx2Double# tcfx# --fromMaybe 0 (fx2Double# tCFX#) 
+            !(D# a#) = fromIntegral ta :: Double 
+            !r# = fmaddDouble# c# c# a#
+          in 
+            computDouble# a# c# r#
+    | otherwise = nxtDgt__# ta tcfx#
+    where
+        -- threshold for shifting vs. direct fromInteger
+        -- we shift when we expect more than 256 bits
+        thresh# :: Int#
+        thresh# = if finiteBitSize (0 :: Word) == 64 then 5# else 9#
+-- There's already a check for negative in integerSquareRoot,
+-- but integerSquareRoot' is exported directly too.
+
+nxtDgt__# :: Integer -> FloatingX# -> Int64#
+nxtDgt__# ta tcfx# = case byPass ta tcfx# of 
     Left _ -> comput (preComput ta tcfx#)
     Right resBy@(I64# resBy#) -> resBy#
 {-# INLINE nxtDgt_# #-}
