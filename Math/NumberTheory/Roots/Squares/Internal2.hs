@@ -123,10 +123,9 @@ isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromInteg
 
 -- | Iteration loop data - these records have vectors / lists in them
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
-
-data ProcessedVec = ProcessedVec {firstTwo :: !(VU.Vector Word32), len :: !Int} deriving (Eq)
-
-data RestNextTwo = RestNextTwo {firstWord32 :: {-# UNPACK #-} !Word32, secondWord32 :: {-# UNPACK #-} !Word32} deriving (Eq)
+data IterArgs_ = IterArgs_ {tA_ :: !Integer, tC_ :: !FloatingX#} deriving (Eq)
+data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64#, ri :: !Integer} deriving (Eq)
+data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
 theFi :: VU.Vector Word32 -> Itr 
 theFi v 
@@ -150,18 +149,6 @@ theFi v
       !dxsVec' = if evenLen then brkVec v (l-2) else brkVec v (l-1) 
       !i = intgrFromRvsrd2ElemVec dxsVec'
 
-{-# INLINE prepA_ #-}
-prepA_ :: Int# -> VU.Vector Word32 -> RestNextTwo
-prepA_ l# w32Vec = RestNextTwo (VU.unsafeIndex w32Vec (I# l# - 2)) (VU.unsafeIndex w32Vec(I# l# - 1)) 
-
-prepB_ :: Integer -> FloatingX# -> RestNextTwo -> IterArgs_
-prepB_ iRem tBFX# (RestNextTwo !n1_ !nl_) = IterArgs_ (intgrFrom3DigitsBase32 iRem (n1_, nl_)) (scaleByPower2 (fromInt64 32) tBFX#) -- sqrtF previous digits being scaled right here
-{-# INLINE prepB_ #-}
-
-{-# INLINE prepArgs_ #-}
-prepArgs_ :: Itr -> IterArgs_
-prepArgs_ (Itr _ w32Vec l# _ iRem tBFX_#) = prepB_ iRem tBFX_# (prepA_ l# w32Vec)
-
 -- Keep it this way: Inlining this lowers performance.
 theNextIterations :: Itr -> Integer
 theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx#
@@ -171,20 +158,13 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
       if I# l_# == 0 || VU.null v
         then yC
         else
-          let !inA_ = prepArgs_ (Itr cl v l_# yC iR t#)
-              !(IterRes !yc !yTildeFinal# !remFinal) = nxtDgtRem yC inA_ -- number crunching only
+          let 
+              !(n1_, nl_) = (VU.unsafeIndex v (I# l_# - 2), VU.unsafeIndex v (I# l_# - 1))
+              !inA_ = IterArgs_ (intgrFrom3DigitsBase32 iR (n1_, nl_)) (scaleByPower2 (fromInt64 32) t#) -- sqrtF previous digits being scaled right here
+              !(IterRes !yc !yTildeFinal# !remFinal) = let !yTilde_# = nxtDgt_# inA_ in computeRem_ yC inA_ yTilde_#
            in tni (succ cl) v (l_# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal#) -- do not VU.force ri32V
 
 -- | numeric loop records
-data IterArgs_ = IterArgs_ {tA_ :: !Integer, tC_ :: !FloatingX#} deriving (Eq)
-
-data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64#, ri :: !Integer} deriving (Eq)
-
-data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
-
-nxtDgtRem :: Integer -> IterArgs_ -> IterRes
-nxtDgtRem yCumulat iterargs_ = let !yTilde_# = nxtDgt_# iterargs_ in computeRem_ yCumulat iterargs_ yTilde_#
-{-# INLINE nxtDgtRem #-}
 
 -- | Early termination if more than the 3rd digit or if digit is 0 
 fixTCFX# :: IterArgs_ -> Int -> Int64# -> FloatingX#
@@ -282,10 +262,6 @@ dgtsVecBase32__ n = mkIW32Vec n radixW32
 {-# INLINE brkVec #-}
 brkVec :: VU.Vector Word32 -> Int -> VU.Vector Word32
 brkVec v loc = VU.unsafeDrop loc v
-
-{-# INLINE brkVecPv #-}
-brkVecPv :: VU.Vector Word32 -> Int -> ProcessedVec
-brkVecPv v loc = let !rst = brkVec v loc in ProcessedVec rst loc
 
 {-# INLINE mkIW32Vec #-}
 

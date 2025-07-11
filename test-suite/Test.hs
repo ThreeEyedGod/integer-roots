@@ -19,13 +19,15 @@ main
 
 tests :: TestTree
 tests = testGroup "Root Tests"
-  [ testGroup "All"
-    [ Squares.testSuite
-    , Cubes.testSuite
-    , Fourth.testSuite
-    , General.testSuite
-    ]
-  , testGroup "All_"
+  [ 
+  --  testGroup "All"
+  --   [ Squares.testSuite
+  --   , Cubes.testSuite
+  --   , Fourth.testSuite
+  --   , General.testSuite
+  --   ]
+  -- , 
+  testGroup "All_"
     [ Squares_.testSuite
     , Cubes.testSuite
     , Fourth.testSuite
