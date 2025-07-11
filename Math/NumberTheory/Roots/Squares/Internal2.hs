@@ -221,20 +221,13 @@ computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# 
 
 preComput :: Integer -> FloatingX# -> CoreArgs
 preComput tA__ tCFX# =
-  let !tAFX# = integer2FloatingX# tA__ 
+  let !tAFX# = unsafeinteger2FloatingX# tA__ 
       !radFX# = tCFX# !**+## tAFX# -- fused square (multiply) and add 
    in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}
 
 comput :: CoreArgs -> Int64#
 comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
--- comput (CoreArgs !tAFX# !tCFX# !radFX#) = 
---   let 
---       !x = sqrtFX# (nextDownFX# radFX#) 
---       !y = nextDownFX# tCFX#
---       !z = x `fm1addFloatingX#` y -- x *## 1 + y 
---     in
---       hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# z)))
 {-# INLINE comput #-}
 
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
@@ -488,7 +481,7 @@ fsqraddFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#)
     | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
     | isTrue# (diff# `gtInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
     | isTrue# (diff# `ltInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
-   | otherwise =  sqr# a !+## c -- default custom mult and add
+    | otherwise =  sqr# a !+## c -- default custom mult and add
  where 
     !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
     !diff# = expC# `subInt64#` twoTimesExpA#
@@ -607,6 +600,14 @@ integer2FloatingX# i
     !(D# maxDouble#) = maxDouble
     !(D# iDouble#) = fromIntegral i
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+
+{-# INLINE unsafeinteger2FloatingX# #-}
+unsafeinteger2FloatingX# :: Integer -> FloatingX#
+unsafeinteger2FloatingX# i = 
+      let !(i_, e_) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+          !(D# s#) = fromIntegral i_
+          !(I# e_#) = e_
+       in FloatingX# s# (intToInt64# e_#)
 
 {-# INLINE int64ToFloatingX# #-}
 int64ToFloatingX# :: Int64 -> FloatingX#
