@@ -35,12 +35,14 @@ library
     build-depends: ghc-bignum < 1.4
   exposed-modules:
     Math.NumberTheory.Roots
+    Math.NumberTheory.Roots_
   other-modules:
     Math.NumberTheory.Primes.Small
     Math.NumberTheory.Roots.Cubes
     Math.NumberTheory.Roots.Fourth
     Math.NumberTheory.Roots.General
     Math.NumberTheory.Roots.Squares
+    Math.NumberTheory.Roots.Squares_
     Math.NumberTheory.Roots.Squares.Internal
     Math.NumberTheory.Roots.Squares.Internal2
     Math.NumberTheory.Utils.BitMask
@@ -62,6 +64,7 @@ test-suite integer-roots-tests
     Math.NumberTheory.Roots.FourthTests
     Math.NumberTheory.Roots.GeneralTests
     Math.NumberTheory.Roots.SquaresTests
+    Math.NumberTheory.Roots.SquaresTests_
     Math.NumberTheory.TestUtils
     Math.NumberTheory.TestUtils.Wrappers
   type: exitcode-stdio-1.0

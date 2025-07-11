@@ -6,6 +6,7 @@ import qualified Math.NumberTheory.Roots.CubesTests as Cubes
 import qualified Math.NumberTheory.Roots.FourthTests as Fourth
 import qualified Math.NumberTheory.Roots.GeneralTests as General
 import qualified Math.NumberTheory.Roots.SquaresTests as Squares
+import qualified Math.NumberTheory.Roots.SquaresTests_ as Squares_
 
 main :: IO ()
 main
@@ -17,9 +18,17 @@ main
   $ tests
 
 tests :: TestTree
-tests = testGroup "All"
-  [ Squares.testSuite
-  , Cubes.testSuite
-  , Fourth.testSuite
-  , General.testSuite
+tests = testGroup "Root Tests"
+  [ testGroup "All"
+    [ Squares.testSuite
+    , Cubes.testSuite
+    , Fourth.testSuite
+    , General.testSuite
+    ]
+  , testGroup "All_"
+    [ Squares_.testSuite
+    , Cubes.testSuite
+    , Fourth.testSuite
+    , General.testSuite
+    ]
   ]

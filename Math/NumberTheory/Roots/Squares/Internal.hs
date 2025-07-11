@@ -16,7 +16,6 @@ module Math.NumberTheory.Roots.Squares.Internal
   )
 where
 
-import Math.NumberTheory.Roots.Squares.Internal2 -- addition
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 
 import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#))
@@ -40,7 +39,7 @@ import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL
 {-# SPECIALIZE isqrtA :: Integer -> Integer #-}
 isqrtA :: (Integral a) => a -> a
 isqrtA 0 = 0
-isqrtA n = isqrtB n --heron n (fromInteger . appSqrt . fromIntegral $ n)
+isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n)
 
 -- Heron's method for integers. First make one step to ensure
 -- the value we're working on is @>= r@, then we have
