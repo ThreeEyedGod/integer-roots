@@ -123,7 +123,6 @@ isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromInteg
 
 -- | Iteration loop data - these records have vectors / lists in them
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
-data IterArgs_ = IterArgs_ {tA_ :: !Integer, tC_ :: !FloatingX#} deriving (Eq)
 data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64#, ri :: !Integer} deriving (Eq)
 data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
@@ -160,30 +159,28 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
         else
           let 
               !(n1_, nl_) = (VU.unsafeIndex v (I# l_# - 2), VU.unsafeIndex v (I# l_# - 1))
-              !inA_ = IterArgs_ (intgrFrom3DigitsBase32 iR (n1_, nl_)) (scaleByPower2 (fromInt64 32) t#) -- sqrtF previous digits being scaled right here
-              !(IterRes !yc !yTildeFinal# !remFinal) = let !yTilde_# = nxtDgt_# inA_ in computeRem_ yC inA_ yTilde_#
-           in tni (succ cl) v (l_# -# 2#) yc remFinal (fixTCFX# inA_ cl yTildeFinal#) -- do not VU.force ri32V
+              !tA_= intgrFrom3DigitsBase32 iR (n1_, nl_) 
+              !tC_= scaleByPower2 (fromInt64 32) t# -- sqrtF previous digits being scaled right here
+              !(IterRes !yc !yTildeFinal# !remFinal) = let !yTilde_# = nxtDgt_# tA_ tC_ in computeRem_ yC tA_ yTilde_#
+              !tcfx# = if currlen <= 2 && isTrue# (yTildeFinal# `gtInt64#` 0#Int64) then nextDownFX# $ tC_ !+## int64ToFloatingX# (I64# yTildeFinal#) else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
+           in tni (succ cl) v (l_# -# 2#) yc remFinal tcfx# -- do not VU.force ri32V
+-- | Early termination of tcfx# if more than the 3rd digit or if digit is 0 
 
 -- | numeric loop records
-
--- | Early termination if more than the 3rd digit or if digit is 0 
-fixTCFX# :: IterArgs_ -> Int -> Int64# -> FloatingX#
-fixTCFX# ia currlen yTildeFinal# = let !tcfx# = tC_ ia in if currlen <= 2 && isTrue# (yTildeFinal# `gtInt64#` 0#Int64) then nextDownFX# $ tcfx# !+## int64ToFloatingX# (I64# yTildeFinal#) else tcfx# -- recall tcfx is already scaled by 32. Do not use normalize here
-{-# INLINE fixTCFX# #-}
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
-nxtDgt_# :: IterArgs_ -> Int64#
-nxtDgt_# (IterArgs_ 0 !_) = 0#Int64
-nxtDgt_# iax = case byPass iax of 
-    Left _ -> comput (preComput iax)
+nxtDgt_# :: Integer -> FloatingX# -> Int64#
+nxtDgt_# 0 !_ = 0#Int64
+nxtDgt_# ta tcfx# = case byPass ta tcfx# of 
+    Left _ -> comput (preComput ta tcfx#)
     Right resBy@(I64# resBy#) -> resBy#
 {-# INLINE nxtDgt_# #-}
 
 {-# INLINE byPass #-}
-byPass :: IterArgs_ -> Either Int Int64
-byPass iax@(IterArgs_ tA__ tCFX#) 
+byPass :: Integer -> FloatingX# -> Either Int Int64
+byPass tA__ tCFX# 
     | tA__ < 2^512-1 && c > 0 = let 
             !(D# a#) = fromIntegral tA__ 
             !r# = fmaddDouble# c# c# a#
@@ -198,8 +195,8 @@ computDouble# :: Double# -> Double# -> Double# -> Int64#
 computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) in hndlOvflwW32# i#
 -- computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (fmaddDouble# (sqrtDouble# (nextDown# radFX#)) 1.00## (nextDown# tCFX#)) ))) in hndlOvflwW32# i#
 
-preComput :: IterArgs_ -> CoreArgs
-preComput (IterArgs_ tA__ tCFX#) =
+preComput :: Integer -> FloatingX# -> CoreArgs
+preComput tA__ tCFX# =
   let !tAFX# = integer2FloatingX# tA__ 
       !radFX# = tCFX# !**+## tAFX# -- fused square (multiply) and add 
    in CoreArgs tAFX# tCFX# radFX#
@@ -219,8 +216,8 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (ne
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
 -- that happens in handleRems_
 -- if the trial digit is zero skip computing remainder
-computeRem_ :: Integer -> IterArgs_ -> Int64# -> IterRes
-computeRem_ tc iArgs_ yTilde_# = let !rTrial = calcRemainder (tA_ iArgs_) tc yTilde_# in handleRems_ (IterRes tc yTilde_# rTrial)
+computeRem_ :: Integer -> Integer -> Int64# -> IterRes
+computeRem_ tc ta yTilde_# = let !rTrial = calcRemainder ta tc yTilde_# in handleRems_ (IterRes tc yTilde_# rTrial)
 {-# INLINE computeRem_ #-}
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
