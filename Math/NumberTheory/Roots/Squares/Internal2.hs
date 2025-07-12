@@ -136,16 +136,16 @@ theFi v
                   !y = hndlOvflwW32 (largestNSqLTEEven i) 
                   !(I64# yT64#) = fromIntegral y 
                 in handleRems_ $ IterRes 0 yT64# (i - y * y) -- set 0 for starting cumulative yc--fstDgtRem i
-          in Itr 1 v l'# yc remInteger (integer2FloatingX# $ fromIntegral (I64# y1)) 
+          in Itr 1 v l'# yc remInteger (unsafeint64ToFloatingX# (I64# y1)) 
     | otherwise = let 
              !(I# l'#) = l-1
              !y = largestNSqLTEOdd i 
-             !remInteger = (i - y * y)
-          in Itr 1 v l'# y remInteger (integer2FloatingX# y) 
+             !remInteger = i - y * y
+          in Itr 1 v l'# y remInteger (unsafeinteger2FloatingX# y) 
  where 
       !l = VU.length v 
       !evenLen = even l 
-      !dxsVec' = if evenLen then brkVec v (l-2) else brkVec v (l-1) 
+      !dxsVec' = if evenLen then brkVec v (l-2) else brkVec v (l-1) -- //FIXME could be made with indexing like in tni
       !i = intgrFromRvsrd2ElemVec dxsVec'
 
 -- Keep it this way: Inlining this lowers performance.
@@ -187,7 +187,7 @@ nxtDgt_# ta@(IP bn#) tcfx#
             !r# = fmaddDouble# c# c# a#
           in 
             computDouble# a# c# r#
-    | otherwise = nxtDgt__# ta tcfx#
+    | otherwise = comput (preComput ta tcfx#)--nxtDgt__# ta tcfx#
     where
         -- threshold for shifting vs. direct fromInteger
         -- we shift when we expect more than 256 bits
@@ -326,7 +326,7 @@ largestNSqLTEOdd i =  floorDouble (sqrt (fromIntegral i) :: Double)
 
 {-# INLINE largestNSqLTEEven #-}
 largestNSqLTEEven :: Integer -> Integer
-largestNSqLTEEven i = let i_ = nextUp (fromIntegral i :: Double) in floorDouble (nextUp (sqrt i_)) 
+largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble (nextUp (sqrt d_)) 
 
 -- | handle overflow
 {-# INLINE hndlOvflwW32 #-}
@@ -479,9 +479,10 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fsqraddFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#) 
     | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
-    | isTrue# (diff# `gtInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
-    | isTrue# (diff# `ltInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
-    | otherwise =  sqr# a !+## c -- default custom mult and add
+    | otherwise = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+    -- | isTrue# (diff# `gtInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+    -- | isTrue# (diff# `ltInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+    -- | otherwise =  sqr# a !+## c -- default custom mult and add
  where 
     !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
     !diff# = expC# `subInt64#` twoTimesExpA#
@@ -615,6 +616,10 @@ int64ToFloatingX# i
   | i == 0 = zero#
   | i < 0 = error "int64ToFloatingX# : invalid negative argument"
   | otherwise = double2FloatingX# (fromIntegral i)
+
+{-# INLINE unsafeint64ToFloatingX# #-}
+unsafeint64ToFloatingX# :: Int64 -> FloatingX#
+unsafeint64ToFloatingX# i = double2FloatingX# (fromIntegral i)
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
