@@ -48,7 +48,7 @@ import Data.Bits (finiteBitSize, unsafeShiftL,  shiftR)
 import qualified Data.Bits.Floating as DB (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
 import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length)
-import Data.Word (Word32)
+import Data.Word (Word32, Word64)
 import GHC.Exts
   ( Double (..),
     Double#,
@@ -135,18 +135,18 @@ theFi v
              !(IterRes !yc !y1 !remInteger) = let 
                   !y = hndlOvflwW32 (largestNSqLTEEven i) 
                   !(I64# yT64#) = fromIntegral y 
-                in handleRems_ $ IterRes 0 yT64# (i - y * y) -- set 0 for starting cumulative yc--fstDgtRem i
-          in Itr 1 v l'# yc remInteger (unsafeint64ToFloatingX# (I64# y1)) 
+                in handleRems_ $ IterRes 0 yT64# $ fromIntegral i - fromIntegral (y * y) -- set 0 for starting cumulative yc--fstDgtRem i
+          in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX# $ fromIntegral (I64# y1)) 
     | otherwise = let 
              !(I# l'#) = l-1
              !y = largestNSqLTEOdd i 
-             !remInteger = i - y * y
-          in Itr 1 v l'# y remInteger (unsafeinteger2FloatingX# y) 
+             !remInteger = fromIntegral $ i - y * y
+          in Itr 1 v l'# (fromIntegral y) remInteger (unsafeword64ToFloatingX# y) 
  where 
       !l = VU.length v 
       !evenLen = even l 
       !dxsVec' = if evenLen then brkVec v (l-2) else brkVec v (l-1) -- //FIXME could be made with indexing like in tni
-      !i = intgrFromRvsrd2ElemVec dxsVec'
+      !i = word64FromRvsrd2ElemVec dxsVec'
 
 -- Keep it this way: Inlining this lowers performance.
 theNextIterations :: Itr -> Integer
@@ -294,6 +294,16 @@ intgrFromRvsrd2ElemVec v2ElemW32s =
         Nothing -> error "intgrFromRvsrd2ElemVec : Invalid Vector - empty " 
    in intgrFromRvsrdTuple (llsb, lmsb) radixW32
 
+{-# INLINE word64FromRvsrd2ElemVec #-}
+
+-- | Int64 from a "reversed" Vector of 2 Word32 digits
+word64FromRvsrd2ElemVec :: VU.Vector Word32 -> Word64
+word64FromRvsrd2ElemVec v2ElemW32s =
+  let (llsb, lmsb) = case VU.uncons v2ElemW32s of
+        Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
+        Nothing -> error "int64FromRvsrd2ElemVec : Invalid Vector - empty " 
+   in word64FromRvsrdTuple (llsb, lmsb) radixW32
+
 {-# INLINE mkIW32Lst #-}
 
 -- | Spit out the Word32 List from digitsUnsigned which comes in reversed format.
@@ -314,6 +324,16 @@ intgrFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
 intgrFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
 intgrFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
+
+{-# INLINE word64FromRvsrdTuple #-}
+-- | Int64 from a "reversed" tuple of Word32 digits
+word64FromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64
+word64FromRvsrdTuple (0, 0) 0 = 0
+word64FromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
+word64FromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
+word64FromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
+
+
 {-# INLINE doubleFromRvsrdTuple #-}
 
 -- | double from a "reversed" tuple of Word32 digits
@@ -321,16 +341,16 @@ doubleFromRvsrdTuple :: (Word32, Word32) -> Integer -> Double
 doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromIntegral l1
 
 {-# INLINE largestNSqLTEOdd #-}
-largestNSqLTEOdd :: Integer -> Integer
+largestNSqLTEOdd :: Word64 -> Word64
 largestNSqLTEOdd i =  floorDouble (sqrt (fromIntegral i) :: Double)
 
 {-# INLINE largestNSqLTEEven #-}
-largestNSqLTEEven :: Integer -> Integer
+largestNSqLTEEven :: Word64 -> Word64
 largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble (nextUp (sqrt d_)) 
 
 -- | handle overflow
 {-# INLINE hndlOvflwW32 #-}
-hndlOvflwW32 :: Integer -> Integer
+hndlOvflwW32 :: Integral a => a  -> a
 hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 {-# INLINE hndlOvflwW32# #-}
@@ -617,9 +637,9 @@ int64ToFloatingX# i
   | i < 0 = error "int64ToFloatingX# : invalid negative argument"
   | otherwise = double2FloatingX# (fromIntegral i)
 
-{-# INLINE unsafeint64ToFloatingX# #-}
-unsafeint64ToFloatingX# :: Int64 -> FloatingX#
-unsafeint64ToFloatingX# i = double2FloatingX# (fromIntegral i)
+{-# INLINE unsafeword64ToFloatingX# #-}
+unsafeword64ToFloatingX# :: Word64 -> FloatingX#
+unsafeword64ToFloatingX# i = double2FloatingX# (fromIntegral i)
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
