@@ -31,7 +31,7 @@ import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 -- *********** BEGIN NEW IMPORTS
 
 import GHC.Int      (Int64(I64#))
-
+import GHC.Word ( Word64(..) )
 #ifdef MIN_VERSION_integer_gmp
 import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
 import GHC.Integer.GMP.Internals (Integer(..), shiftLInteger, shiftRInteger, sizeofBigNat#)
@@ -40,7 +40,7 @@ import GHC.Integer.Logarithms (integerLog2#)
 #define IP Jp#
 #define bigNatSize sizeofBigNat
 #else
-import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#, Int64#)
+import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#, Int64#, Word64#)
 import GHC.Num.BigNat (bigNatSize#)
 #endif
 
@@ -63,6 +63,9 @@ import GHC.Exts
     intToInt64#,
     timesInt64#,
     eqInt64#,
+    eqWord64#, 
+    gtWord64#,
+    subWord64#,
     isTrue#,
     leInt64#,
     ltInt64#,
@@ -123,7 +126,7 @@ isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromInteg
 
 -- | Iteration loop data - these records have vectors / lists in them
 data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
-data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Int64#, ri :: !Integer} deriving (Eq)
+data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Word64#, ri :: !Integer} deriving (Eq)
 data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
 theFi :: VU.Vector Word32 -> Itr 
@@ -134,9 +137,9 @@ theFi v
              !(I# l'#) = l-2
              !(IterRes !yc !y1 !remInteger) = let 
                   !y = hndlOvflwW32 (largestNSqLTEEven i) 
-                  !(I64# yT64#) = fromIntegral y 
+                  !(W64# yT64#) = y 
                 in handleRems_ $ IterRes 0 yT64# $ fromIntegral i - fromIntegral (y * y) -- set 0 for starting cumulative yc--fstDgtRem i
-          in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX# $ fromIntegral (I64# y1)) 
+          in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX# $ fromIntegral (W64# y1)) 
     | otherwise = let 
              !(I# l'#) = l-1
              !y = largestNSqLTEOdd i 
@@ -162,7 +165,7 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
               !tA_= intgrFrom3DigitsBase32 iR (n1_, nl_) 
               !tC_= scaleByPower2 (fromInt64 32) t# -- sqrtF previous digits being scaled right here
               !(IterRes !yc !yTildeFinal# !remFinal) = let !yTilde_# = nxtDgt_# tA_ tC_ in computeRem_ yC tA_ yTilde_#
-              !tcfx# = if currlen <= 2 && isTrue# (yTildeFinal# `gtInt64#` 0#Int64) then nextDownFX# $ tC_ !+## int64ToFloatingX# (I64# yTildeFinal#) else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
+              !tcfx# = if currlen <= 2 && isTrue# (yTildeFinal# `gtWord64#` 0#Word64) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX# (W64# yTildeFinal#) else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
            in tni (succ cl) v (l_# -# 2#) yc remFinal tcfx# -- do not VU.force ri32V
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0 
 
@@ -171,9 +174,9 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
-nxtDgt_# :: Integer -> FloatingX# -> Int64#
+nxtDgt_# :: Integer -> FloatingX# -> Word64#
 nxtDgt_# (IN _) !_ = error "nxtDgt_ :: Invalid negative integer argument"
-nxtDgt_# 0 !_ = 0#Int64
+nxtDgt_# 0 !_ = 0#Word64
 nxtDgt_# (IS ta#) tcfx# = let 
             !c@(D# c#) = unsafefx2Double# tcfx# --fromMaybe 0 (fx2Double# tCFX#) 
             a# = int2Double# ta#
@@ -196,27 +199,27 @@ nxtDgt_# ta@(IP bn#) tcfx#
 -- There's already a check for negative in integerSquareRoot,
 -- but integerSquareRoot' is exported directly too.
 
-nxtDgt__# :: Integer -> FloatingX# -> Int64#
+nxtDgt__# :: Integer -> FloatingX# -> Word64#
 nxtDgt__# ta tcfx# = case byPass ta tcfx# of 
     Left _ -> comput (preComput ta tcfx#)
-    Right resBy@(I64# resBy#) -> resBy#
+    Right resBy@(W64# resBy#) -> resBy#
 {-# INLINE nxtDgt_# #-}
 
 {-# INLINE byPass #-}
-byPass :: Integer -> FloatingX# -> Either Int Int64
+byPass :: Integer -> FloatingX# -> Either Int Word64
 byPass tA__ tCFX# 
     | tA__ < 2^512-1 && c > 0 = let 
             !(D# a#) = fromIntegral tA__ 
             !r# = fmaddDouble# c# c# a#
           in 
-             Right (I64# $ computDouble# a# c# r#)
+             Right (W64# $ computDouble# a# c# r#)
     | otherwise = Left 0 
   where 
       !c@(D# c#) = unsafefx2Double# tCFX# --fromMaybe 0 (fx2Double# tCFX#) 
 
 {-# INLINE computDouble# #-}
-computDouble# :: Double# -> Double# -> Double# -> Int64#
-computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) in hndlOvflwW32# i#
+computDouble# :: Double# -> Double# -> Double# -> Word64#
+computDouble# !tAFX# !tCFX# !radFX# = let !(W64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) in hndlOvflwW32# i#
 -- computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (fmaddDouble# (sqrtDouble# (nextDown# radFX#)) 1.00## (nextDown# tCFX#)) ))) in hndlOvflwW32# i#
 
 preComput :: Integer -> FloatingX# -> CoreArgs
@@ -226,14 +229,14 @@ preComput tA__ tCFX# =
    in CoreArgs tAFX# tCFX# radFX#
 {-# INLINE preComput #-}
 
-comput :: CoreArgs -> Int64#
+comput :: CoreArgs -> Word64#
 comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE comput #-}
 
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
 -- that happens in handleRems_
 -- if the trial digit is zero skip computing remainder
-computeRem_ :: Integer -> Integer -> Int64# -> IterRes
+computeRem_ :: Integer -> Integer -> Word64# -> IterRes
 computeRem_ tc ta yTilde_# = let !rTrial = calcRemainder ta tc yTilde_# in handleRems_ (IterRes tc yTilde_# rTrial)
 {-# INLINE computeRem_ #-}
 
@@ -243,20 +246,20 @@ computeRem_ tc ta yTilde_# = let !rTrial = calcRemainder ta tc yTilde_# in handl
 handleRems_ :: IterRes -> IterRes
 handleRems_ (IterRes yc_ yi64# ri_)
   | ri_ < 0 = let 
-                !yAdj# = yi64# `subInt64#` 1#Int64 
+                !yAdj# = yi64# `subWord64#` 1#Word64 
                 !adjYc = pred ycyi
                 !rdr = fixRemainder adjYc ri_ in IterRes adjYc yAdj# rdr -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = IterRes ycyi yi64# ri_
   where
     !yc = yc_ * radixW32
-    !ycyi = yc + fromIntegral (I64# yi64#) -- accumulating the growing square root
+    !ycyi = yc + fromIntegral (W64# yi64#) -- accumulating the growing square root
 {-# INLINE handleRems_ #-}
 
 -- Calculate remainder accompanying a 'digit'
-calcRemainder :: Integer -> Integer -> Int64# -> Integer
-calcRemainder tAI !_ 0#Int64 = tAI
+calcRemainder :: Integer -> Integer -> Word64# -> Integer
+calcRemainder tAI !_ 0#Word64 = tAI
 calcRemainder tAI tc_ dgt64# = let 
-        !i = fromIntegral (I64# dgt64#) 
+        !i = fromIntegral (W64# dgt64#) 
         !tc = tc_ * radixW32
     in tAI - i * (double tc + i) --tAI - ((double i * tc) + i * i)
 {-# INLINE calcRemainder #-}
@@ -354,8 +357,8 @@ hndlOvflwW32 :: Integral a => a  -> a
 hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 {-# INLINE hndlOvflwW32# #-}
-hndlOvflwW32# :: Int64# -> Int64#
-hndlOvflwW32# i# = if I64# i# == maxW32 then fromInt64 $ pred maxW32 else i# where maxW32 = radixW32
+hndlOvflwW32# :: Word64# -> Word64#
+hndlOvflwW32# i# = if isTrue# (i# `eqWord64#` maxW32#) then maxW32# else i# where !(W64# maxW32#) = predRadixW32
 
 scaleByPower2 :: Int64# -> FloatingX# -> FloatingX#
 scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else FloatingX# s# (e# `plusInt64#` n#)--normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
@@ -394,9 +397,9 @@ floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
         _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE floorX## #-}
-floorX## :: FloatingX# -> Int64#
+floorX## :: FloatingX# -> Word64#
 floorX## (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
-        Just d -> let !(I64# d#) = floor d in d# 
+        Just d -> let !(W64# d#) = floor d in d# 
         _ -> error "floorX##: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE zero# #-}
@@ -683,6 +686,9 @@ split# d# =
 
 radixW32 :: (Integral a) => a
 radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
+
+predRadixW32 :: (Integral a) => a
+predRadixW32 = 4294967295 -- 2 ^ finiteBitSize (0 :: Word32) -1 
 
 secndPlaceW32Radix :: Integer
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
