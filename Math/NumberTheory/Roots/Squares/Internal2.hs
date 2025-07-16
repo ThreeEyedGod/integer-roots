@@ -351,6 +351,17 @@ largestNSqLTEOdd i =  floorDouble (sqrt (fromIntegral i) :: Double)
 largestNSqLTEEven :: Word64 -> Word64
 largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble (nextUp (sqrt d_)) 
 
+{-# INLINE largestNSqLTEOdd## #-}
+largestNSqLTEOdd## :: Word64# -> Word64#
+largestNSqLTEOdd## w# =  let !(W64# r#) = floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) in r#
+
+{-# INLINE largestNSqLTEEven## #-}
+largestNSqLTEEven## :: Word64# -> Word64#
+largestNSqLTEEven## w# = let 
+        d_ = nextUp (fromIntegral (W64# w#) :: Double) 
+        !(W64# r#) = floorDouble (nextUp (sqrt d_)) 
+      in r#
+
 -- | handle overflow
 {-# INLINE hndlOvflwW32 #-}
 hndlOvflwW32 :: Integral a => a  -> a
@@ -643,6 +654,10 @@ int64ToFloatingX# i
 {-# INLINE unsafeword64ToFloatingX# #-}
 unsafeword64ToFloatingX# :: Word64 -> FloatingX#
 unsafeword64ToFloatingX# i = double2FloatingX# (fromIntegral i)
+
+{-# INLINE unsafeword64ToFloatingX## #-}
+unsafeword64ToFloatingX## :: Word64# -> FloatingX#
+unsafeword64ToFloatingX## w# = double2FloatingX# (fromIntegral (W64# w#))
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
