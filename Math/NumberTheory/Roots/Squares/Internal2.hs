@@ -29,7 +29,7 @@ where
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 
 -- *********** BEGIN NEW IMPORTS
-
+import Data.WideWord
 import GHC.Int      (Int64(I64#))
 import GHC.Word ( Word64(..) )
 #ifdef MIN_VERSION_integer_gmp
