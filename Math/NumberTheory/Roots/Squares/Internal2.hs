@@ -137,12 +137,12 @@ theFi v
     | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 v 0# 0 0 zero#
     | evenLen = let 
              !(I# l'#) = l-2
-             !(IterRes !yc !y1 !remInteger) = let 
+             !(IterRes !yc !y1# !remInteger) = let 
                   yT64# = hndlOvflwW32# (largestNSqLTEEven## i#)                                     
                   ysq# = yT64# `timesWord64#` yT64#
                   diff = fromIntegral i - fromIntegral (W64# ysq#)
                 in handleRems_ $ IterRes 0 yT64# diff -- set 0 for starting cumulative yc--fstDgtRem i
-          in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX# (W64# y1)) 
+          in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX## y1#) 
     | otherwise = let 
              !(I# l'#) = l-1
              yT64# = largestNSqLTEOdd## i# 
