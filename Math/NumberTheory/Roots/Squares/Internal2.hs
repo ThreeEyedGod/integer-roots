@@ -66,11 +66,13 @@ import GHC.Exts
     eqWord64#, 
     gtWord64#,
     subWord64#,
+    timesWord64#, 
     isTrue#,
     leInt64#,
     ltInt64#,
     minusWord#,
     plusInt64#,
+    subWord64#, 
     sqrtDouble#,
     subInt64#,
     timesWord#,
@@ -133,6 +135,14 @@ theFi :: VU.Vector Word32 -> Itr
 theFi v 
     | VU.null v = error "theFI: Invalid Argument null vector "
     | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 v 0# 0 0 zero#
+    -- | evenLen = let 
+    --          !(I# l'#) = l-2
+    --          !(IterRes !yc !y1 !remInteger) = let 
+    --               yT64# = hndlOvflwW32# (largestNSqLTEEven## i#) 
+    --               y = W64# yT64#
+    --               diff = fromIntegral i - fromIntegral (y*y)
+    --             in handleRems_ $ IterRes 0 yT64# diff -- set 0 for starting cumulative yc--fstDgtRem i
+    --       in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX## y1) 
     | evenLen = let 
              !(I# l'#) = l-2
              !(IterRes !yc !y1 !remInteger) = let 
@@ -142,14 +152,15 @@ theFi v
           in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX# (W64# y1)) 
     | otherwise = let 
              !(I# l'#) = l-1
-             !y = largestNSqLTEOdd i 
-             !remInteger = fromIntegral $ i - y * y
-          in Itr 1 v l'# (fromIntegral y) remInteger (unsafeword64ToFloatingX# y) 
+             yT64# = largestNSqLTEOdd## i# 
+             y = W64# yT64#
+             !remInteger = fromIntegral $ W64# (i# `subWord64#` (yT64# `timesWord64#` yT64#)) -- no chance this will be negative
+          in Itr 1 v l'# (fromIntegral y) remInteger (unsafeword64ToFloatingX## yT64#) 
  where 
       !l = VU.length v 
       !evenLen = even l 
       !dxsVec' = if evenLen then brkVec v (l-2) else brkVec v (l-1) -- //FIXME could be made with indexing like in tni
-      !i = word64FromRvsrd2ElemVec dxsVec'
+      !i@(W64# i#) = word64FromRvsrd2ElemVec dxsVec'
 
 -- Keep it this way: Inlining this lowers performance.
 theNextIterations :: Itr -> Integer
