@@ -135,20 +135,13 @@ theFi :: VU.Vector Word32 -> Itr
 theFi v 
     | VU.null v = error "theFI: Invalid Argument null vector "
     | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 v 0# 0 0 zero#
-    -- | evenLen = let 
-    --          !(I# l'#) = l-2
-    --          !(IterRes !yc !y1 !remInteger) = let 
-    --               yT64# = hndlOvflwW32# (largestNSqLTEEven## i#) 
-    --               y = W64# yT64#
-    --               diff = fromIntegral i - fromIntegral (y*y)
-    --             in handleRems_ $ IterRes 0 yT64# diff -- set 0 for starting cumulative yc--fstDgtRem i
-    --       in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX## y1) 
     | evenLen = let 
              !(I# l'#) = l-2
              !(IterRes !yc !y1 !remInteger) = let 
-                  !y = hndlOvflwW32 (largestNSqLTEEven i) 
-                  !(W64# yT64#) = y 
-                in handleRems_ $ IterRes 0 yT64# $ fromIntegral i - fromIntegral (y * y) -- set 0 for starting cumulative yc--fstDgtRem i
+                  yT64# = hndlOvflwW32# (largestNSqLTEEven## i#)                                     
+                  ysq# = yT64# `timesWord64#` yT64#
+                  diff = fromIntegral i - fromIntegral (W64# ysq#)
+                in handleRems_ $ IterRes 0 yT64# diff -- set 0 for starting cumulative yc--fstDgtRem i
           in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX# (W64# y1)) 
     | otherwise = let 
              !(I# l'#) = l-1
@@ -380,7 +373,10 @@ hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 {-# INLINE hndlOvflwW32# #-}
 hndlOvflwW32# :: Word64# -> Word64#
-hndlOvflwW32# i# = if isTrue# (i# `eqWord64#` maxW32#) then maxW32# else i# where !(W64# maxW32#) = predRadixW32
+hndlOvflwW32# i# = if isTrue# (i# `eqWord64#` maxW32#) then predmaxW32# else i# 
+    where 
+      !(W64# maxW32#) = radixW32
+      !(W64# predmaxW32#) = predRadixW32
 
 scaleByPower2 :: Int64# -> FloatingX# -> FloatingX#
 scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else FloatingX# s# (e# `plusInt64#` n#)--normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
