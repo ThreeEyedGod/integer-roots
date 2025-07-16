@@ -44,11 +44,11 @@ import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDoubl
 import GHC.Num.BigNat (bigNatSize#)
 #endif
 
-import Data.Bits (finiteBitSize, unsafeShiftL,  shiftR)
+import Data.Bits (shiftR)
 import qualified Data.Bits.Floating as DB (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
 import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length)
-import Data.Word (Word32, Word64)
+import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
     Double#,
@@ -139,7 +139,7 @@ theFi v
                   !y = hndlOvflwW32 (largestNSqLTEEven i) 
                   !(W64# yT64#) = y 
                 in handleRems_ $ IterRes 0 yT64# $ fromIntegral i - fromIntegral (y * y) -- set 0 for starting cumulative yc--fstDgtRem i
-          in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX# $ fromIntegral (W64# y1)) 
+          in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX# (W64# y1)) 
     | otherwise = let 
              !(I# l'#) = l-1
              !y = largestNSqLTEOdd i 
