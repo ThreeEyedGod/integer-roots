@@ -127,40 +127,40 @@ isqrtB n = fromInteger . theNextIterations . theFi . dgtsVecBase32__ . fromInteg
 {-# INLINEABLE isqrtB #-}
 
 -- | Iteration loop data - these records have vectors / lists in them
-data Itr = Itr {lv :: {-# UNPACK #-} !Int, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
+data Itr = Itr {lv# :: {-# UNPACK #-} !Int#, vecW32_ :: {-# UNPACK #-} !(VU.Vector Word32), l_ :: {-# UNPACK #-} !Int#, yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 data IterRes = IterRes {yCum :: !Integer, yTilde :: {-# UNPACK #-} !Word64#, ri :: !Integer} deriving (Eq)
 data CoreArgs = CoreArgs {tA# :: !FloatingX#, tC# :: !FloatingX#, rad# :: !FloatingX#} deriving (Eq)
 
 theFi :: VU.Vector Word32 -> Itr 
 theFi v 
     | VU.null v = error "theFI: Invalid Argument null vector "
-    | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1 v 0# 0 0 zero#
+    | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1# v 0# 0 0 zero#
     | evenLen = let 
-             !(I# l'#) = l-2
+             l'# = l# -# 2#
              !(IterRes !yc !y1# !remInteger) = let 
                   yT64# = hndlOvflwW32# (largestNSqLTEEven## i#)                                     
                   ysq# = yT64# `timesWord64#` yT64#
                   diff = fromIntegral i - fromIntegral (W64# ysq#)
                 in handleRems_ $ IterRes 0 yT64# diff -- set 0 for starting cumulative yc--fstDgtRem i
-          in Itr 1 v l'# yc remInteger (unsafeword64ToFloatingX## y1#) 
+          in Itr 1# v l'# yc remInteger (unsafeword64ToFloatingX## y1#) 
     | otherwise = let 
-             !(I# l'#) = l-1
+             l'# = l# -# 1#
              yT64# = largestNSqLTEOdd## i# 
              y = W64# yT64#
              !remInteger = fromIntegral $ W64# (i# `subWord64#` (yT64# `timesWord64#` yT64#)) -- no chance this will be negative
-          in Itr 1 v l'# (fromIntegral y) remInteger (unsafeword64ToFloatingX## yT64#) 
+          in Itr 1# v l'# (fromIntegral y) remInteger (unsafeword64ToFloatingX## yT64#) 
  where 
-      !l = VU.length v 
+      !l@(I# l#) = VU.length v 
       !evenLen = even l 
       !dxsVec' = if evenLen then brkVec v (l-2) else brkVec v (l-1) -- //FIXME could be made with indexing like in tni
       !i@(W64# i#) = word64FromRvsrd2ElemVec dxsVec'
 
 -- Keep it this way: Inlining this lowers performance.
 theNextIterations :: Itr -> Integer
-theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni currlen w32Vec l# yCumulated iRem tbfx#
+theNextIterations itr@(Itr !currlen# !w32Vec !l# !yCumulated !iRem !tbfx#) = tni currlen# w32Vec l# yCumulated iRem tbfx#
   where
-    tni :: Int -> VU.Vector Word32 -> Int# -> Integer -> Integer -> FloatingX# -> Integer 
-    tni cl v l_# yC iR t# =
+    tni :: Int# -> VU.Vector Word32 -> Int# -> Integer -> Integer -> FloatingX# -> Integer 
+    tni cl# v l_# yC iR t# =
       if I# l_# == 0 || VU.null v
         then yC
         else
@@ -169,8 +169,8 @@ theNextIterations itr@(Itr !currlen !w32Vec !l# !yCumulated !iRem !tbfx#) = tni 
               !tA_= intgrFrom3DigitsBase32 iR (n1_, nl_) 
               !tC_= scaleByPower2 (fromInt64 32) t# -- sqrtF previous digits being scaled right here
               !(IterRes !yc !yTildeFinal# !remFinal) = let !yTilde_# = nxtDgt_# tA_ tC_ in computeRem_ yC tA_ yTilde_#
-              !tcfx# = if currlen <= 2 && isTrue# (yTildeFinal# `gtWord64#` 0#Word64) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX# (W64# yTildeFinal#) else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
-           in tni (succ cl) v (l_# -# 2#) yc remFinal tcfx# -- do not VU.force ri32V
+              !tcfx# = if isTrue# (currlen# <# 2#) && isTrue# (yTildeFinal# `gtWord64#` 0#Word64) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX# (W64# yTildeFinal#) else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
+           in tni (cl# +# 1#) v (l_# -# 2#) yc remFinal tcfx# -- do not VU.force ri32V
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0 
 
 -- | numeric loop records
