@@ -68,11 +68,14 @@ import GHC.Exts
     subWord64#,
     timesWord64#, 
     word64ToInt64#,
+    word32ToWord#,
+    wordToWord64#,
     isTrue#,
     leInt64#,
     ltInt64#,
     minusWord#,
     plusInt64#,
+    plusWord64#,
     subWord64#, 
     sqrtDouble#,
     subInt64#,
@@ -154,7 +157,7 @@ theFi v
       !l@(I# l#) = VU.length v 
       !evenLen = even l 
       !dxsVec' = if evenLen then brkVec v (l-2) else brkVec v (l-1) -- //FIXME could be made with indexing like in tni
-      !i@(W64# i#) = word64FromRvsrd2ElemVec dxsVec'
+      i# = word64FromRvsrd2ElemVec# dxsVec'
 
 -- Keep it this way: Inlining this lowers performance.
 theNextIterations :: Itr -> Integer
@@ -304,13 +307,21 @@ intgrFromRvsrd2ElemVec v2ElemW32s =
 
 {-# INLINE word64FromRvsrd2ElemVec #-}
 
--- | Int64 from a "reversed" Vector of 2 Word32 digits
+-- | Word64 from a "reversed" Vector of 2 Word32 digits
 word64FromRvsrd2ElemVec :: VU.Vector Word32 -> Word64
 word64FromRvsrd2ElemVec v2ElemW32s =
   let (llsb, lmsb) = case VU.uncons v2ElemW32s of
         Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
         Nothing -> error "int64FromRvsrd2ElemVec : Invalid Vector - empty " 
    in word64FromRvsrdTuple (llsb, lmsb) radixW32
+
+-- | Word64# from a "reversed" Vector of 2 Word32 digits
+word64FromRvsrd2ElemVec# :: VU.Vector Word32 -> Word64#
+word64FromRvsrd2ElemVec# v2ElemW32s =
+  let (llsb, lmsb) = case VU.uncons v2ElemW32s of
+        Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
+        Nothing -> error "int64FromRvsrd2ElemVec : Invalid Vector - empty " 
+   in word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
 
 {-# INLINE mkIW32Lst #-}
 
@@ -334,13 +345,20 @@ intgrFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral 
 
 
 {-# INLINE word64FromRvsrdTuple #-}
--- | Int64 from a "reversed" tuple of Word32 digits
+-- | Word64 from a "reversed" tuple of Word32 digits
 word64FromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64
 word64FromRvsrdTuple (0, 0) 0 = 0
 word64FromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
 word64FromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
 word64FromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
+{-# INLINE word64FromRvsrdTuple# #-}
+-- | Word64# from a "reversed" tuple of Word32 digits
+word64FromRvsrdTuple# :: (Word32, Word32) -> Word64# -> Word64#
+word64FromRvsrdTuple# (0, 0) _ = 0#Word64
+word64FromRvsrdTuple# (0, W32# lMSB#) base# = wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#
+word64FromRvsrdTuple# (W32# lLSB#, 0) _ =  wordToWord64# (word32ToWord# lLSB#) 
+word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#) `plusWord64#` wordToWord64# (word32ToWord# lLSB#)
 
 {-# INLINE doubleFromRvsrdTuple #-}
 
