@@ -31,7 +31,7 @@ import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 -- *********** BEGIN NEW IMPORTS
 import Data.WideWord
 import GHC.Int      (Int64(I64#))
-import GHC.Word ( Word64(..) )
+import GHC.Word ( Word64(..), Word32(..))
 #ifdef MIN_VERSION_integer_gmp
 import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
 import GHC.Integer.GMP.Internals (Integer(..), shiftLInteger, shiftRInteger, sizeofBigNat#)
@@ -40,7 +40,7 @@ import GHC.Integer.Logarithms (integerLog2#)
 #define IP Jp#
 #define bigNatSize sizeofBigNat
 #else
-import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#, Int64#, Word64#)
+import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#, Int64#, Word64#, Word32#)
 import GHC.Num.BigNat (bigNatSize#)
 #endif
 
@@ -67,6 +67,7 @@ import GHC.Exts
     gtWord64#,
     subWord64#,
     timesWord64#, 
+    word64ToInt64#,
     isTrue#,
     leInt64#,
     ltInt64#,
@@ -140,8 +141,8 @@ theFi v
              !(IterRes !yc !y1# !remInteger) = let 
                   yT64# = hndlOvflwW32# (largestNSqLTEEven## i#)                                     
                   ysq# = yT64# `timesWord64#` yT64#
-                  diff = fromIntegral i - fromIntegral (W64# ysq#)
-                in handleRems_ $ IterRes 0 yT64# diff -- set 0 for starting cumulative yc--fstDgtRem i
+                  diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
+                in handleRems_ $ IterRes 0 yT64# (fromIntegral (I64# diff#)) -- set 0 for starting cumulative yc--fstDgtRem i
           in Itr 1# v l'# yc remInteger (unsafeword64ToFloatingX## y1#) 
     | otherwise = let 
              l'# = l# -# 1#
