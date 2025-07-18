@@ -649,10 +649,9 @@ integer2FloatingX# i
   | i < 0 = error "integer2FloatingX# : invalid negative argument"
   | itsOKtoUsePlainDoubleCalc = double2FloatingX# (fromIntegral i)
   | otherwise =
-      let !(i_, e_) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+      let !(# i_, e_# #) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
           !(D# s#) = fromIntegral i_
-          !(I# e_#) = e_
-       in FloatingX# s# (intToInt64# e_#)
+       in FloatingX# s# e_#
   where
     !(D# maxDouble#) = maxDouble
     !(D# iDouble#) = fromIntegral i
@@ -661,10 +660,9 @@ integer2FloatingX# i
 {-# INLINE unsafeinteger2FloatingX# #-}
 unsafeinteger2FloatingX# :: Integer -> FloatingX#
 unsafeinteger2FloatingX# i = 
-      let !(i_, e_) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+      let !(# i_, e_# #) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
           !(D# s#) = fromIntegral i_
-          !(I# e_#) = e_
-       in FloatingX# s# (intToInt64# e_#)
+       in FloatingX# s# e_#
 
 {-# INLINE int64ToFloatingX# #-}
 int64ToFloatingX# :: Int64 -> FloatingX#
@@ -684,19 +682,19 @@ unsafeword64ToFloatingX## w# = double2FloatingX# (fromIntegral (W64# w#))
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
 {-# INLINE cI2D2_ #-}
-cI2D2_ :: Integer -> (Integer, Int)
-cI2D2_ i@(IS i#) = (i, 0)
+cI2D2_ :: Integer -> (# Integer, Int64# #)
+cI2D2_ i@(IS _) = (# i, 0#Int64 #)
 cI2D2_ n@(IP bn#)
-    | isTrue# ((bigNatSize# bn#) <# thresh#) = (n,0)
+    | isTrue# ((bigNatSize# bn#) <# thresh#) = (#n, 0#Int64 #)
     | otherwise = case integerLog2# n of
 #ifdef MIN_VERSION_integer_gmp
                     l# -> case uncheckedIShiftRA# l# 1# -# 47# of
                             h# -> case shiftRInteger n (2# *# h#) of
-                                    m -> (m, I# 2# *# h#)
+                                    m -> (m, I64# 2# *# h#)
 #else
                     l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
                             h# -> case integerShiftR# n (2## `timesWord#` h#) of
-                                    m -> (m, 2 * I# (word2Int# h#))
+                                    m -> (# m, 2#Int64 `timesInt64#` intToInt64# (word2Int# h#) #)
 #endif
     where
         -- threshold for shifting vs. direct fromInteger
