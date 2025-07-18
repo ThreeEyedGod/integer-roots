@@ -520,7 +520,7 @@ fsqraddFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#)
     -- | isTrue# (diff# `ltInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
     -- | otherwise =  sqr# a !+## c -- default custom mult and add
  where 
-    !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
+    twoTimesExpA# = 2#Int64 `timesInt64#` expA# -- lazy till its needed in otherwise 
     !diff# = expC# `subInt64#` twoTimesExpA#
 
 {-# INLINE fm1addFloatingX# #-}
@@ -544,7 +544,8 @@ sqrtSplitDbl (FloatingX d e)
   | even e = (s, shiftR e 1) -- even
   | otherwise = (sqrtOf2 * s, shiftR (e - 1) 1) -- odd
   where
-    !s = sqrtDX d
+    -- !s = sqrtDX d
+    !s = unsafesqrtDX d
 {-# INLINE sqrtSplitDbl #-}
 
 sqrtDX :: Double -> Double
@@ -555,6 +556,13 @@ sqrtDX d
   | d == 1 = 1
   | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 {-# INLINE sqrtDX #-}
+
+unsafesqrtDX :: Double -> Double
+unsafesqrtDX d
+  | d == 0 = 0
+  | d == 1 = 1
+  | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
+{-# INLINE unsafesqrtDX #-}
 
 toInt64 :: Int64# -> Int64
 toInt64 = I64#
