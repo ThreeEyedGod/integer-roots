@@ -93,7 +93,8 @@ import GHC.Exts
     (<##),
     (==##),
     (>=##),
-    quotInt64#
+    quotInt64#,
+    indexDoubleArray#
   )
 import GHC.Float ( divideDouble, floorDouble)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
@@ -203,27 +204,27 @@ nxtDgt_# ta@(IP bn#) tcfx#
         -- threshold for shifting vs. direct fromInteger
         -- we shift when we expect more than 256 bits
         thresh# :: Int#
-        thresh# = if finiteBitSize (0 :: Word) == 64 then 5# else 9#
+        thresh# = if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 -- There's already a check for negative in integerSquareRoot,
 -- but integerSquareRoot' is exported directly too.
 
-nxtDgt__# :: Integer -> FloatingX# -> Word64#
-nxtDgt__# ta tcfx# = case byPass ta tcfx# of 
-    Left _ -> comput_ (preComput_ ta tcfx#)
-    Right resBy@(W64# resBy#) -> resBy#
-{-# INLINE nxtDgt_# #-}
+-- nxtDgt__# :: Integer -> FloatingX# -> Word64#
+-- nxtDgt__# ta tcfx# = case byPass ta tcfx# of 
+--     Left _ -> comput_ (preComput_ ta tcfx#)
+--     Right resBy@(W64# resBy#) -> resBy#
+-- {-# INLINE nxtDgt_# #-}
 
-{-# INLINE byPass #-}
-byPass :: Integer -> FloatingX# -> Either Int Word64
-byPass tA__ tCFX# 
-    | tA__ < 2^512-1 && c > 0 = let 
-            !(D# a#) = fromIntegral tA__ 
-            !r# = fmaddDouble# c# c# a#
-          in 
-             Right (W64# $ computDouble# a# c# r#)
-    | otherwise = Left 0 
-  where 
-      !c@(D# c#) = unsafefx2Double# tCFX# --fromMaybe 0 (fx2Double# tCFX#) 
+-- {-# INLINE byPass #-}
+-- byPass :: Integer -> FloatingX# -> Either Int Word64
+-- byPass tA__ tCFX# 
+--     | tA__ < 2^512-1 && c > 0 = let 
+--             !(D# a#) = fromIntegral tA__ 
+--             !r# = fmaddDouble# c# c# a#
+--           in 
+--              Right (W64# $ computDouble# a# c# r#)
+--     | otherwise = Left 0 
+--   where 
+--       !c@(D# c#) = unsafefx2Double# tCFX# --fromMaybe 0 (fx2Double# tCFX#) 
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Word64#
