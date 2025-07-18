@@ -141,11 +141,11 @@ theFi v
     | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1# v 0# 0 0 zero#
     | evenLen = let 
              l'# = l# -# 2#
-             !(IterRes !yc !y1# !remInteger) = let 
+             !(# !yc, !y1#, !remInteger #) = let 
                   yT64# = hndlOvflwW32# (largestNSqLTEEven## i#)                                     
                   ysq# = yT64# `timesWord64#` yT64#
                   diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-                in handleRems_ $ IterRes 0 yT64# (fromIntegral (I64# diff#)) -- set 0 for starting cumulative yc--fstDgtRem i
+                in handleRems (# 0, yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
           in Itr 1# v l'# yc remInteger (unsafeword64ToFloatingX## y1#) 
     | otherwise = let 
              l'# = l# -# 1#
@@ -172,7 +172,7 @@ theNextIterations itr@(Itr !currlen# !w32Vec !l# !yCumulated !iRem !tbfx#) = tni
               !(n1_, nl_) = (VU.unsafeIndex v (I# l_# - 2), VU.unsafeIndex v (I# l_# - 1))
               !tA_= intgrFrom3DigitsBase32 iR (n1_, nl_) 
               !tC_= scaleByPower2 (fromInt64 32) t# -- sqrtF previous digits being scaled right here
-              !(IterRes !yc !yTildeFinal# !remFinal) = let !yTilde_# = nxtDgt_# tA_ tC_ in computeRem_ yC tA_ yTilde_#
+              !(# !yc, !yTildeFinal#, !remFinal #) = let !yTilde_# = nxtDgt_# tA_ tC_ in computeRem_ yC tA_ yTilde_#
               !tcfx# = if isTrue# (currlen# <# 2#) && isTrue# (yTildeFinal# `gtWord64#` 0#Word64) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX# (W64# yTildeFinal#) else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
            in tni (cl# +# 1#) v (l_# -# 2#) yc remFinal tcfx# -- do not VU.force ri32V
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0 
@@ -244,8 +244,8 @@ comput (CoreArgs !tAFX# !tCFX# !radFX#) = hndlOvflwW32# (floorX## (nextUpFX# (ne
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
 -- that happens in handleRems_
 -- if the trial digit is zero skip computing remainder
-computeRem_ :: Integer -> Integer -> Word64# -> IterRes
-computeRem_ tc ta yTilde_# = let !rTrial = calcRemainder ta tc yTilde_# in handleRems_ (IterRes tc yTilde_# rTrial)
+computeRem_ :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
+computeRem_ tc ta yTilde_# = let !rTrial = calcRemainder ta tc yTilde_# in handleRems (# tc, yTilde_#, rTrial #)
 {-# INLINE computeRem_ #-}
 
 -- | if the remainder is negative it's a clear sign to decrement the candidate digit
@@ -262,6 +262,18 @@ handleRems_ (IterRes yc_ yi64# ri_)
     !yc = yc_ * radixW32
     !ycyi = yc + fromIntegral (W64# yi64#) -- accumulating the growing square root
 {-# INLINE handleRems_ #-}
+
+handleRems :: (# Integer, Word64#, Integer #) -> (# Integer, Word64#, Integer #)
+handleRems (# yc_, yi64#, ri_ #)
+  | ri_ < 0 = let 
+                !yAdj# = yi64# `subWord64#` 1#Word64 
+                !adjYc = pred ycyi
+                !rdr = fixRemainder adjYc ri_ in (# adjYc, yAdj#, rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | otherwise = (# ycyi, yi64#, ri_ #)
+  where
+    !yc = yc_ * radixW32
+    !ycyi = yc + fromIntegral (W64# yi64#) -- accumulating the growing square root
+{-# INLINE handleRems #-}
 
 -- Calculate remainder accompanying a 'digit'
 calcRemainder :: Integer -> Integer -> Word64# -> Integer
