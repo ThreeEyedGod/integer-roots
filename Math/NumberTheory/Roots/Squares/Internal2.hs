@@ -702,9 +702,7 @@ cI2D2_ n@(IP bn#)
         -- threshold for shifting vs. direct fromInteger
         -- we shift when we expect more than 256 bits
         thresh# :: Int#
-        thresh# = if finiteBitSize (0 :: Word) == 64 then 5# else 9#
--- There's already a check for negative in integerSquareRoot,
--- but integerSquareRoot' is exported directly too.
+        thresh# = if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
 cI2D2_ _ = error "cI2D2_': negative argument"
 
 {-# INLINE split #-}
