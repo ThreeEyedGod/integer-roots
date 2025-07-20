@@ -169,10 +169,10 @@ theNextIterations itr@(Itr !currlen# !w32Vec !l# !yCumulated !iRem !tbfx#) = tni
         else
           let 
               !(n1_, nl_) = (VU.unsafeIndex v (I# l_# - 2), VU.unsafeIndex v (I# l_# - 1))
-              !tA_= intgrFrom3DigitsBase32 iR (n1_, nl_) 
-              !tC_= scaleByPower2 (fromInt64 32) t# -- sqrtF previous digits being scaled right here
+              !tA_= intgrFrom3DigitsBase32 iR (n1_, nl_) -- //FIXME this will certainly be less than Int128 and 100% from Word256
+              !tC_= scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
               !(# !yc, !yTildeFinal#, !remFinal #) = let !yTilde_# = nxtDgt_# tA_ tC_ in computeRem_ yC tA_ yTilde_#
-              !tcfx# = if isTrue# (currlen# <# 2#) && isTrue# (yTildeFinal# `gtWord64#` 0#Word64) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX# (W64# yTildeFinal#) else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
+              !tcfx# = if isTrue# (currlen# <# 2#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX# (W64# yTildeFinal#) else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
            in tni (cl# +# 1#) v (l_# -# 2#) yc remFinal tcfx# -- do not VU.force ri32V
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0 
 
