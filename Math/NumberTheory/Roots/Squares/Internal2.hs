@@ -606,7 +606,7 @@ updateDouble# d# ex# = let
 
 unsafefx2Double :: FloatingX -> Double
 unsafefx2Double (FloatingX d@(D# d#) e)
-  | ex < 0 = fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary
+  | ex < 0 = fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary 
   | otherwise = D# (encodeDoubleInteger m ex#)
   where
     !(# m, n# #) = decodeDoubleInteger d#
@@ -615,11 +615,11 @@ unsafefx2Double (FloatingX d@(D# d#) e)
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# d# e#)
-  | isTrue# (ex# <# 0#) = let !(D# d#) = fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) in d# -- this is necessary
+  | isTrue# (ex# <# 0#) = let !(D# d#) = fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) in d# -- this is necessary 
   | otherwise = encodeDoubleInteger m ex#
   where
     !(# m, n# #) = decodeDoubleInteger d#
-    ex# = n# +# int64ToInt# e#
+    !ex# = n# +# int64ToInt# e#
 {-# INLINE unsafefx2Double## #-}
 
 {-# INLINE double2FloatingX# #-}
@@ -644,8 +644,8 @@ integer2FloatingX# ibn#
        in FloatingX# s# e_#
   where
     !(D# maxDouble#) = maxDouble
-    iDouble# =  bigNatEncodeDouble# ibn# 0#
-    itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+    !iDouble# =  bigNatEncodeDouble# ibn# 0#
+    !itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
 {-# INLINE unsafeinteger2FloatingX# #-}
 unsafeinteger2FloatingX# :: BigNat# -> FloatingX#
