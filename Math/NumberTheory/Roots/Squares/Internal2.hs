@@ -607,24 +607,16 @@ updateDouble# d# ex# = let
 unsafefx2Double :: FloatingX -> Double
 unsafefx2Double (FloatingX d@(D# d#) e)
   | ex < 0 = fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary
-  | otherwise =
-      let 
-          !(I# ex#) = ex
-          result# = encodeDoubleInteger m ex#
-          !result = D# result#
-       in result
+  | otherwise = D# (encodeDoubleInteger m ex#)
   where
     !(# m, n# #) = decodeDoubleInteger d#
-    !ex = I# n# + fromIntegral e
+    !ex@(I# ex#) = I# n# + fromIntegral e
 {-# INLINE unsafefx2Double #-}
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# d# e#)
   | isTrue# (ex# <# 0#) = let !(D# d#) = fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) in d# -- this is necessary
-  | otherwise =
-      let 
-          result# = encodeDoubleInteger m ex#
-       in result#
+  | otherwise = encodeDoubleInteger m ex#
   where
     !(# m, n# #) = decodeDoubleInteger d#
     ex# = n# +# int64ToInt# e#
