@@ -660,8 +660,9 @@ integer2FloatingX# i
 {-# INLINE unsafeinteger2FloatingX# #-}
 unsafeinteger2FloatingX# :: Integer -> FloatingX#
 unsafeinteger2FloatingX# i = 
-      let !(# i_, e_# #) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-          !(D# s#) = fromIntegral i_
+      let !(# i_@(IP bn#), e_# #) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+          -- !(D# s#) = fromIntegral i_
+          s# = bigNatEncodeDouble# bn# 0#
        in FloatingX# s# e_#
 
 {-# INLINE int64ToFloatingX# #-}
