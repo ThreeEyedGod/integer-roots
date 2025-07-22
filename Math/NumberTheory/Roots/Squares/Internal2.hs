@@ -41,7 +41,7 @@ import GHC.Integer.Logarithms (integerLog2#)
 #define bigNatSize sizeofBigNat
 #else
 import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#, Int64#, Word64#, Word32#)
-import GHC.Num.BigNat (bigNatSize#)
+import GHC.Num.BigNat (bigNatSize#, bigNatEncodeDouble#)
 #endif
 
 import Data.Bits (shiftR)
@@ -193,7 +193,7 @@ nxtDgt_# (IS ta#) tcfx# = let
 nxtDgt_# ta@(IP bn#) tcfx#
     | isTrue# ((bigNatSize# bn#) <# thresh#) = let 
             c# = unsafefx2Double## tcfx# --fromMaybe 0 (fx2Double# tCFX#) 
-            !(D# a#) = fromIntegral ta :: Double 
+            a# = bigNatEncodeDouble# bn# 0#
             !r# = fmaddDouble# c# c# a#
           in 
             computDouble# a# c# r#
