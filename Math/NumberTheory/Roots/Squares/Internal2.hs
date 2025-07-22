@@ -41,7 +41,7 @@ import GHC.Integer.Logarithms (integerLog2#)
 #define bigNatSize sizeofBigNat
 #else
 import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#, Int64#, Word64#, Word32#)
-import GHC.Num.BigNat (bigNatSize#, bigNatEncodeDouble#)
+import GHC.Num.BigNat (BigNat#, bigNatSize#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#, bigNatShiftR#)
 #endif
 
 import Data.Bits (shiftR)
@@ -197,7 +197,7 @@ nxtDgt_# ta@(IP bn#) tcfx#
             !r# = fmaddDouble# c# c# a#
           in 
             computDouble# a# c# r#
-    | otherwise = comput_ (preComput_ ta tcfx#)--nxtDgt__# ta tcfx#
+    | otherwise = comput_ (preComput_ bn# tcfx#)--nxtDgt__# ta tcfx#
     where
         -- threshold for shifting vs. direct fromInteger
         -- we shift when we expect more than 256 bits
@@ -209,9 +209,9 @@ computDouble# :: Double# -> Double# -> Double# -> Word64#
 computDouble# !tAFX# !tCFX# !radFX# = let !(W64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) in hndlOvflwW32# i#
 -- computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (fmaddDouble# (sqrtDouble# (nextDown# radFX#)) 1.00## (nextDown# tCFX#)) ))) in hndlOvflwW32# i#
 
-preComput_ :: Integer -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComput_ tA__ tCFX# =
-  let !tAFX# = unsafeinteger2FloatingX# tA__ 
+preComput_ :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
+preComput_ tA__bn# tCFX# =
+  let !tAFX# = unsafeinteger2FloatingX# tA__bn# 
       !radFX# = tCFX# !**+## tAFX# -- fused square (multiply) and add 
    in (# tAFX#, tCFX#, radFX# #)
 {-# INLINE preComput_ #-}
@@ -643,28 +643,22 @@ double2FloatingX## d# =
     (# s#, e# #) -> FloatingX# s# e#
 
 {-# INLINE integer2FloatingX# #-}
-integer2FloatingX# :: Integer -> FloatingX#
-integer2FloatingX# i
-  | i == 0 = zero#
-  | i < 0 = error "integer2FloatingX# : invalid negative argument"
-  | itsOKtoUsePlainDoubleCalc = double2FloatingX# (fromIntegral i)
+integer2FloatingX# :: BigNat# -> FloatingX#
+integer2FloatingX# ibn#
+  | bigNatIsZero ibn# = zero#
+  | itsOKtoUsePlainDoubleCalc = double2FloatingX## iDouble#
   | otherwise =
-      let !(# i_, e_# #) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-          !(D# s#) = fromIntegral i_
+      let !(# s#, e_# #) = cI2D2_ ibn# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
        in FloatingX# s# e_#
   where
     !(D# maxDouble#) = maxDouble
-    !(D# iDouble#) = fromIntegral i
+    iDouble# =  bigNatEncodeDouble# ibn# 0#
     itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
 {-# INLINE unsafeinteger2FloatingX# #-}
-unsafeinteger2FloatingX# :: Integer -> FloatingX#
-unsafeinteger2FloatingX# i = 
-      let !(# i_@(IP bn#), e_# #) = cI2D2_ i --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-          -- !(D# s#) = fromIntegral i_
-          s# = bigNatEncodeDouble# bn# 0#
-       in FloatingX# s# e_#
-
+unsafeinteger2FloatingX# :: BigNat# -> FloatingX#
+unsafeinteger2FloatingX# ibn# = let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+       
 {-# INLINE int64ToFloatingX# #-}
 int64ToFloatingX# :: Int64 -> FloatingX#
 int64ToFloatingX# i
@@ -683,26 +677,24 @@ unsafeword64ToFloatingX## w# = double2FloatingX# (fromIntegral (W64# w#))
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
 {-# INLINE cI2D2_ #-}
-cI2D2_ :: Integer -> (# Integer, Int64# #)
-cI2D2_ i@(IS _) = (# i, 0#Int64 #)
-cI2D2_ n@(IP bn#)
-    | isTrue# ((bigNatSize# bn#) <# thresh#) = (#n, 0#Int64 #)
-    | otherwise = case integerLog2# n of
+cI2D2_ :: BigNat# -> (# Double#, Int64# #)
+cI2D2_ bn#
+    | isTrue# ((bigNatSize# bn#) <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
+    | otherwise = case bigNatLog2# bn# of
 #ifdef MIN_VERSION_integer_gmp
                     l# -> case uncheckedIShiftRA# l# 1# -# 47# of
                             h# -> case shiftRInteger n (2# *# h#) of
                                     m -> (m, I64# 2# *# h#)
 #else
                     l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
-                            h# -> case integerShiftR# n (2## `timesWord#` h#) of
-                                    m -> (# m, 2#Int64 `timesInt64#` intToInt64# (word2Int# h#) #)
+                            h# -> case bigNatShiftR# bn# (2## `timesWord#` h#) of
+                                    mbn# -> (# bigNatEncodeDouble# mbn# 0#, 2#Int64 `timesInt64#` intToInt64# (word2Int# h#) #)
 #endif
     where
         -- threshold for shifting vs. direct fromInteger
         -- we shift when we expect more than 256 bits
         thresh# :: Int#
         thresh# = if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
-cI2D2_ _ = error "cI2D2_': negative argument"
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
