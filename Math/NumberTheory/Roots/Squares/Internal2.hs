@@ -5,7 +5,7 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 -- addition
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples #-} -- used everywhere within
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
@@ -446,11 +446,12 @@ minValue# = FloatingX# 1.0## 0#Int64
 {-# INLINE add# #-}
 add# :: FloatingX# -> FloatingX# -> FloatingX#
 add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
-  | a == zero# = b
-  | b == zero# = a
+  -- | a == zero# = b
+  -- | b == zero# = a
+  | isTrue# (expA# `eqInt64#` expB#) = FloatingX# (sA# +## sB#) expA#
   | isTrue# (expA# `gtInt64#` expB#) = combine a b
-  | isTrue# (expA# `ltInt64#` expB#) = combine b a
-  | otherwise = FloatingX# (sA# +## sB#) expA# -- FloatingX (signifA + signifB) expA
+  | otherwise = combine b a
+  -- | otherwise = FloatingX# (sA# +## sB#) expA# -- FloatingX (signifA + signifB) expA
   where
     combine big@(FloatingX# sBig# expBig#) little@(FloatingX# sLittle# expLittle#) =
       let !scale# = expLittle# `subInt64#` expBig#
@@ -466,11 +467,12 @@ mul# :: FloatingX# -> FloatingX# -> FloatingX#
 -- mul# (FloatingX# 1.0## 0#) b = b
 -- mul# a (FloatingX# 1.00## 0.00##) = a
 mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
-  | isTrue# (sA# ==## 0.00##) = zero#
-  | isTrue# (sB# ==## 0.00##) = zero#
-  | isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = b
-  | isTrue# (sB# ==## 1.00##) && isTrue# (expB# `eqInt64#` 0#Int64) = a
-  | otherwise =
+  -- | isTrue# (sA# ==## 0.00##) = zero#
+  -- | isTrue# (sB# ==## 0.00##) = zero#
+  -- | isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = b
+  -- | isTrue# (sB# ==## 1.00##) && isTrue# (expB# `eqInt64#` 0#Int64) = a
+  -- | otherwise 
+    =
       let !resExp# = expA# `plusInt64#` expB#
           !resSignif# = sA# *## sB#
        in if isTrue# (resSignif# >=## 2.0##)
@@ -534,15 +536,11 @@ unsafeDivide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
             then zero#
             else FloatingX# finalSignif# finalExp#
 
-
 {-# INLINE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fsqraddFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#) 
     | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
     | otherwise = case updateDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# --let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
-    -- | isTrue# (diff# `gtInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
-    -- | isTrue# (diff# `ltInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
-    -- | otherwise =  sqr# a !+## c -- default custom mult and add
  where 
     twoTimesExpA# = 2#Int64 `timesInt64#` expA# -- lazy till its needed in otherwise 
     !diff# = expC# `subInt64#` twoTimesExpA#
@@ -557,18 +555,21 @@ fm1addFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#)
 
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
-sqrtFX# (FloatingX# s# e#) = case sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) of (D# sX#, I64# eX#) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
+sqrtFX# fx@(FloatingX# s# e#) = case sqrtSplitDbl# fx of (# sX#, eX# #) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
 
+-- | actual sqrt call to the hardware for custom type happens here
 sqrtSplitDbl :: FloatingX -> (Double, Int64)
 sqrtSplitDbl (FloatingX d e)
-  | d == 0 = (0, 0)
-  | d == 1 = (1, 0)
-  | even e = (s, shiftR e 1) -- even
-  | otherwise = (sqrtOf2 * s, shiftR (e - 1) 1) -- odd
-  where
-    -- !s = sqrtDX d
-    !s = unsafesqrtDX d
+  | even e = (sqrt d, shiftR e 1) -- even
+  | otherwise = (sqrtOf2 * sqrt d, shiftR (e - 1) 1) -- odd
 {-# INLINE sqrtSplitDbl #-}
+
+-- | actual sqrt call to the hardware for custom type happens here
+sqrtSplitDbl# :: FloatingX# -> (# Double#, Int64# #)
+sqrtSplitDbl# (FloatingX# d# e#)
+  | even (I64# e#) = (# sqrtDouble# d#, e# `quotInt64#` 2#Int64  #) -- even
+  | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, (e# `subInt64#` 1#Int64) `quotInt64#` 2#Int64 #) -- odd sqrt2 times sqrt d#
+{-# INLINE sqrtSplitDbl# #-}
 
 sqrtDX :: Double -> Double
 sqrtDX d
@@ -588,7 +589,7 @@ toInt64 = I64#
 {-# INLINE toInt64 #-}
 
 fromInt64 :: Int64 -> Int64#
-fromInt64 !(I64# x#) = x#
+fromInt64 (I64# x#) = x#
 {-# INLINE fromInt64 #-}
 
 fx2Double# :: FloatingX# -> Maybe Double
