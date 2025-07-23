@@ -57,16 +57,16 @@ import GHC.Exts
     Int64#,
     double2Int#,
     gtInt64#,
-    geInt64#, 
+    geInt64#,
     int2Double#,
     int64ToInt#,
     intToInt64#,
     timesInt64#,
     eqInt64#,
-    eqWord64#, 
+    eqWord64#,
     gtWord64#,
     subWord64#,
-    timesWord64#, 
+    timesWord64#,
     word64ToInt64#,
     word32ToWord#,
     wordToWord64#,
@@ -76,7 +76,7 @@ import GHC.Exts
     minusWord#,
     plusInt64#,
     plusWord64#,
-    subWord64#, 
+    subWord64#,
     sqrtDouble#,
     subInt64#,
     timesWord#,
@@ -94,7 +94,7 @@ import GHC.Exts
     (==##),
     (>=##),
     quotInt64#,
-    indexDoubleArray#
+    indexDoubleArray#, word2Double#, castWord64ToDouble#
   )
 import GHC.Float ( divideDouble, floorDouble)
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
@@ -141,7 +141,7 @@ theFi v
     | evenLen = let 
              l'# = l# -# 2#
              !(# !yc, !y1#, !remInteger #) = let 
-                  yT64# = hndlOvflwW32# (largestNSqLTEEven## i#)                                     
+                  yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)                                     
                   ysq# = yT64# `timesWord64#` yT64#
                   diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
                 in handleRems (# 0, yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
@@ -206,18 +206,18 @@ nxtDgt_# ta@(IP bn#) tcfx#
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Word64#
-computDouble# !tAFX# !tCFX# !radFX# = let !(W64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) in hndlOvflwW32# i#
+computDouble# !tAFX# !tCFX# !radFX# = let !(W64# w#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) in hndlOvflwW32## w#
 -- computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (fmaddDouble# (sqrtDouble# (nextDown# radFX#)) 1.00## (nextDown# tCFX#)) ))) in hndlOvflwW32# i#
 
 preComput_ :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComput_ tA__bn# tCFX# =
-  let !tAFX# = unsafeinteger2FloatingX# tA__bn# 
+  let !tAFX# = unsafebigNat2FloatingX## tA__bn# 
       !radFX# = tCFX# !**+## tAFX# -- fused square (multiply) and add 
    in (# tAFX#, tCFX#, radFX# #)
 {-# INLINE preComput_ #-}
 
 comput_ :: (# FloatingX#, FloatingX#, FloatingX# #)-> Word64#
-comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32# (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE comput_ #-}
 
 -- | compute the remainder. It may be that the trial "digit" may need to be reworked
@@ -366,9 +366,9 @@ largestNSqLTEEven## w# = let
 hndlOvflwW32 :: Integral a => a  -> a
 hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
-{-# INLINE hndlOvflwW32# #-}
-hndlOvflwW32# :: Word64# -> Word64#
-hndlOvflwW32# i# = if isTrue# (i# `eqWord64#` maxW32#) then predmaxW32# else i# 
+{-# INLINE hndlOvflwW32## #-}
+hndlOvflwW32## :: Word64# -> Word64#
+hndlOvflwW32## w64# = if isTrue# (w64# `eqWord64#` maxW32#) then predmaxW32# else w64# 
     where 
       !(W64# maxW32#) = radixW32
       !(W64# predmaxW32#) = predRadixW32
@@ -412,7 +412,7 @@ floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
 {-# INLINE floorX## #-}
 floorX## :: FloatingX# -> Word64#
 floorX## (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
-        Just d -> let !(W64# d#) = floor d in d# 
+        Just d -> case floor d of (W64# d#) -> d# --let !(W64# d#) = floor d in d# 
         _ -> error "floorX##: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE zero# #-}
@@ -634,9 +634,9 @@ double2FloatingX## d# =
   case split# d# of
     (# s#, e# #) -> FloatingX# s# e#
 
-{-# INLINE integer2FloatingX# #-}
-integer2FloatingX# :: BigNat# -> FloatingX#
-integer2FloatingX# ibn#
+{-# INLINE bigNat2FloatingX## #-}
+bigNat2FloatingX## :: BigNat# -> FloatingX#
+bigNat2FloatingX## ibn#
   | bigNatIsZero ibn# = zero#
   | itsOKtoUsePlainDoubleCalc = double2FloatingX## iDouble#
   | otherwise =
@@ -647,9 +647,9 @@ integer2FloatingX# ibn#
     !iDouble# =  bigNatEncodeDouble# ibn# 0#
     !itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
-{-# INLINE unsafeinteger2FloatingX# #-}
-unsafeinteger2FloatingX# :: BigNat# -> FloatingX#
-unsafeinteger2FloatingX# ibn# = let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+{-# INLINE unsafebigNat2FloatingX## #-}
+unsafebigNat2FloatingX## :: BigNat# -> FloatingX#
+unsafebigNat2FloatingX## ibn# = let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
        
 {-# INLINE int64ToFloatingX# #-}
 int64ToFloatingX# :: Int64 -> FloatingX#
