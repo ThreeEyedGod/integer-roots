@@ -437,7 +437,7 @@ minValue# = FloatingX# 1.0## 0#Int64
 
 {-# INLINE (!/##) #-}
 (!/##) :: FloatingX# -> FloatingX# -> FloatingX#
-(!/##) x y = x `divide#` y
+(!/##) x y = x `unsafeDivide#` y
 
 {-# INLINE (!**+##) #-}
 (!**+##) :: FloatingX# -> FloatingX# -> FloatingX#
@@ -510,6 +510,30 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
           if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` 0#Int64)
             then zero#
             else FloatingX# finalSignif# finalExp#
+
+{-# INLINE unsafeDivide# #-}
+unsafeDivide# :: FloatingX# -> FloatingX# -> FloatingX#
+unsafeDivide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
+  -- | d == FloatingX# 1.0## (fromInt64 0) = n
+  -- | isTrue# (s1# ==## 0.0##) = zero#
+  -- | isTrue# (s2# ==## 0.0##) = error "divide#: error divide by zero "
+  -- | otherwise 
+    =
+      let !resExp# = e1# `subInt64#` e2#
+          !resSignif# = s1# /## s2#
+          -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
+          -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
+          !(# finalSignif#, finalExp# #) =
+            if isTrue# (resSignif# <## 1.0##)
+              then (# resSignif# *## 2.0##, resExp# `subInt64#` 1#Int64 #)
+              else (# resSignif#, resExp# #)
+       in -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
+          -- //TODO fix this next line
+          -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
+          if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` 0#Int64)
+            then zero#
+            else FloatingX# finalSignif# finalExp#
+
 
 {-# INLINE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
