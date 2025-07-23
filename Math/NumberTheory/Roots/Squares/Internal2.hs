@@ -533,9 +533,7 @@ fm1addFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#)
 
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
-sqrtFX# (FloatingX# s# e#) =
-  let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#))
-   in FloatingX# sX# eX#
+sqrtFX# (FloatingX# s# e#) = case sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) of (D# sX#, I64# eX#) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
 
 sqrtSplitDbl :: FloatingX -> (Double, Int64)
 sqrtSplitDbl (FloatingX d e)
@@ -558,10 +556,7 @@ sqrtDX d
 {-# INLINE sqrtDX #-}
 
 unsafesqrtDX :: Double -> Double
-unsafesqrtDX d
-  | d == 0 = 0
-  | d == 1 = 1
-  | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
+unsafesqrtDX !d = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 {-# INLINE unsafesqrtDX #-}
 
 toInt64 :: Int64# -> Int64
@@ -569,7 +564,7 @@ toInt64 = I64#
 {-# INLINE toInt64 #-}
 
 fromInt64 :: Int64 -> Int64#
-fromInt64 (I64# x#) = x#
+fromInt64 !(I64# x#) = x#
 {-# INLINE fromInt64 #-}
 
 fx2Double# :: FloatingX# -> Maybe Double
