@@ -238,48 +238,16 @@ handleRems (# ycScaled_, yi64#, ri_ #)
 -- Calculate remainder accompanying a 'digit'
 calcRemainder :: Integer -> Integer -> Word64# -> (Integer, Integer)
 calcRemainder tAI !yc_ 0#Word64 = (tAI, yc_ * radixW32)
-calcRemainder tAI yc_ dgt64# = let 
+calcRemainder !tAI !yc_ !dgt64# = let 
         !i = fromIntegral (W64# dgt64#) 
-        !tc = yc_ * radixW32
-    in (tAI - i * (double tc + i), tc) --tAI - ((double i * tc) + i * i)
+        !ycScaled = yc_ * radixW32
+    in (tAI - i * (double ycScaled + i), ycScaled) --tAI - ((double i * tc) + i * i)
 {-# INLINE calcRemainder #-}
-
--- Calculate remainder accompanying a 'digit'
--- calcRemainder :: Integer -> Integer -> Word64# -> Integer
--- calcRemainder tAI !_ 0#Word64 = tAI
--- calcRemainder tAI tc_ dgt64#
---   | tAI <= fromIntegral (maxBound :: Word64)
---   , tc_ <= fromIntegral (maxBound :: Word64)
---   = let
---       !i = fromIntegral (W64# dgt64#) :: Word64
---       !tc = fromIntegral tc_ * radixW32
---       !res = fromIntegral tAI - fromIntegral i * (double (fromIntegral tc) + fromIntegral i)
---     in fromIntegral res
---   | otherwise
---   = let
---       !i = fromIntegral (W64# dgt64#)
---       !tc = tc_ * radixW32
---     in tAI - i * (double tc + i)
--- {-# INLINE calcRemainder #-}
 
 -- -- Fix remainder accompanying a 'next downed digit'
 fixRemainder :: Integer -> Integer -> Integer
-fixRemainder tcplusdgtadj rdr = rdr + double tcplusdgtadj + 1
+fixRemainder !tcplusdgtadj !rdr = rdr + double tcplusdgtadj + 1
 {-# INLINE fixRemainder #-}
-
--- Fix remainder accompanying a 'next downed digit'
--- fixRemainder :: Integer -> Integer -> Integer
--- fixRemainder tcplusdgtadj rdr
---   | tcplusdgtadj <= fromIntegral (maxBound :: Word128)
---   , rdr <= fromIntegral (maxBound :: Word128)
---   = let
---       !tc = fromIntegral tcplusdgtadj :: Word128
---       !rd = fromIntegral rdr :: Word128
---       !res = rd + (tc `unsafeShiftL` 1) + 1
---     in fromIntegral res
---   | otherwise
---   = rdr + double tcplusdgtadj + 1
--- {-# INLINE fixRemainder #-}
 
 -- | HELPER functions
 {-# INLINE dgtsVecBase32__ #-}
