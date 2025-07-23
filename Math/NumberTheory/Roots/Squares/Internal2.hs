@@ -624,24 +624,18 @@ unsafefx2Double## (FloatingX# d# e#)
 
 {-# INLINE double2FloatingX# #-}
 double2FloatingX# :: Double -> FloatingX#
-double2FloatingX# d =
-  let !(D# s#, I64# e#) = split d
-   in FloatingX# s# e#
+double2FloatingX# d = case split d of (D# s#, I64# e#) ->  FloatingX# s# e# --let !(D# s#, I64# e#) = split d in FloatingX# s# e#
 
 {-# INLINE double2FloatingX## #-}
 double2FloatingX## :: Double# -> FloatingX#
-double2FloatingX## d# =
-  case split# d# of
-    (# s#, e# #) -> FloatingX# s# e#
+double2FloatingX## d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 
 {-# INLINE bigNat2FloatingX## #-}
 bigNat2FloatingX## :: BigNat# -> FloatingX#
 bigNat2FloatingX## ibn#
   | bigNatIsZero ibn# = zero#
   | itsOKtoUsePlainDoubleCalc = double2FloatingX## iDouble#
-  | otherwise =
-      let !(# s#, e_# #) = cI2D2_ ibn# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-       in FloatingX# s# e_#
+  | otherwise = let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
   where
     !(D# maxDouble#) = maxDouble
     !iDouble# =  bigNatEncodeDouble# ibn# 0#
@@ -649,7 +643,7 @@ bigNat2FloatingX## ibn#
 
 {-# INLINE unsafebigNat2FloatingX## #-}
 unsafebigNat2FloatingX## :: BigNat# -> FloatingX#
-unsafebigNat2FloatingX## ibn# = let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+unsafebigNat2FloatingX## ibn# = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# --let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
        
 {-# INLINE int64ToFloatingX# #-}
 int64ToFloatingX# :: Int64 -> FloatingX#
@@ -690,7 +684,7 @@ cI2D2_ bn#
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
-split (D# d#) = let !(# s#, ex# #) = split# d# in (D# s#, I64# ex#)
+split (D# d#) = case split# d# of (# s#, ex# #) ->  (D# s#, I64# ex#) --let !(# s#, ex# #) = split# d# in (D# s#, I64# ex#)
 
 {-# INLINE split# #-}
 split# :: Double# -> (# Double#, Int64# #)
