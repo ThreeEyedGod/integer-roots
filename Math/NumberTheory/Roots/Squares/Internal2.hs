@@ -756,11 +756,11 @@ nextDown = DB.nextDown -- NFI.nextDown
 
 {-# INLINE nextUp# #-}
 nextUp# :: Double# -> Double#
-nextUp# dIn# = let !(D# dOut#) = nextUp (D# dIn#) in dOut#
+nextUp# dIn# = case nextUp (D# dIn#) of (D# dOut#) -> dOut# --let !(D# dOut#) = nextUp (D# dIn#) in dOut#
 
 {-# INLINE nextDown# #-}
 nextDown# :: Double# -> Double#
-nextDown# dIn# = let !(D# dOut#) = nextDown (D# dIn#) in dOut#
+nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut#--let !(D# dOut#) = nextDown (D# dIn#) in dOut#
 
 {-# INLINE nextUpFX# #-}
 nextUpFX# :: FloatingX# -> FloatingX#
