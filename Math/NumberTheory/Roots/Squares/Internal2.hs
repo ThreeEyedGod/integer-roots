@@ -45,7 +45,7 @@ import GHC.Num.BigNat (BigNat#, bigNatSize#, bigNatEncodeDouble#, bigNatIsZero, 
 #endif
 
 import Data.Bits (shiftR)
-import qualified Data.Bits.Floating as DB (nextDown, nextUp)
+import Data.Bits.Floating (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
 import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length)
 import Data.Word (Word32)
@@ -160,7 +160,7 @@ theFi v
 
 -- Keep it this way: Inlining this lowers performance.
 theNextIterations :: Itr -> Integer
-theNextIterations itr@(Itr !currlen# !w32Vec !l# !yCumulated !iRem !tbfx#) = tni currlen# w32Vec l# yCumulated iRem tbfx#
+theNextIterations (Itr !currlen# !w32Vec !l# !yCumulated !iRem !tbfx#) = tni currlen# w32Vec l# yCumulated iRem tbfx#
   where
     tni :: Int# -> VU.Vector Word32 -> Int# -> Integer -> Integer -> FloatingX# -> Integer 
     tni cl# v l_# yC iR t# =
@@ -190,7 +190,7 @@ nxtDgt_# (IS ta#) tcfx# = let
             !r# = fmaddDouble# c# c# a#
           in 
             computDouble# a# c# r#
-nxtDgt_# ta@(IP bn#) tcfx#
+nxtDgt_# (IP bn#) tcfx#
     | isTrue# ((bigNatSize# bn#) <# thresh#) = let 
             c# = unsafefx2Double## tcfx# --fromMaybe 0 (fx2Double# tCFX#) 
             a# = bigNatEncodeDouble# bn# 0#
@@ -212,7 +212,7 @@ computDouble# !tAFX# !tCFX# !radFX# = let !(W64# w#) = floorDouble (D# (nextUp# 
 preComput_ :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComput_ tA__bn# tCFX# =
   let !tAFX# = unsafebigNat2FloatingX## tA__bn# 
-      !radFX# = tCFX# !**+## tAFX# -- fused square (multiply) and add 
+      !radFX# = tCFX# !**+## tAFX# -- custom fx# based fused square (multiply) and add 
    in (# tAFX#, tCFX#, radFX# #)
 {-# INLINE preComput_ #-}
 
@@ -539,7 +539,7 @@ unsafeDivide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 
 {-# INLINE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
-fsqraddFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#) 
+fsqraddFloatingX# (FloatingX# sA# expA#) (FloatingX# sC# expC#) 
     | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
     | otherwise = case updateDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# --let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
  where 
@@ -619,11 +619,7 @@ fx2Double (FloatingX d@(D# d#) e)
 
 {-# INLINE updateDouble# #-}
 updateDouble# :: Double# -> Int# -> Double#
-updateDouble# d# ex# = let 
-    !(# m, n# #) = decodeDoubleInteger d#
-    !exUpd# = n# +# ex# 
-  in 
-    encodeDoubleInteger m exUpd#
+updateDouble# d# ex# = case decodeDoubleInteger d# of (# m, n# #) -> encodeDoubleInteger m (n# +# ex#)
 
 unsafefx2Double :: FloatingX -> Double
 unsafefx2Double (FloatingX d@(D# d#) e)
@@ -760,14 +756,6 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
 -- | Floating Point nextUp/nextDown funxctions
-
-{-# INLINE nextUp #-}
-nextUp :: Double -> Double
-nextUp = DB.nextUp -- NFI.nextUp
-
-{-# INLINE nextDown #-}
-nextDown :: Double -> Double
-nextDown = DB.nextDown -- NFI.nextDown
 
 {-# INLINE nextUp# #-}
 nextUp# :: Double# -> Double#
