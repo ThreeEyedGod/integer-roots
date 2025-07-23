@@ -206,14 +206,11 @@ nxtDgt_# (IP bn#) tcfx#
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Word64#
-computDouble# !tAFX# !tCFX# !radFX# = let !(W64# w#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) in hndlOvflwW32## w#
+computDouble# !tAFX# !tCFX# !radFX# = case floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) of (W64# w#) -> hndlOvflwW32## w#
 -- computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (fmaddDouble# (sqrtDouble# (nextDown# radFX#)) 1.00## (nextDown# tCFX#)) ))) in hndlOvflwW32# i#
 
 preComput_ :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComput_ tA__bn# tCFX# =
-  let !tAFX# = unsafebigNat2FloatingX## tA__bn# 
-      !radFX# = tCFX# !**+## tAFX# -- custom fx# based fused square (multiply) and add 
-   in (# tAFX#, tCFX#, radFX# #)
+preComput_ tA__bn# tCFX# = case unsafebigNat2FloatingX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add 
 {-# INLINE preComput_ #-}
 
 comput_ :: (# FloatingX#, FloatingX#, FloatingX# #)-> Word64#
@@ -224,7 +221,7 @@ comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nex
 -- that happens in handleRems_
 -- if the trial digit is zero skip computing remainder
 computeRem_ :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
-computeRem_ tc ta yTilde_# = let !rTrial = calcRemainder ta tc yTilde_# in handleRems (# tc, yTilde_#, rTrial #)
+computeRem_ tc ta yTilde_# = case calcRemainder ta tc yTilde_# of rTrial -> handleRems (# tc, yTilde_#, rTrial #)
 {-# INLINE computeRem_ #-}
 
 handleRems :: (# Integer, Word64#, Integer #) -> (# Integer, Word64#, Integer #)
