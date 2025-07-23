@@ -515,7 +515,7 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fsqraddFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#) 
     | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
-    | otherwise = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+    | otherwise = let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
     -- | isTrue# (diff# `gtInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
     -- | isTrue# (diff# `ltInt64#` 0#Int64) = let sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
     -- | otherwise =  sqr# a !+## c -- default custom mult and add
