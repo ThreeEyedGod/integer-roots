@@ -1,7 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 -- addition
-{-# LANGUAGE LinearTypes #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 -- addition
@@ -136,8 +135,8 @@ data Itr = Itr {lv# :: {-# UNPACK #-} !Int#, vecW32_ :: {-# UNPACK #-} !(VU.Vect
 
 theFi :: VU.Vector Word32 -> Itr 
 theFi v 
-    | VU.null v = error "theFI: Invalid Argument null vector "
-    | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1# v 0# 0 0 zero#
+    -- | VU.null v = error "theFI: Invalid Argument null vector "
+    -- | VU.length v == 1 && VU.unsafeHead v == 0 = Itr 1# v 0# 0 0 zero#
     | evenLen = let 
              l'# = l# -# 2#
              !(# !yc, !y1#, !remInteger #) = let 
