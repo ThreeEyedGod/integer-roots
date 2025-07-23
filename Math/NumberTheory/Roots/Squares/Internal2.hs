@@ -552,7 +552,7 @@ sqrtFX# fx@(FloatingX# s# e#) = case sqrtSplitDbl# fx of (# sX#, eX# #) -> Float
 
 -- | actual sqrt call to the hardware for custom type happens here
 sqrtSplitDbl :: FloatingX -> (Double, Int64)
-sqrtSplitDbl (FloatingX d e)
+sqrtSplitDbl (FloatingX d e) -- //FIXME FOR zero case
   | even e = (sqrt d, shiftR e 1) -- even
   | otherwise = (sqrtOf2 * sqrt d, shiftR (e - 1) 1) -- odd
 {-# INLINE sqrtSplitDbl #-}
@@ -560,6 +560,7 @@ sqrtSplitDbl (FloatingX d e)
 -- | actual sqrt call to the hardware for custom type happens here
 sqrtSplitDbl# :: FloatingX# -> (# Double#, Int64# #)
 sqrtSplitDbl# (FloatingX# d# e#)
+  | isTrue# (d# ==## 0.00##) = case minBound :: Int64 of I64# mb# ->  (# 0.0##, mb# #)
   | even (I64# e#) = (# sqrtDouble# d#, e# `quotInt64#` 2#Int64  #) -- even
   | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, (e# `subInt64#` 1#Int64) `quotInt64#` 2#Int64 #) -- odd sqrt2 times sqrt d#
 {-# INLINE sqrtSplitDbl# #-}
