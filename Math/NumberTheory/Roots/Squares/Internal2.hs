@@ -8,7 +8,7 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
-{-# OPTIONS_GHC -O2 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
+{-# OPTIONS_GHC -O2 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=160 -fmax-worker-args=32 #-}
 -- {-# OPTIONS_GHC -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
 -- |
@@ -46,7 +46,7 @@ import GHC.Num.BigNat (BigNat#, bigNatSize#, bigNatEncodeDouble#, bigNatIsZero, 
 import Data.Bits (shiftR)
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
-import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length)
+import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length, (!?))
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
@@ -175,7 +175,6 @@ theNextIterations (Itr !currlen# !w32Vec !l# !yCumulated !iRem !tbfx#) = tni cur
            in tni (cl# +# 1#) v (l_# -# 2#) yc remFinal tcfx# -- do not VU.force ri32V
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0 
 
--- | numeric loop records
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
@@ -184,14 +183,14 @@ nxtDgt_# :: Integer -> FloatingX# -> Word64#
 nxtDgt_# (IN _) !_ = error "nxtDgt_ :: Invalid negative integer argument"
 nxtDgt_# 0 !_ = 0#Word64
 nxtDgt_# (IS ta#) tcfx# = let 
-            c# = unsafefx2Double## tcfx# --fromMaybe 0 (fx2Double# tCFX#) 
+            c# = unsafefx2Double## tcfx# 
             a# = int2Double# ta#
             !r# = fmaddDouble# c# c# a#
           in 
             computDouble# a# c# r#
 nxtDgt_# (IP bn#) tcfx#
     | isTrue# ((bigNatSize# bn#) <# thresh#) = let 
-            c# = unsafefx2Double## tcfx# --fromMaybe 0 (fx2Double# tCFX#) 
+            c# = unsafefx2Double## tcfx# 
             a# = bigNatEncodeDouble# bn# 0#
             !r# = fmaddDouble# c# c# a#
           in 
@@ -288,11 +287,15 @@ word64FromRvsrd2ElemVec v2ElemW32s =
 
 -- | Word64# from a "reversed" Vector of 2 Word32 digits
 word64FromRvsrd2ElemVec# :: VU.Vector Word32 -> Word64#
-word64FromRvsrd2ElemVec# v2ElemW32s =
-  let (llsb, lmsb) = case VU.uncons v2ElemW32s of
-        Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
-        Nothing -> error "int64FromRvsrd2ElemVec : Invalid Vector - empty " 
-   in word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
+word64FromRvsrd2ElemVec# v2 = case (VU.unsafeIndex v2 0, v2 VU.!? 1) of (llsb, lmsb) -> case lmsb of 
+                                                                                            Nothing -> word64FromRvsrdTuple# (llsb, 0) 4294967296#Word64
+                                                                                            Just msb       -> word64FromRvsrdTuple# (llsb, msb) 4294967296#Word64
+-- word64FromRvsrd2ElemVec# v2ElemW32s =
+--   let (llsb, lmsb) = case VU.uncons v2ElemW32s of
+--         Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
+--         Nothing -> error "int64FromRvsrd2ElemVec : Invalid Vector - empty " 
+--    in word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
+{-# INLINE word64FromRvsrd2ElemVec# #-}
 
 {-# INLINE mkIW32Lst #-}
 
