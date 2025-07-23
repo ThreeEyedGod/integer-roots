@@ -411,9 +411,10 @@ floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
 
 {-# INLINE floorX## #-}
 floorX## :: FloatingX# -> Word64#
-floorX## (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
-        Just d -> case floor d of (W64# d#) -> d# --let !(W64# d#) = floor d in d# 
-        _ -> error "floorX##: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
+floorX## f@(FloatingX# s# e#) = case floorDouble (D# $ unsafefx2Double## f) of (W64# w#) -> w#
+-- floorX## (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
+--         Just d -> case floor d of (W64# d#) -> d# --let !(W64# d#) = floor d in d# 
+--         _ -> error "floorX##: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE zero# #-}
 zero# :: FloatingX#
