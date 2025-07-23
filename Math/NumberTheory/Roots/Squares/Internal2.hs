@@ -169,7 +169,7 @@ theNextIterations (Itr !currlen# !w32Vec !l# !yCumulated !iRem !tbfx#) = tni cur
         else
           let 
               !(n1_, nl_) = (VU.unsafeIndex v (I# l_# - 2), VU.unsafeIndex v (I# l_# - 1))
-              !tA_= intgrFrom3DigitsBase32 iR (n1_, nl_) -- //FIXME this will certainly be less than Int128 and 100% from Word256
+              !tA_= intgrFrom3DigitsBase32 iR (n1_, nl_) -- //FIXME this will certainly be less than Int128 and 100% lesser than Word256
               !tC_= scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
               !(# !yc, !yTildeFinal#, !remFinal #) = let !yTilde_# = nxtDgt_# tA_ tC_ in computeRem_ yC tA_ yTilde_#
               !tcfx# = if isTrue# (currlen# <# 2#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
@@ -221,28 +221,27 @@ comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nex
 -- that happens in handleRems_
 -- if the trial digit is zero skip computing remainder
 computeRem_ :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
-computeRem_ tc ta yTilde_# = case calcRemainder ta tc yTilde_# of rTrial -> handleRems (# tc, yTilde_#, rTrial #)
+computeRem_ yc ta yTilde_# = case calcRemainder ta yc yTilde_# of (rTrial, scaledby32yC) -> handleRems (# scaledby32yC, yTilde_#, rTrial #)
 {-# INLINE computeRem_ #-}
 
 handleRems :: (# Integer, Word64#, Integer #) -> (# Integer, Word64#, Integer #)
-handleRems (# yc_, yi64#, ri_ #)
+handleRems (# ycScaled_, yi64#, ri_ #)
   | ri_ < 0 = let 
                 !yAdj# = yi64# `subWord64#` 1#Word64 
                 !adjYc = pred ycyi
                 !rdr = fixRemainder adjYc ri_ in (# adjYc, yAdj#, rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = (# ycyi, yi64#, ri_ #)
   where
-    !yc = yc_ * radixW32
-    !ycyi = yc + fromIntegral (W64# yi64#) -- accumulating the growing square root
+    !ycyi = ycScaled_ + fromIntegral (W64# yi64#) -- accumulating the growing square root
 {-# INLINE handleRems #-}
 
 -- Calculate remainder accompanying a 'digit'
-calcRemainder :: Integer -> Integer -> Word64# -> Integer
-calcRemainder tAI !_ 0#Word64 = tAI
-calcRemainder tAI tc_ dgt64# = let 
+calcRemainder :: Integer -> Integer -> Word64# -> (Integer, Integer)
+calcRemainder tAI !yc_ 0#Word64 = (tAI, yc_ * radixW32)
+calcRemainder tAI yc_ dgt64# = let 
         !i = fromIntegral (W64# dgt64#) 
-        !tc = tc_ * radixW32
-    in tAI - i * (double tc + i) --tAI - ((double i * tc) + i * i)
+        !tc = yc_ * radixW32
+    in (tAI - i * (double tc + i), tc) --tAI - ((double i * tc) + i * i)
 {-# INLINE calcRemainder #-}
 
 -- Calculate remainder accompanying a 'digit'
