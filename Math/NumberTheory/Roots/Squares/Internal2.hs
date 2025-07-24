@@ -3,6 +3,7 @@
 -- addition
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OrPatterns #-}
 -- addition
 {-# LANGUAGE UnboxedTuples #-} -- used everywhere within
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
@@ -350,7 +351,7 @@ largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble 
 
 {-# INLINE largestNSqLTEOdd## #-}
 largestNSqLTEOdd## :: Word64# -> Word64#
-largestNSqLTEOdd## w# =  let !(W64# r#) = floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) in r#
+largestNSqLTEOdd## w# =  case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
 
 {-# INLINE largestNSqLTEEven## #-}
 largestNSqLTEEven## :: Word64# -> Word64#
@@ -650,7 +651,7 @@ bigNat2FloatingX## :: BigNat# -> FloatingX#
 bigNat2FloatingX## ibn#
   | bigNatIsZero ibn# = zero#
   | itsOKtoUsePlainDoubleCalc = double2FloatingX## iDouble#
-  | otherwise = let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+  | otherwise = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
   where
     !(D# maxDouble#) = maxDouble
     !iDouble# =  bigNatEncodeDouble# ibn# 0#
