@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
-{-# OPTIONS_GHC -O2 -optl-m64 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=160 -fmax-worker-args=32 #-}
+{-# OPTIONS_GHC -O2 -threaded -optl-m64 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=160 -fmax-worker-args=32 #-}
 -- {-# OPTIONS_GHC -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
 -- |
