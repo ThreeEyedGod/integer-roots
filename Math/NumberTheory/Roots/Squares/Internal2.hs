@@ -183,30 +183,24 @@ theNextIterations (Itr !currlen# !w32Vec !l# !yCumulated !iRem !tbfx#) = tni cur
 nxtDgt_# :: Integer -> FloatingX# -> Word64#
 nxtDgt_# (IN _) !_ = error "nxtDgt_ :: Invalid negative integer argument"
 nxtDgt_# 0 !_ = 0#Word64
-nxtDgt_# (IS ta#) tcfx# = let 
-            c# = unsafefx2Double## tcfx# 
-            a# = int2Double# ta#
-            !r# = fmaddDouble# c# c# a#
-          in 
-            computDouble# a# c# r#
-nxtDgt_# (IP bn#) tcfx#
-    | isTrue# ((bigNatSize# bn#) <# thresh#) = let 
-            c# = unsafefx2Double## tcfx# 
-            a# = bigNatEncodeDouble# bn# 0#
-            !r# = fmaddDouble# c# c# a#
-          in 
-            computDouble# a# c# r#
-    | otherwise = comput_ (preComput_ bn# tcfx#) 
-    where
-        -- threshold for shifting vs. direct fromInteger
-        -- we shift when we expect more than 256 bits
-        thresh# :: Int#
-        thresh# = if finiteBitSize (0 :: Word) == 64 then 9# else 14#
+nxtDgt_# (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
+nxtDgt_# (IP bn#) tcfx#  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
+                         | otherwise = comput_ (preComput_ bn# tcfx#) 
+                  where
+                      thresh# :: Int#
+                      thresh# = if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Word64#
 computDouble# !tAFX# !tCFX# !radFX# = case floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) of (W64# w#) -> hndlOvflwW32## w#
 -- computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (fmaddDouble# (sqrtDouble# (nextDown# radFX#)) 1.00## (nextDown# tCFX#)) ))) in hndlOvflwW32# i#
+
+preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
+preComput a# tcfx# = let 
+            !c# = unsafefx2Double## tcfx# 
+            !r# = fmaddDouble# c# c# a#
+          in (# a#, c#, r# #)
+{-# INLINE preComput #-}
 
 preComput_ :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComput_ tA__bn# tCFX# = case unsafebigNat2FloatingX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add 
