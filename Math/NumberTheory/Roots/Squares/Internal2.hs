@@ -644,12 +644,12 @@ double2FloatingX## d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 bigNat2FloatingX## :: BigNat# -> FloatingX#
 bigNat2FloatingX## ibn#
   | bigNatIsZero ibn# = zero#
-  | itsOKtoUsePlainDoubleCalc = double2FloatingX## iDouble#
+  -- | itsOKtoUsePlainDoubleCalc = double2FloatingX## iDouble#
   | otherwise = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-  where
-    !(D# maxDouble#) = maxDouble
-    !iDouble# =  bigNatEncodeDouble# ibn# 0#
-    !itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+  -- where
+  --   !(D# maxDouble#) = maxDouble
+  --   !iDouble# =  bigNatEncodeDouble# ibn# 0#
+  --   !itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
 {-# INLINE unsafebigNat2FloatingX## #-}
 unsafebigNat2FloatingX## :: BigNat# -> FloatingX#
@@ -668,7 +668,7 @@ unsafeword64ToFloatingX# i = double2FloatingX# (fromIntegral i)
 
 {-# INLINE unsafeword64ToFloatingX## #-}
 unsafeword64ToFloatingX## :: Word64# -> FloatingX#
-unsafeword64ToFloatingX## w# = double2FloatingX# (fromIntegral (W64# w#))
+unsafeword64ToFloatingX## w# = case W64# w# of i -> unsafeword64ToFloatingX# i 
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
