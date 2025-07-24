@@ -40,7 +40,7 @@ import GHC.Integer.Logarithms (integerLog2#)
 #define bigNatSize sizeofBigNat
 #else
 import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#, Int64#, Word64#, Word32#)
-import GHC.Num.BigNat (BigNat#, bigNatSize#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#, bigNatShiftR#)
+import GHC.Num.BigNat (BigNat#, bigNatSize#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatToWordList, bigNatFromWordListUnsafe)
 #endif
 
 import Data.Bits (shiftR)
@@ -170,8 +170,8 @@ theNextIterations (Itr !currlen# !w32Vec !l# !yCumulated !iRem !tbfx#) = tni cur
               !(n1_, nl_) = (VU.unsafeIndex v (I# l_# - 2), VU.unsafeIndex v (I# l_# - 1))
               !tA_= intgrFrom3DigitsBase32 iR (n1_, nl_) -- //FIXME this will certainly be less than Int128 and 100% lesser than Word256
               !tC_= scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
-              !(# !yc, !yTildeFinal#, !remFinal #) = let !yTilde_# = nxtDgt_# tA_ tC_ in computeRem_ yC tA_ yTilde_#
-              !tcfx# = if isTrue# (currlen# <# 2#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
+              !(# !yc, !yTildeFinal#, !remFinal #) = case nxtDgt_# tA_ tC_ of yTilde_# -> computeRem_ yC tA_ yTilde_#
+              !tcfx# = if isTrue# (cl# <# 2#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
            in tni (cl# +# 1#) v (l_# -# 2#) yc remFinal tcfx# -- do not VU.force ri32V
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0 
 
@@ -695,6 +695,23 @@ cI2D2_ bn#
         thresh# :: Int#
         thresh# = if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
 
+-- {-# INLINE cI2D2_ #-}
+-- cI2D2_ :: BigNat# -> (# Double#, Int64# #)
+-- cI2D2_ bn#
+--     | isTrue# ((bigNatSize# bn#) <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
+--     | otherwise =
+--         let bnWrdXs = bigNatToWordList bn#
+--             bnWrdXsLen = length bnWrdXs
+--             bnWrdXsTrunc = drop (bnWrdXsLen - t) bnWrdXs  -- take the most significant 9 words
+--             bnTrunc# = bigNatFromWordListUnsafe bnWrdXsTrunc
+--             dTrunc# = bigNatEncodeDouble# bnTrunc# 0#
+--             !(I# bitsDiscarded#) = (bnWrdXsLen - t) * wrdSize
+--         in (# dTrunc#, intToInt64# bitsDiscarded# #)
+--   where
+--     thresh# :: Int#
+--     wrdSize = finiteBitSize (0 :: Word)
+--     !t@(I# thresh#) = if wrdSize == 64 then 9 else 14
+
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
 split (D# d#) = case split# d# of (# s#, ex# #) ->  (D# s#, I64# ex#) --let !(# s#, ex# #) = split# d# in (D# s#, I64# ex#)
@@ -779,10 +796,10 @@ nextDownFX# x@(FloatingX# s# e#)
 
 
 --- *********************
--- Integer square root with remainder, using the Karatsuba Square Root
--- algorithm from
--- Paul Zimmermann. Karatsuba Square Root. [Research Report] RR-3805, 1999,
--- pp.8. <inria-00072854>
+-- -- Integer square root with remainder, using the Karatsuba Square Root
+-- -- algorithm from
+-- -- Paul Zimmermann. Karatsuba Square Root. [Research Report] RR-3805, 1999,
+-- -- pp.8. <inria-00072854>
 
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
@@ -832,6 +849,7 @@ karatsubaSplit k n0 = (a3, a2, a1, a0)
     n1 = n0 `unsafeShiftR` k
     a0 = n0 .&. m
     m = 1 `unsafeShiftL` k - 1
+
 
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
