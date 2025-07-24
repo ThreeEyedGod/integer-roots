@@ -114,6 +114,7 @@ import GHC.Num.Integer
     integerShiftR#,
     integerToInt,
   )
+import Data.Maybe (fromMaybe)
 
 -- *********** END NEW IMPORTS
 
@@ -282,14 +283,7 @@ word64FromRvsrd2ElemVec v2ElemW32s =
 
 -- | Word64# from a "reversed" Vector of 2 Word32 digits
 word64FromRvsrd2ElemVec# :: VU.Vector Word32 -> Word64#
-word64FromRvsrd2ElemVec# v2 = case (VU.unsafeIndex v2 0, v2 VU.!? 1) of (llsb, lmsb) -> case lmsb of 
-                                                                                            Nothing -> word64FromRvsrdTuple# (llsb, 0) 4294967296#Word64
-                                                                                            Just msb       -> word64FromRvsrdTuple# (llsb, msb) 4294967296#Word64
--- word64FromRvsrd2ElemVec# v2ElemW32s =
---   let (llsb, lmsb) = case VU.uncons v2ElemW32s of
---         Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
---         Nothing -> error "int64FromRvsrd2ElemVec : Invalid Vector - empty " 
---    in word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
+word64FromRvsrd2ElemVec# v2 = case (VU.unsafeIndex v2 0, v2 VU.!? 1) of (llsb, lmsb) -> word64FromRvsrdTuple# (llsb, fromMaybe 0 lmsb) 4294967296#Word64
 {-# INLINE word64FromRvsrd2ElemVec# #-}
 
 {-# INLINE mkIW32Lst #-}
