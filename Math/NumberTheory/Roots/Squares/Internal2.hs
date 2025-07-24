@@ -8,7 +8,7 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
-{-# OPTIONS_GHC -O2 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=160 -fmax-worker-args=32 #-}
+{-# OPTIONS_GHC -O2 -optl-m64 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=160 -fmax-worker-args=32 #-}
 -- {-# OPTIONS_GHC -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
 -- |
@@ -619,8 +619,9 @@ updateDouble# d# ex# = case decodeDoubleInteger d# of (# m, n# #) -> encodeDoubl
 
 unsafefx2Double :: FloatingX -> Double
 unsafefx2Double (FloatingX d@(D# d#) e)
-  | ex < 0 = fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary 
-  | otherwise = D# (encodeDoubleInteger m ex#)
+  -- | ex < 0 = fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary 
+  -- | otherwise 
+  = D# (encodeDoubleInteger m ex#)
   where
     !(# m, n# #) = decodeDoubleInteger d#
     !ex@(I# ex#) = I# n# + fromIntegral e
@@ -628,8 +629,9 @@ unsafefx2Double (FloatingX d@(D# d#) e)
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# d# e#)
-  | isTrue# (ex# <# 0#) = let !(D# d#) = fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) in d# -- this is necessary 
-  | otherwise = encodeDoubleInteger m ex#
+  -- | isTrue# (ex# <# 0#) = case fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) of (D# do#) -> do# -- this is necessary 
+  -- | otherwise 
+  = encodeDoubleInteger m ex#
   where
     !(# m, n# #) = decodeDoubleInteger d#
     !ex# = n# +# int64ToInt# e#
@@ -782,18 +784,13 @@ nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut#--let !(D# dOut#)
 nextUpFX# :: FloatingX# -> FloatingX#
 nextUpFX# (FloatingX# s# e#)
   | isTrue# (s# ==## 0.0##) = minValue#
-  | otherwise =
-      let !interimS# = nextUp# s#
-       in if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
+  | otherwise = case nextUp# s# of interimS# -> if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
 
 {-# INLINE nextDownFX# #-}
 nextDownFX# :: FloatingX# -> FloatingX#
 nextDownFX# x@(FloatingX# s# e#)
   | isTrue# (s# ==## 0.0##) || x == minValue# = zero#
-  | otherwise =
-      let !interimS# = nextDown# s#
-       in if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#
-
+  | otherwise = case nextDown# s# of interimS# -> if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#
 
 --- *********************
 -- -- Integer square root with remainder, using the Karatsuba Square Root
