@@ -254,6 +254,10 @@ dgtsVecBase32__ n = mkIW32Vec n radixW32
 brkVec :: VU.Vector Word32 -> Int -> VU.Vector Word32
 brkVec v loc = VU.unsafeDrop loc v
 
+{-# INLINE dgtsLstBase32 #-}
+dgtsLstBase32 :: Integer -> [Word32]
+dgtsLstBase32 n = mkIW32Lst n radixW32
+
 {-# INLINE mkIW32Vec #-}
 
 -- | Spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
