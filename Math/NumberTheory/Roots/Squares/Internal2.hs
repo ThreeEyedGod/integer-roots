@@ -293,6 +293,23 @@ mkIW32Lst :: Integer -> Word -> [Word32]
 mkIW32Lst 0 _ = [0] -- safety
 mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b)
 
+{-# INLINE pairUp #-}
+pairUp :: [a] -> [(a,a)]
+pairUp xs | odd (length xs) = error "pairUp: Invalid odd length of list"
+pairUp [] = []
+pairUp [_] = error "pairUp: Invalid singleton list"
+pairUp (x:y:rs) = (x, y) : pairUp rs
+
+{-# INLINE integerOfNxtPairsLst #-}
+integerOfNxtPairsLst :: [(Word32, Word32)] -> [Integer]
+integerOfNxtPairsLst = map iFrmTupleBaseW32 
+{-# INLINE iFrmTupleBaseW32 #-}
+iFrmTupleBaseW32 :: (Word32, Word32) -> Integer
+iFrmTupleBaseW32 xs = intgrFromRvsrdTuple xs radixW32
+{-# INLINE mkIW32EvenRestLst #-}
+mkIW32EvenRestLst :: [Word32] -> [Integer]
+mkIW32EvenRestLst xs = integerOfNxtPairsLst (pairUp xs)
+
 --- END helpers
 --- BEGIN Core numeric helper functions
 --- ***********************************
