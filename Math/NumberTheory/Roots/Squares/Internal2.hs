@@ -3,11 +3,9 @@
 -- addition
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE OrPatterns #-}
 -- addition
 {-# LANGUAGE UnboxedTuples #-} -- used everywhere within
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
-{-# LANGUAGE OrPatterns #-} -- addition
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
 {-# OPTIONS_GHC -O2 -threaded -optl-m64 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=160 -fmax-worker-args=32 #-}
@@ -110,7 +108,7 @@ import GHC.Num.Integer
     integerToInt,
   )
 import Data.Maybe (fromMaybe)
-import Control.Arrow ((***),(&&&))
+import Control.Arrow ((***))
 
 -- *********** END NEW IMPORTS
 
@@ -151,11 +149,13 @@ theFi xs
 
 {-# INLINE stageList #-}
 stageList :: [Word32] -> (Bool, [Word64], [Word32])
-stageList xs  = case even l of 
-    True -> let (rstEvenLen, lastTwo) = splitLastTwo xs l in (True, mkIW32EvenRestLst True rstEvenLen, lastTwo)
-    _   -> let (rstEvenLen, lastOne) = splitLastOne xs l in (False, mkIW32EvenRestLst True rstEvenLen, lastOne)
-  where 
-    !l = length xs 
+stageList xs = if even l
+    then let (rstEvenLen, lastTwo) = splitLastTwo xs l
+         in (True, mkIW32EvenRestLst True rstEvenLen, lastTwo)
+    else let (rstEvenLen, lastOne) = splitLastOne xs l
+         in (False, mkIW32EvenRestLst True rstEvenLen, lastOne)
+  where
+    !l = length xs
 
 -- Keep it this way: Inlining this lowers performance.
 theNextIterations :: Itr -> Integer
@@ -180,11 +180,6 @@ theNextIterations (Itr !currlen# !wrd64Xs yCumulated iRem !tbfx# yCumLst iRLst) 
 pairUndigits :: (Integral a, Integral b, Integral c) => a -> ([b], [c]) -> (Integer, Integer)
 pairUndigits base = undigits_ base *** undigits_ base
 {-# INLINE pairUndigits #-}
-
--- unsnocSeq :: Seq.Seq Word64 -> (Seq.Seq Word64, Word64)
--- unsnocSeq s = case Seq.viewr s of
---   rest Seq.:> x -> (rest, x)
---   Seq.EmptyR   -> (Seq.empty, 0)
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
@@ -264,11 +259,6 @@ calcRemainder2 !dgt64# ycXs rXs@(x:0:xs) = let
 calcRemainder2 _ _ _ = error "error"
 {-# INLINE calcRemainder2 #-}
 
--- | Using (&&&): lifts two arrows to work on an input and then feed it to the second arrow
-pairUndigitsFeed :: (Integral a, Integral b) => a -> [b] -> (Integer, Integer)
-pairUndigitsFeed base = undigits_ base &&& undigits base 
-{-# INLINE pairUndigitsFeed #-}
-
 -- Calculate remainder accompanying a 'digit'
 calcRemainder1 :: Integer -> Integer -> Word64# -> (Integer, Integer)
 calcRemainder1 tAI !yc_ 0#Word64 = (tAI, yc_ * radixW32)
@@ -285,51 +275,9 @@ fixRemainder !tcplusdgtadj !rdr = rdr + double tcplusdgtadj + 1
 {-# INLINE fixRemainder #-}
 
 -- | HELPER functions
--- {-# INLINE dgtsVecBase32__ #-}
--- dgtsVecBase32__ :: Integer -> VU.Vector Word32
--- dgtsVecBase32__ n | n < 0 = error "dgtsVecBase32_: Invalid negative argument"
--- dgtsVecBase32__ 0 = VU.singleton 0
--- dgtsVecBase32__ n = mkIW32Vec n radixW32
-
--- {-# INLINE brkVec #-}
--- brkVec :: VU.Vector Word32 -> Int -> VU.Vector Word32
--- brkVec v loc = VU.unsafeDrop loc v
-
 {-# INLINE dgtsLstBase32 #-}
 dgtsLstBase32 :: Integer -> [Word32]
 dgtsLstBase32 n = mkIW32Lst n radixW32
-
--- {-# INLINE mkIW32Vec #-}
-
--- -- | Spit out the unboxed Vector as-is from digitsUnsigned which comes in reversed format.
--- mkIW32Vec :: Integer -> Word -> VU.Vector Word32
--- mkIW32Vec 0 _ = VU.singleton 0 -- safety
--- mkIW32Vec i b = VU.fromList $ mkIW32Lst i b
-
--- {-# INLINE intgrFromRvsrd2ElemVec #-}
-
--- -- | Integer from a "reversed" Vector of Word32 digits
--- intgrFromRvsrd2ElemVec :: VU.Vector Word32 -> Integer
--- intgrFromRvsrd2ElemVec v2ElemW32s =
---   let (llsb, lmsb) = case VU.uncons v2ElemW32s of
---         Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
---         Nothing -> error "intgrFromRvsrd2ElemVec : Invalid Vector - empty "
---    in intgrFromRvsrdTuple (llsb, lmsb) radixW32
-
--- {-# INLINE word64FromRvsrd2ElemVec #-}
-
--- -- | Word64 from a "reversed" Vector of 2 Word32 digits
--- word64FromRvsrd2ElemVec :: VU.Vector Word32 -> Word64
--- word64FromRvsrd2ElemVec v2ElemW32s =
---   let (llsb, lmsb) = case VU.uncons v2ElemW32s of
---         Just (u, v) -> if VU.null v then (u, 0) else (u, VU.unsafeHead v)
---         Nothing -> error "int64FromRvsrd2ElemVec : Invalid Vector - empty "
---    in word64FromRvsrdTuple (llsb, lmsb) radixW32
-
--- -- | Word64# from a "reversed" Vector of 2 Word32 digits
--- word64FromRvsrd2ElemVec# :: VU.Vector Word32 -> Word64#
--- word64FromRvsrd2ElemVec# v2 = case (VU.unsafeIndex v2 0, v2 VU.!? 1) of (llsb, lmsb) -> word64FromRvsrdTuple# (llsb, fromMaybe 0 lmsb) 4294967296#Word64
--- {-# INLINE word64FromRvsrd2ElemVec# #-}
 
 -- | Word64# from a "reversed" List of at least 1 and at most 2 Word32 digits
 word64FromRvsrd2ElemList# :: [Word32] -> Word64#
@@ -353,10 +301,7 @@ splitLastTwo xs l = splitAt (l - 2) xs
 {-# INLINE splitLastOne #-}
 splitLastOne :: [a] -> Int -> ([a], [a])
 splitLastOne xs l = splitAt (l-1) xs 
-  -- case unsnoc xs of
-  --         Just (ixs, l) -> (ixs, [l])
-  --         Nothing -> error "splitLastOne: error"
-
+  
 {-# INLINE pairUp #-}
 pairUp :: Bool -> [a] -> [(a,a)]
 pairUp True (x:y:rs) = (x, y) : pairUp True rs
@@ -752,10 +697,6 @@ cI2D2_ :: BigNat# -> (# Double#, Int64# #)
 cI2D2_ bn#
     | isTrue# ((bigNatSize# bn#) <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
     | otherwise = case bigNatLog2# bn# of
-
-
-
-
                     l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
                             h# -> case bigNatShiftR# bn# (2## `timesWord#` h#) of
                                     mbn# -> (# bigNatEncodeDouble# mbn# 0#, 2#Int64 `timesInt64#` intToInt64# (word2Int# h#) #)
@@ -765,23 +706,6 @@ cI2D2_ bn#
         -- we shift when we expect more than 256 bits
         thresh# :: Int#
         thresh# = if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
-
--- {-# INLINE cI2D2_ #-}
--- cI2D2_ :: BigNat# -> (# Double#, Int64# #)
--- cI2D2_ bn#
---     | isTrue# ((bigNatSize# bn#) <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
---     | otherwise =
---         let bnWrdXs = bigNatToWordList bn#
---             bnWrdXsLen = length bnWrdXs
---             bnWrdXsTrunc = drop (bnWrdXsLen - t) bnWrdXs  -- take the most significant 9 words
---             bnTrunc# = bigNatFromWordListUnsafe bnWrdXsTrunc
---             dTrunc# = bigNatEncodeDouble# bnTrunc# 0#
---             !(I# bitsDiscarded#) = (bnWrdXsLen - t) * wrdSize
---         in (# dTrunc#, intToInt64# bitsDiscarded# #)
---   where
---     thresh# :: Int#
---     wrdSize = finiteBitSize (0 :: Word)
---     !t@(I# thresh#) = if wrdSize == 64 then 9 else 14
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
@@ -886,11 +810,7 @@ karatsubaSqrt n
             in  (s `unsafeShiftR` 1, r' `unsafeShiftR` 2)
   where
     k = lgN `unsafeShiftR` 2 + 1
-
-
-
     lgN = I# (word2Int# (integerLog2# n))
-
 
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)
