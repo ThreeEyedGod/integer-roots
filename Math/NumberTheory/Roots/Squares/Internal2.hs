@@ -4,11 +4,13 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 -- addition
-{-# LANGUAGE UnboxedTuples #-} -- used everywhere within
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+-- used everywhere within
+{-# LANGUAGE UnboxedTuples #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
 {-# OPTIONS_GHC -O2 -threaded -optl-m64 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=160 -fmax-worker-args=32 #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
 -- {-# OPTIONS_GHC -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
 -- |
@@ -20,27 +22,22 @@
 -- Internal functions dealing with square roots. End-users should not import this module.
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
 module Math.NumberTheory.Roots.Squares.Internal2
-  (   karatsubaSqrt
-    , isqrtB
+  ( karatsubaSqrt,
+    isqrtB,
   )
 where
 
-import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
+-- \*********** BEGIN NEW IMPORTS
 
--- *********** BEGIN NEW IMPORTS
-import GHC.Int      (Int64(I64#))
-import GHC.Word ( Word64(..), Word32(..))
-import Data.List
-import Data.WideWord (Int128)
+-- import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length, (!?))
 
-import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#,fmaddDouble#, Int64#, Word64#, Word32#, quotWord64#)
-import GHC.Num.BigNat (BigNat#, bigNatSize#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatToWordList, bigNatFromWordListUnsafe)
-
-
-import Data.Bits (shiftR)
+import Control.Arrow ((***))
+import Data.Bits (finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
--- import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length, (!?))
+import Data.List
+import Data.Maybe (fromMaybe)
+import Data.WideWord (Int128)
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
@@ -48,34 +45,42 @@ import GHC.Exts
     Int (..),
     Int#,
     Int64#,
+    Word32#,
+    Word64#,
+    castWord64ToDouble#,
     double2Int#,
-    gtInt64#,
+    eqInt64#,
+    eqWord64#,
+    fmaddDouble#,
     geInt64#,
+    gtInt64#,
+    gtWord64#,
+    indexDoubleArray#,
     int2Double#,
     int64ToInt#,
     intToInt64#,
-    timesInt64#,
-    eqInt64#,
-    eqWord64#,
-    gtWord64#,
-    subWord64#,
-    timesWord64#,
-    word64ToInt64#,
-    word32ToWord#,
-    wordToWord64#,
     isTrue#,
     leInt64#,
     ltInt64#,
     minusWord#,
     plusInt64#,
     plusWord64#,
-    subWord64#,
+    quotInt#,
+    quotInt64#,
+    quotWord64#,
     sqrtDouble#,
     subInt64#,
+    subWord64#,
+    timesInt64#,
     timesWord#,
+    timesWord64#,
     uncheckedIShiftRA#,
     uncheckedShiftRL#,
+    word2Double#,
     word2Int#,
+    word32ToWord#,
+    word64ToInt64#,
+    wordToWord64#,
     (*##),
     (**##),
     (+#),
@@ -86,11 +91,11 @@ import GHC.Exts
     (<##),
     (==##),
     (>=##),
-    quotInt64#,
-    indexDoubleArray#, word2Double#, castWord64ToDouble#, quotInt#
   )
-import GHC.Float ( divideDouble, floorDouble)
+import GHC.Float (divideDouble, floorDouble)
+import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
+import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWordListUnsafe, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatSize#, bigNatToWordList)
 import GHC.Num.Integer
   ( Integer (..),
     integerDecodeDouble#,
@@ -107,11 +112,9 @@ import GHC.Num.Integer
     integerShiftR#,
     integerToInt,
   )
-import Data.Maybe (fromMaybe)
-import Control.Arrow ((***))
+import GHC.Word (Word32 (..), Word64 (..))
 
 -- *********** END NEW IMPORTS
-
 
 -- BEGIN isqrtB ****************************************************************
 
@@ -131,29 +134,32 @@ data Itr = Itr {lv# :: {-# UNPACK #-} !Int#, lstW32_ :: {-# UNPACK #-} ![Word64]
 
 theFi :: [Word32] -> Itr
 theFi xs
-    | evenLen = let
-             !(# ycOutXs, !yc, !y1#, !remInteger #) = let
-                  yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                  ysq# = yT64# `timesWord64#` yT64#
-                  diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-                in handleRems (# [], 0, yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-          in Itr 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#) ycOutXs [fromIntegral remInteger]
-    | otherwise = let
-             yT64# = largestNSqLTEOdd## i#
-             y = W64# yT64#
-             !remInteger = fromIntegral $ W64# (i# `subWord64#` (yT64# `timesWord64#` yT64#)) -- no chance this will be negative
-          in Itr 1# passXs (fromIntegral y) remInteger (unsafeword64ToFloatingX## yT64#) [y] [fromIntegral remInteger]
- where
-      !(evenLen, passXs, dxs') = stageList xs
-      i# = word64FromRvsrd2ElemList# dxs'
+  | evenLen =
+      let !(# ycOutXs, !yc, !y1#, !remInteger #) =
+            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
+                ysq# = yT64# `timesWord64#` yT64#
+                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
+             in handleRems (# [], 0, yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+       in Itr 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#) ycOutXs [fromIntegral remInteger]
+  | otherwise =
+      let yT64# = largestNSqLTEOdd## i#
+          y = W64# yT64#
+          !remInteger = fromIntegral $ W64# (i# `subWord64#` (yT64# `timesWord64#` yT64#)) -- no chance this will be negative
+       in Itr 1# passXs (fromIntegral y) remInteger (unsafeword64ToFloatingX## yT64#) [y] [fromIntegral remInteger]
+  where
+    !(evenLen, passXs, dxs') = stageList xs
+    i# = word64FromRvsrd2ElemList# dxs'
 
 {-# INLINE stageList #-}
 stageList :: [Word32] -> (Bool, [Word64], [Word32])
-stageList xs = if even l
-    then let (rstEvenLen, lastTwo) = splitLastTwo xs l
-         in (True, mkIW32EvenRestLst True rstEvenLen, lastTwo)
-    else let (rstEvenLen, lastOne) = splitLastOne xs l
-         in (False, mkIW32EvenRestLst True rstEvenLen, lastOne)
+stageList xs =
+  if even l
+    then
+      let (rstEvenLen, lastTwo) = splitLastTwo xs l
+       in (True, mkIW32EvenRestLst True rstEvenLen, lastTwo)
+    else
+      let (rstEvenLen, lastOne) = splitLastOne xs l
+       in (False, mkIW32EvenRestLst True rstEvenLen, lastOne)
   where
     !l = length xs
 
@@ -164,18 +170,19 @@ theNextIterations (Itr !currlen# !wrd64Xs yCumulated iRem !tbfx# yCumLst iRLst) 
     tni :: Int# -> [Word64] -> FloatingX# -> [Word64] -> [Int128] -> Integer
     tni cl# xs t# ycXs irXs =
       if null xs
-        then undigits_ radixW32 ycXs  --yC
+        then undigits_ radixW32 ycXs -- yC
         else
-          let
-              !(xsPass, twoLSPlaces) = fromMaybe ([], 0) (unsnoc xs)
+          let !(xsPass, twoLSPlaces) = fromMaybe ([], 0) (unsnoc xs)
               updRemXs = fromIntegral twoLSPlaces : 0 : irXs
               !(tA_, yC_) = pairUndigits radixW32 (updRemXs, ycXs) -- !tA_= undigits radixW32 updRemXs and then yC_ = undigits radixW32 ycXs
-              !tC_= scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
+              !tC_ = scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
               !(# ycXsOut, !yTildeFinal#, !remFinal, rFinalXs #) = case nxtDgt_# tA_ tC_ of yTilde_# -> computeRem_ yC_ tA_ yTilde_# ycXs updRemXs
               !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
-           in tni (cl# +# 1#) xsPass tcfx# ycXsOut (fromIntegral <$> digitsUnsigned radixW32 (fromIntegral remFinal)) 
-          --  in tni (cl# +# 1#) xsPass tcfx# ycXsOut rFinalXs
--- | Early termination of tcfx# if more than the 3rd digit or if digit is 0 
+           in tni (cl# +# 1#) xsPass tcfx# ycXsOut rFinalXs --(fromIntegral <$> digitsUnsigned radixW32 (fromIntegral remFinal))
+
+--  in tni (cl# +# 1#) xsPass tcfx# ycXsOut rFinalXs
+
+-- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
 -- | Using (***): lifts two arrows to work on a pair of inputs
 pairUndigits :: (Integral a, Integral b, Integral c) => a -> ([b], [c]) -> (Integer, Integer)
@@ -189,29 +196,31 @@ nxtDgt_# :: Integer -> FloatingX# -> Word64#
 nxtDgt_# (IN _) !_ = error "nxtDgt_ :: Invalid negative integer argument"
 nxtDgt_# 0 !_ = 0#Word64
 nxtDgt_# (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
-nxtDgt_# (IP bn#) tcfx#  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
-                         | otherwise = comput_ (preComput_ bn# tcfx#)
-                  where
-                      thresh# :: Int#
-                      thresh# = 9# --if finiteBitSize (0 :: Word) == 64 then 9# else 14#
+nxtDgt_# (IP bn#) tcfx#
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
+  | otherwise = comput_ (preComput_ bn# tcfx#)
+  where
+    thresh# :: Int#
+    thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Word64#
 computDouble# !tAFX# !tCFX# !radFX# = case floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) of (W64# w#) -> hndlOvflwW32## w#
+
 -- computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (fmaddDouble# (sqrtDouble# (nextDown# radFX#)) 1.00## (nextDown# tCFX#)) ))) in hndlOvflwW32# i#
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
-preComput a# tcfx# = let
-            !c# = unsafefx2Double## tcfx#
-            !r# = fmaddDouble# c# c# a#
-          in (# a#, c#, r# #)
+preComput a# tcfx# =
+  let !c# = unsafefx2Double## tcfx#
+      !r# = fmaddDouble# c# c# a#
+   in (# a#, c#, r# #)
 {-# INLINE preComput #-}
 
 preComput_ :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComput_ tA__bn# tCFX# = case unsafebigNat2FloatingX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add 
+preComput_ tA__bn# tCFX# = case unsafebigNat2FloatingX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComput_ #-}
 
-comput_ :: (# FloatingX#, FloatingX#, FloatingX# #)-> Word64#
+comput_ :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
 comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE comput_ #-}
 
@@ -225,11 +234,12 @@ computeRem_ yc ta yTilde_# yXs rXs = case (calcRemainder2 yTilde_# yXs rXs, yc *
 
 handleRems :: (# [Word64], Integer, Word64#, Integer #) -> (# [Word64], Integer, Word64#, Integer #)
 handleRems (# ycXs, ycScaled_, yi64#, ri_ #)
-  | ri_ < 0 = let
-                !yAdj# = yi64# `subWord64#` 1#Word64
-                !adjYc = pred ycyi
-                !rdr = fixRemainder adjYc ri_ in (# W64# yAdj# : ycXs, adjYc, yAdj#, rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | otherwise = (#  W64# yi64# : ycXs, ycyi, yi64#, ri_ #)
+  | ri_ < 0 =
+      let !yAdj# = yi64# `subWord64#` 1#Word64
+          !adjYc = pred ycyi
+          !rdr = fixRemainder adjYc ri_
+       in (# W64# yAdj# : ycXs, adjYc, yAdj#, rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | otherwise = (# W64# yi64# : ycXs, ycyi, yi64#, ri_ #)
   where
     -- !ycyi = ycScaled_ + fromIntegral (W64# yi64#) -- accumulating the growing square root
     !ycyi = undigits radixW32 (W64# yi64# : ycXs) -- accumulating the growing square root
@@ -237,12 +247,13 @@ handleRems (# ycXs, ycScaled_, yi64#, ri_ #)
 
 handleRems2 :: (# [Word64], Word64#, Integer, [Int128] #) -> (# [Word64], Word64#, Integer, [Int128] #)
 handleRems2 (# ycXs, yi64#, ri_, ri_Xs #)
-  | ri_ < 0 = let
-                !yAdj# = yi64# `subWord64#` 1#Word64
-              -- !ycyi = ycScaled_ + fromIntegral (W64# yi64#) -- accumulating the growing square root
-                !ycyi = undigits_ radixW32 ycXsOutAsIs-- accumulating the growing square root
-                !adjYc = pred ycyi
-                !rdr = fixRemainder adjYc ri_ in (# W64# yAdj# : ycXs, yAdj#, rdr, fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | ri_ < 0 =
+      let !yAdj# = yi64# `subWord64#` 1#Word64
+          -- !ycyi = ycScaled_ + fromIntegral (W64# yi64#) -- accumulating the growing square root
+          !ycyi = undigits_ radixW32 ycXsOutAsIs -- accumulating the growing square root
+          !adjYc = pred ycyi
+          !rdr = fixRemainder adjYc ri_
+       in (# W64# yAdj# : ycXs, yAdj#, rdr, fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = (# ycXsOutAsIs, yi64#, ri_, ri_Xs #)
   where
     !ycXsOutAsIs = W64# yi64# : ycXs
@@ -250,25 +261,28 @@ handleRems2 (# ycXs, yi64#, ri_, ri_Xs #)
 
 -- Calculate remainder accompanying a 'digit'
 calcRemainder2 :: Word64# -> [Word64] -> [Int128] -> (Integer, [Int128])
-calcRemainder2 !dgt64# ycXs rXs@(x:0:xs) = let
-        !i = fromIntegral (W64# dgt64#)
-        !isq = fromIntegral $ W64# (dgt64# `timesWord64#` dgt64#) --i*i
-        !yc__ = undigits_ radixW32 ycXs
-        !i2yc_ = i * double yc__
-        !rdrXs = fromIntegral x-isq : negate i2yc_ : (fromIntegral <$> xs) 
-        !rdr = undigits_ radixW32 rdrXs-- (i * double yc_ * radixW32 + i*i)
-    in (rdr, fromIntegral <$> rdrXs)  --tAI - ((double i * tc) + i * i)
+calcRemainder2 !dgt64# ycXs rXs@(x : 0 : xs) =
+  let !i = W64# dgt64# -- W64
+      !isq = W64# (dgt64# `timesWord64#` dgt64#) -- i*i W64
+      !yc__ = undigits_ radixW32 ycXs -- Integer
+      !i2yc_ = fromIntegral i * double yc__ -- Integer
+      !xMinusISq = x - fromIntegral isq -- int128
+      !negI2ycInteger = negate i2yc_ -- integer
+      !rdrXs = fromIntegral xMinusISq : negI2ycInteger : (fromIntegral <$> xs) -- this works !
+      !rdr = undigits_ radixW32 rdrXs -- (i * double yc_ * radixW32 + i*i)
+      !rdrXsInt128 = if rdr < 0 then [] else fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) --fromIntegral <$> rdrXs -- xMinusISq : negI2ycInt128 : xs -- does not work
+   in (rdr, rdrXsInt128) -- tAI - ((double i * tc) + i * i)
 calcRemainder2 _ _ _ = error "error"
 {-# INLINE calcRemainder2 #-}
 
 -- Calculate remainder accompanying a 'digit'
 calcRemainder1 :: Integer -> Integer -> Word64# -> (Integer, Integer)
 calcRemainder1 tAI !yc_ 0#Word64 = (tAI, yc_ * radixW32)
-calcRemainder1 tAI !yc_ !dgt64# = let
-        !i = fromIntegral (W64# dgt64#)
-        ycScaled = yc_ * radixW32
-        rdr = tAI - i * (double ycScaled + i)
-    in (rdr, ycScaled) --tAI - ((double i * tc) + i * i)
+calcRemainder1 tAI !yc_ !dgt64# =
+  let !i = fromIntegral (W64# dgt64#)
+      ycScaled = yc_ * radixW32
+      rdr = tAI - i * (double ycScaled + i)
+   in (rdr, ycScaled) -- tAI - ((double i * tc) + i * i)
 {-# INLINE calcRemainder1 #-}
 
 -- -- Fix remainder accompanying a 'next downed digit'
@@ -302,11 +316,11 @@ splitLastTwo xs l = splitAt (l - 2) xs
 
 {-# INLINE splitLastOne #-}
 splitLastOne :: [a] -> Int -> ([a], [a])
-splitLastOne xs l = splitAt (l-1) xs 
-  
+splitLastOne xs l = splitAt (l - 1) xs
+
 {-# INLINE pairUp #-}
-pairUp :: Bool -> [a] -> [(a,a)]
-pairUp True (x:y:rs) = (x, y) : pairUp True rs
+pairUp :: Bool -> [a] -> [(a, a)]
+pairUp True (x : y : rs) = (x, y) : pairUp True rs
 pairUp True [] = []
 pairUp _ [_] = error "pairUp: Invalid singleton list"
 pairUp False _ = error "pairUp: Invalid odd length of list"
@@ -314,9 +328,11 @@ pairUp False _ = error "pairUp: Invalid odd length of list"
 {-# INLINE integerOfNxtPairsLst #-}
 integerOfNxtPairsLst :: [(Word32, Word32)] -> [Word64]
 integerOfNxtPairsLst = map iFrmTupleBaseW32
+
 {-# INLINE iFrmTupleBaseW32 #-}
 iFrmTupleBaseW32 :: (Word32, Word32) -> Word64
 iFrmTupleBaseW32 xs = word64FromRvsrdTuple xs radixW32
+
 {-# INLINE mkIW32EvenRestLst #-}
 mkIW32EvenRestLst :: Bool -> [Word32] -> [Word64]
 mkIW32EvenRestLst evenLen xs = integerOfNxtPairsLst (pairUp evenLen xs)
@@ -334,8 +350,8 @@ intgrFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
 intgrFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
 intgrFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
-
 {-# INLINE word64FromRvsrdTuple #-}
+
 -- | Word64 from a "reversed" tuple of Word32 digits
 word64FromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64
 word64FromRvsrdTuple (0, 0) 0 = 0
@@ -344,11 +360,12 @@ word64FromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
 word64FromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
 {-# INLINE word64FromRvsrdTuple# #-}
+
 -- | Word64# from a "reversed" tuple of Word32 digits
 word64FromRvsrdTuple# :: (Word32, Word32) -> Word64# -> Word64#
 word64FromRvsrdTuple# (0, 0) _ = 0#Word64
 word64FromRvsrdTuple# (0, W32# lMSB#) base# = wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#
-word64FromRvsrdTuple# (W32# lLSB#, 0) _ =  wordToWord64# (word32ToWord# lLSB#)
+word64FromRvsrdTuple# (W32# lLSB#, 0) _ = wordToWord64# (word32ToWord# lLSB#)
 word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#) `plusWord64#` wordToWord64# (word32ToWord# lLSB#)
 
 {-# INLINE doubleFromRvsrdTuple #-}
@@ -359,7 +376,7 @@ doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromI
 
 {-# INLINE largestNSqLTEOdd #-}
 largestNSqLTEOdd :: Word64 -> Word64
-largestNSqLTEOdd i =  floorDouble (sqrt (fromIntegral i) :: Double)
+largestNSqLTEOdd i = floorDouble (sqrt (fromIntegral i) :: Double)
 
 {-# INLINE largestNSqLTEEven #-}
 largestNSqLTEEven :: Word64 -> Word64
@@ -367,29 +384,29 @@ largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble 
 
 {-# INLINE largestNSqLTEOdd## #-}
 largestNSqLTEOdd## :: Word64# -> Word64#
-largestNSqLTEOdd## w# =  case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
+largestNSqLTEOdd## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
 
 {-# INLINE largestNSqLTEEven## #-}
 largestNSqLTEEven## :: Word64# -> Word64#
-largestNSqLTEEven## w# = let
-        !d_ = nextUp (fromIntegral (W64# w#) :: Double)
-        !(W64# r#) = floorDouble (nextUp (sqrt d_))
-      in r#
+largestNSqLTEEven## w# =
+  let !d_ = nextUp (fromIntegral (W64# w#) :: Double)
+      !(W64# r#) = floorDouble (nextUp (sqrt d_))
+   in r#
 
 -- | handle overflow
 {-# INLINE hndlOvflwW32 #-}
-hndlOvflwW32 :: Integral a => a  -> a
+hndlOvflwW32 :: (Integral a) => a -> a
 hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 {-# INLINE hndlOvflwW32## #-}
 hndlOvflwW32## :: Word64# -> Word64#
 hndlOvflwW32## w64# = if isTrue# (w64# `eqWord64#` maxW32#) then predmaxW32# else w64#
-    where
-      !(W64# maxW32#) = radixW32
-      !(W64# predmaxW32#) = predRadixW32
+  where
+    !(W64# maxW32#) = radixW32
+    !(W64# predmaxW32#) = predRadixW32
 
 scaleByPower2 :: Int64# -> FloatingX# -> FloatingX#
-scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else FloatingX# s# (e# `plusInt64#` n#)--normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
+scaleByPower2 n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zero# else FloatingX# s# (e# `plusInt64#` n#) -- normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
 {-# INLINE scaleByPower2 #-}
 
 {-# INLINE wrd2wrd32 #-}
@@ -421,8 +438,8 @@ data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-#
 {-# INLINE floorX# #-}
 floorX# :: FloatingX# -> Int64
 floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
-        Just d -> floor d
-        _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
+  Just d -> floor d
+  _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE floorX## #-}
 floorX## :: FloatingX# -> Word64#
@@ -459,13 +476,14 @@ minValue# = FloatingX# 1.0## 0#Int64
 {-# INLINE add# #-}
 add# :: FloatingX# -> FloatingX# -> FloatingX#
 add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
-  -- | a == zero# = b
-  -- | b == zero# = a
+  -- \| a == zero# = b
+  -- \| b == zero# = a
   | isTrue# (expA# `eqInt64#` expB#) = FloatingX# (sA# +## sB#) expA#
   | isTrue# (expA# `gtInt64#` expB#) = combine a b
   | otherwise = combine b a
-  -- | otherwise = FloatingX# (sA# +## sB#) expA# -- FloatingX (signifA + signifB) expA
   where
+    -- \| otherwise = FloatingX# (sA# +## sB#) expA# -- FloatingX (signifA + signifB) expA
+
     combine big@(FloatingX# sBig# expBig#) little@(FloatingX# sLittle# expLittle#) =
       let !scale# = expLittle# `subInt64#` expBig#
           !(D# !scaleD#) = fromIntegral (I64# scale#)
@@ -479,18 +497,17 @@ add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
 mul# :: FloatingX# -> FloatingX# -> FloatingX#
 -- mul# (FloatingX# 1.0## 0#) b = b
 -- mul# a (FloatingX# 1.00## 0.00##) = a
-mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
-  -- | isTrue# (sA# ==## 0.00##) = zero#
-  -- | isTrue# (sB# ==## 0.00##) = zero#
-  -- | isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = b
-  -- | isTrue# (sB# ==## 1.00##) && isTrue# (expB# `eqInt64#` 0#Int64) = a
-  -- | otherwise 
-    =
-      let !resExp# = expA# `plusInt64#` expB#
-          !resSignif# = sA# *## sB#
-       in if isTrue# (resSignif# >=## 2.0##)
-            then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
-            else FloatingX# resSignif# resExp#
+mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) =
+  -- \| isTrue# (sA# ==## 0.00##) = zero#
+  -- \| isTrue# (sB# ==## 0.00##) = zero#
+  -- \| isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = b
+  -- \| isTrue# (sB# ==## 1.00##) && isTrue# (expB# `eqInt64#` 0#Int64) = a
+  -- \| otherwise
+  let !resExp# = expA# `plusInt64#` expB#
+      !resSignif# = sA# *## sB#
+   in if isTrue# (resSignif# >=## 2.0##)
+        then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
+        else FloatingX# resSignif# resExp#
 
 {-# INLINE sqr# #-}
 sqr# :: FloatingX# -> FloatingX#
@@ -528,42 +545,41 @@ divide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
 
 {-# INLINE unsafeDivide# #-}
 unsafeDivide# :: FloatingX# -> FloatingX# -> FloatingX#
-unsafeDivide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
-  -- | d == FloatingX# 1.0## (fromInt64 0) = n
-  -- | isTrue# (s1# ==## 0.0##) = zero#
-  -- | isTrue# (s2# ==## 0.0##) = error "divide#: error divide by zero "
-  -- | otherwise 
-    =
-      let !resExp# = e1# `subInt64#` e2#
-          !resSignif# = s1# /## s2#
-          -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
-          -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
-          !(# finalSignif#, finalExp# #) =
-            if isTrue# (resSignif# <## 1.0##)
-              then (# resSignif# *## 2.0##, resExp# `subInt64#` 1#Int64 #)
-              else (# resSignif#, resExp# #)
-       in -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
-          -- //TODO fix this next line
-          -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
-          if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` 0#Int64)
-            then zero#
-            else FloatingX# finalSignif# finalExp#
+unsafeDivide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) =
+  -- \| d == FloatingX# 1.0## (fromInt64 0) = n
+  -- \| isTrue# (s1# ==## 0.0##) = zero#
+  -- \| isTrue# (s2# ==## 0.0##) = error "divide#: error divide by zero "
+  -- \| otherwise
+  let !resExp# = e1# `subInt64#` e2#
+      !resSignif# = s1# /## s2#
+      -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
+      -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
+      !(# finalSignif#, finalExp# #) =
+        if isTrue# (resSignif# <## 1.0##)
+          then (# resSignif# *## 2.0##, resExp# `subInt64#` 1#Int64 #)
+          else (# resSignif#, resExp# #)
+   in -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
+      -- //TODO fix this next line
+      -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
+      if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` 0#Int64)
+        then zero#
+        else FloatingX# finalSignif# finalExp#
 
 {-# INLINE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fsqraddFloatingX# (FloatingX# sA# expA#) (FloatingX# sC# expC#)
-    | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
-    | otherwise = case updateDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# --let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
- where
-    twoTimesExpA# = 2#Int64 `timesInt64#` expA# -- lazy till its needed in otherwise 
+  | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
+  | otherwise = case updateDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+  where
+    twoTimesExpA# = 2#Int64 `timesInt64#` expA# -- lazy till its needed in otherwise
     !diff# = expC# `subInt64#` twoTimesExpA#
 
 {-# INLINE fm1addFloatingX# #-}
 fm1addFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fm1addFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#)
-    | isTrue# (cExcessa# `geInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# 1.00## sC#) cExcessa#
-    | otherwise = a !*## one# !+## c -- default custom mult and add
- where
+  | isTrue# (cExcessa# `geInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# 1.00## sC#) cExcessa#
+  | otherwise = a !*## one# !+## c -- default custom mult and add
+  where
     !cExcessa# = expC# `subInt64#` expA#
 
 {-# INLINE sqrtFX# #-}
@@ -580,8 +596,8 @@ sqrtSplitDbl (FloatingX d e) -- //FIXME FOR zero case
 -- | actual sqrt call to the hardware for custom type happens here
 sqrtSplitDbl# :: FloatingX# -> (# Double#, Int64# #)
 sqrtSplitDbl# (FloatingX# d# e#)
-  | isTrue# (d# ==## 0.00##) = case minBound :: Int64 of I64# mb# ->  (# 0.0##, mb# #)
-  | even (I64# e#) = (# sqrtDouble# d#, e# `quotInt64#` 2#Int64  #) -- even
+  | isTrue# (d# ==## 0.00##) = case minBound :: Int64 of I64# mb# -> (# 0.0##, mb# #)
+  | even (I64# e#) = (# sqrtDouble# d#, e# `quotInt64#` 2#Int64 #) -- even
   | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, (e# `subInt64#` 1#Int64) `quotInt64#` 2#Int64 #) -- odd sqrt2 times sqrt d#
 {-# INLINE sqrtSplitDbl# #-}
 
@@ -607,11 +623,11 @@ fromInt64 (I64# x#) = x#
 {-# INLINE fromInt64 #-}
 
 fx2Double# :: FloatingX# -> Maybe Double
-fx2Double# x@(FloatingX# s# e#) = fx2Double $ FloatingX (D# s#) (I64# e#)--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
+fx2Double# x@(FloatingX# s# e#) = fx2Double $ FloatingX (D# s#) (I64# e#) -- fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
 {-# INLINE fx2Double# #-}
 
 unsafefx2Double# :: FloatingX# -> Double
-unsafefx2Double# x@(FloatingX# s# e#) = unsafefx2Double $ FloatingX (D# s#) (I64# e#)--fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
+unsafefx2Double# x@(FloatingX# s# e#) = unsafefx2Double $ FloatingX (D# s#) (I64# e#) -- fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
 {-# INLINE unsafefx2Double# #-}
 
 fx2Double :: FloatingX -> Maybe Double
@@ -620,8 +636,7 @@ fx2Double (FloatingX d@(D# d#) e)
   | isInfinite d = Nothing -- error "Input is Infinity"
   | ex < 0 = Just $ fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary
   | otherwise =
-      let
-          !(I# ex#) = ex
+      let !(I# ex#) = ex
           result# = encodeDoubleInteger m ex#
           !result = D# result#
        in if isInfinite result || isNaN result then Nothing else Just result
@@ -635,20 +650,20 @@ updateDouble# :: Double# -> Int# -> Double#
 updateDouble# d# ex# = case decodeDoubleInteger d# of (# m, n# #) -> encodeDoubleInteger m (n# +# ex#)
 
 unsafefx2Double :: FloatingX -> Double
-unsafefx2Double (FloatingX d@(D# d#) e)
-  -- | ex < 0 = fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary 
-  -- | otherwise 
-  = D# (encodeDoubleInteger m ex#)
+unsafefx2Double (FloatingX d@(D# d#) e) =
+  -- \| ex < 0 = fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary
+  -- \| otherwise
+  D# (encodeDoubleInteger m ex#)
   where
     !(# m, n# #) = decodeDoubleInteger d#
     !ex@(I# ex#) = I# n# + fromIntegral e
 {-# INLINE unsafefx2Double #-}
 
 unsafefx2Double## :: FloatingX# -> Double#
-unsafefx2Double## (FloatingX# d# e#)
-  -- | isTrue# (ex# <# 0#) = case fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) of (D# do#) -> do# -- this is necessary 
-  -- | otherwise 
-  = encodeDoubleInteger m ex#
+unsafefx2Double## (FloatingX# d# e#) =
+  -- \| isTrue# (ex# <# 0#) = case fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) of (D# do#) -> do# -- this is necessary
+  -- \| otherwise
+  encodeDoubleInteger m ex#
   where
     !(# m, n# #) = decodeDoubleInteger d#
     !ex# = n# +# int64ToInt# e#
@@ -656,7 +671,7 @@ unsafefx2Double## (FloatingX# d# e#)
 
 {-# INLINE double2FloatingX# #-}
 double2FloatingX# :: Double -> FloatingX#
-double2FloatingX# d = case split d of (D# s#, I64# e#) ->  FloatingX# s# e# --let !(D# s#, I64# e#) = split d in FloatingX# s# e#
+double2FloatingX# d = case split d of (D# s#, I64# e#) -> FloatingX# s# e# -- let !(D# s#, I64# e#) = split d in FloatingX# s# e#
 
 {-# INLINE double2FloatingX## #-}
 double2FloatingX## :: Double# -> FloatingX#
@@ -666,8 +681,8 @@ double2FloatingX## d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 bigNat2FloatingX## :: BigNat# -> FloatingX#
 bigNat2FloatingX## ibn#
   | bigNatIsZero ibn# = zero#
-  -- | itsOKtoUsePlainDoubleCalc = double2FloatingX## iDouble#
-  | otherwise = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+  -- \| itsOKtoUsePlainDoubleCalc = double2FloatingX## iDouble#
+  | otherwise = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# -- cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
   -- where
   --   !(D# maxDouble#) = maxDouble
   --   !iDouble# =  bigNatEncodeDouble# ibn# 0#
@@ -675,7 +690,7 @@ bigNat2FloatingX## ibn#
 
 {-# INLINE unsafebigNat2FloatingX## #-}
 unsafebigNat2FloatingX## :: BigNat# -> FloatingX#
-unsafebigNat2FloatingX## ibn# = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# --let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+unsafebigNat2FloatingX## ibn# = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
 {-# INLINE int64ToFloatingX# #-}
 int64ToFloatingX# :: Int64 -> FloatingX#
@@ -697,21 +712,20 @@ unsafeword64ToFloatingX## w# = case W64# w# of i -> unsafeword64ToFloatingX# i
 {-# INLINE cI2D2_ #-}
 cI2D2_ :: BigNat# -> (# Double#, Int64# #)
 cI2D2_ bn#
-    | isTrue# ((bigNatSize# bn#) <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
-    | otherwise = case bigNatLog2# bn# of
-                    l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
-                            h# -> case bigNatShiftR# bn# (2## `timesWord#` h#) of
-                                    mbn# -> (# bigNatEncodeDouble# mbn# 0#, 2#Int64 `timesInt64#` intToInt64# (word2Int# h#) #)
-
-    where
-        -- threshold for shifting vs. direct fromInteger
-        -- we shift when we expect more than 256 bits
-        thresh# :: Int#
-        thresh# = 9# --if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
+  | otherwise = case bigNatLog2# bn# of
+      l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
+        h# -> case bigNatShiftR# bn# (2## `timesWord#` h#) of
+          mbn# -> (# bigNatEncodeDouble# mbn# 0#, 2#Int64 `timesInt64#` intToInt64# (word2Int# h#) #)
+  where
+    -- threshold for shifting vs. direct fromInteger
+    -- we shift when we expect more than 256 bits
+    thresh# :: Int#
+    thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
-split (D# d#) = case split# d# of (# s#, ex# #) ->  (D# s#, I64# ex#) --let !(# s#, ex# #) = split# d# in (D# s#, I64# ex#)
+split (D# d#) = case split# d# of (# s#, ex# #) -> (D# s#, I64# ex#) -- let !(# s#, ex# #) = split# d# in (D# s#, I64# ex#)
 
 {-# INLINE split# #-}
 split# :: Double# -> (# Double#, Int64# #)
@@ -722,12 +736,11 @@ split# d# =
    in (# s#, ex# #)
 
 -- | Some Constants
-
 radixW32 :: (Integral a) => a
 radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
 
 predRadixW32 :: (Integral a) => a
-predRadixW32 = 4294967295 -- 2 ^ finiteBitSize (0 :: Word32) -1 
+predRadixW32 = 4294967295 -- 2 ^ finiteBitSize (0 :: Word32) -1
 
 secndPlaceW32Radix :: Integer
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
@@ -766,14 +779,13 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
 -- | Floating Point nextUp/nextDown funxctions
-
 {-# INLINE nextUp# #-}
 nextUp# :: Double# -> Double#
-nextUp# dIn# = case nextUp (D# dIn#) of (D# dOut#) -> dOut# --let !(D# dOut#) = nextUp (D# dIn#) in dOut#
+nextUp# dIn# = case nextUp (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextUp (D# dIn#) in dOut#
 
 {-# INLINE nextDown# #-}
 nextDown# :: Double# -> Double#
-nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut#--let !(D# dOut#) = nextDown (D# dIn#) in dOut#
+nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextDown (D# dIn#) in dOut#
 
 {-# INLINE nextUpFX# #-}
 nextUpFX# :: FloatingX# -> FloatingX#
@@ -796,28 +808,30 @@ nextDownFX# x@(FloatingX# s# e#)
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
-    | lgN < 2300 =
-        let s = isqrtB n in (s, n - s * s)
-    | otherwise =
-        if lgN .&. 2 /= 0 then
-            karatsubaStep k (karatsubaSplit k n)
+  | lgN < 2300 =
+      let s = isqrtB n in (s, n - s * s)
+  | otherwise =
+      if lgN .&. 2 /= 0
+        then
+          karatsubaStep k (karatsubaSplit k n)
         else
-            -- before we split n into 4 part we must ensure that the first part
-            -- is at least 2^k/4, since this doesn't happen here we scale n by
-            -- multiplying it by 4
-            let n' = n `unsafeShiftL` 2
-                (s, r) = karatsubaStep k (karatsubaSplit k n')
-                r' | s .&. 1 == 0 = r
-                   | otherwise = r + double s - 1
-            in  (s `unsafeShiftR` 1, r' `unsafeShiftR` 2)
+          -- before we split n into 4 part we must ensure that the first part
+          -- is at least 2^k/4, since this doesn't happen here we scale n by
+          -- multiplying it by 4
+          let n' = n `unsafeShiftL` 2
+              (s, r) = karatsubaStep k (karatsubaSplit k n')
+              r'
+                | s .&. 1 == 0 = r
+                | otherwise = r + double s - 1
+           in (s `unsafeShiftR` 1, r' `unsafeShiftR` 2)
   where
     k = lgN `unsafeShiftR` 2 + 1
     lgN = I# (word2Int# (integerLog2# n))
 
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)
-    | r >= 0 = (s, r)
-    | otherwise = (s - 1, r + double s - 1)
+  | r >= 0 = (s, r)
+  | otherwise = (s - 1, r + double s - 1)
   where
     r = cat u a0 - q * q
     s = s' `unsafeShiftL` k + q
@@ -844,15 +858,18 @@ double x = x `unsafeShiftL` 1
 
 -- | Return an integer, built from given digits in reverse order.
 --   Condition 0 ≤ digit < base is not checked.
-undigits_ :: (Integral a, Integral b)
-         => a       -- ^ The base to use
-         -> [b]     -- ^ The list of digits to convert
-         -> Integer
+undigits_ ::
+  (Integral a, Integral b) =>
+  -- | The base to use
+  a ->
+  -- | The list of digits to convert
+  [b] ->
+  Integer
 undigits_ = undigits
 {-# INLINE undigits_ #-}
-{-# SPECIALIZE undigits_ :: Word    -> [Word]    -> Integer #-}
-{-# SPECIALIZE undigits_ :: Int     -> [Int]     -> Integer #-}
-{-# SPECIALIZE undigits_ :: Int64     -> [Int64]     -> Integer #-}
-{-# SPECIALIZE undigits_ :: Word64    -> [Word64]    -> Integer #-}
-{-# SPECIALIZE undigits_ :: Int128    -> [Int128]    -> Integer #-}
+{-# SPECIALIZE undigits_ :: Word -> [Word] -> Integer #-}
+{-# SPECIALIZE undigits_ :: Int -> [Int] -> Integer #-}
+{-# SPECIALIZE undigits_ :: Int64 -> [Int64] -> Integer #-}
+{-# SPECIALIZE undigits_ :: Word64 -> [Word64] -> Integer #-}
+{-# SPECIALIZE undigits_ :: Int128 -> [Int128] -> Integer #-}
 {-# SPECIALIZE undigits_ :: Integer -> [Integer] -> Integer #-}
