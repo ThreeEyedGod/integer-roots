@@ -10,6 +10,7 @@
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
 {-# OPTIONS_GHC -O2 -threaded -optl-m64 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=160 -fmax-worker-args=32 #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 -- {-# OPTIONS_GHC -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
@@ -262,18 +263,13 @@ handleRems2 (# !ycXs, !yi64#, !ri_, !ri_Xs #)
 calcRemainder2 :: Word64# -> [Word64] -> [Int128] -> (Integer, [Int128])
 calcRemainder2 !dgt64# !ycXs rXs@(x : 0 : xs) =
   let !i = W64# dgt64# -- W64
-      !isq = W64# (dgt64# `timesWord64#` dgt64#) -- i*i W64
-      !yc__ = undigits_ radixW32 ycXs -- Integer
-      !i2yc_ = fromIntegral i * double yc__ -- Integer
-      !xMinusISq = x - fromIntegral isq -- int128
-      !negI2ycInteger = negate i2yc_ -- integer and it will be negative 
-      -- !negI2ycInt128Xs = fromIntegral <$> digits radixW32 negI2ycInteger :: [Int128]
-      -- !rdrXsInt128 = xMinusISq : ( negI2ycInt128Xs ++ xs ) 
-      -- !rdr  = undigits radixW32 rdrXsInt128
+      !xMinusISq = x - fromIntegral (W64# (dgt64# `timesWord64#` dgt64#))  -- int128
+      !negI2ycInteger = negate (fromIntegral i *  double (undigits_ radixW32 ycXs))--negate i2yc_ -- integer and it will be negative 
       !rdrXs = fromIntegral xMinusISq : negI2ycInteger : (fromIntegral <$> xs) -- this works !
       !rdr = undigits_ radixW32 rdrXs -- (i * double yc_ * radixW32 + i*i)
       !rdrXsInt128 = if rdr < 0 then [] else fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) --fromIntegral <$> rdrXs -- xMinusISq : negI2ycInt128 : xs -- does not work
    in (rdr, rdrXsInt128) -- tAI - ((double i * tc) + i * i)
+
 calcRemainder2 _ _ _ = error "error"
 {-# INLINE calcRemainder2 #-}
 

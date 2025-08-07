@@ -1,18 +1,24 @@
 {
-  // File autosave settings
   "files.autoSave": "afterDelay",
   "files.autoSaveDelay": 500,
-  // Hover and formatting
+
   "editor.hover.enabled": true,
   "editor.formatOnSave": true,
-  // Haskell Language Server configuration
-  "haskell.manageHLS": true,
-  "haskell.serverExecutablePath": null,
-  // Choose Ormolu as the default formatter
+
+  "haskell.manageHLS": "PATH",
+  "haskell.ghcupExecutablePath": "/Users/mandeburung/.ghcup/bin/ghcup",
+  "haskell.serverExecutablePath": "/Users/mandeburung/.ghcup/hls/2.11.0.0/bin/haskell-language-server-wrapper",
+  "haskell.trace.server": "verbose",
+
   "haskell.formattingProvider": "ormolu",
-  "ormolu.path": "/Users/mandeburung/.cabal/bin/ormolu",
+  "ormolu.path": "/opt/homebrew/bin/ormolu",
   "ormolu.args": [
     "--no-cabal"
   ],
-  "haskell.ghcupExecutablePath": "/Users/mandeburung/.ghcup/bin/ghcup",
+
+  "[haskell]": {
+    "editor.defaultFormatter": "haskell.haskell",
+    "editor.formatOnSave": true,
+    "editor.hover.enabled": true
+  }
 }
