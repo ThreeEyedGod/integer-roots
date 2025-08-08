@@ -29,7 +29,6 @@ library
    ,fast-digits >= 0.3.2.0
    ,floating-bits >= 0.3.1.0
    ,ghc-prim >= 0.13.0
-   ,wide-word >= 0.1.7.1
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
   else
