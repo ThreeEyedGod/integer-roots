@@ -156,10 +156,10 @@ stageList :: [Word32] -> (Bool, [Word64], [Word32])
 stageList xs =
   if even l
     then
-      let (rstEvenLen, lastTwo) = splitLastTwo xs l
+      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
        in (True, mkIW32EvenRestLst True rstEvenLen, lastTwo)
     else
-      let (rstEvenLen, lastOne) = splitLastOne xs l
+      let !(rstEvenLen, lastOne) = splitLastOne xs l
        in (False, mkIW32EvenRestLst True rstEvenLen, lastOne)
   where
     !l = length xs
@@ -174,7 +174,7 @@ theNextIterations (Itr !currlen# !wrd64Xs yCumulated iRem !tbfx# yCumLst iRLst) 
         then undigits_ radixW32 ycXs -- yC
         else
           let !(xsPass, twoLSPlaces) = fromMaybe ([], 0) (unsnoc xs)
-              updRemXs = fromIntegral twoLSPlaces : 0 : irXs
+              !updRemXs = fromIntegral twoLSPlaces : 0 : irXs
               !tA_= undigits radixW32 updRemXs 
               yC_ = 0 
               -- !(tA_, yC_) = pairUndigits radixW32 (updRemXs, ycXs) -- !tA_= undigits radixW32 updRemXs and then yC_ = undigits radixW32 ycXs
@@ -272,11 +272,6 @@ calcRemainder2 !dgt64# !ycXs rXs@(x : 0 : xs) =
    in (rdr, rdrXsInt128) -- tAI - ((double i * tc) + i * i)
 calcRemainder2 _ _ _ = error "error"
 {-# INLINE calcRemainder2 #-}
-
-fromIntegralDigits :: (Integral a, Integral b) => [a] -> [b]
-fromIntegralDigits xs = fromIntegral <$> xs 
-{-# INLINE fromIntegralDigits #-}
-{-# SPECIALIZE fromIntegralDigits :: [Integer] -> [Int128] #-}
 
 -- Calculate remainder accompanying a 'digit'
 calcRemainder1 :: Integer -> Integer -> Word64# -> (Integer, Integer)
