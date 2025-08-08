@@ -229,8 +229,8 @@ comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nex
 -- if the trial digit is zero skip computing remainder
 computeRem_ :: Integer -> Integer -> Word64# -> [Word64] -> [Int128] -> (# [Word64], Word64#, [Int128] #)
 computeRem_ _ _ 0#Word64 yXs rXs = (# 0:yXs, 0#Word64, rXs #)
-computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder2 yTilde_# yXs rXs of (rTrial, rTrialXs, scaledby32yC) -> handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
--- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# ta yc of (rTrial, rTrialXs, scaledby32yC) ->  handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
+-- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder2 yTilde_# yXs rXs of (rTrial, rTrialXs, scaledby32yC) -> handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
+computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# yc ta of (rTrial, rTrialXs, scaledby32yC) ->  handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
 -- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# ta yc of (rTrial, rTrialXs, scaledby32yC) -> handleRems (# scaledby32yC, yTilde_#, rTrial #)
 {-# INLINE computeRem_ #-}
 
