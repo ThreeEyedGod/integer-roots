@@ -280,8 +280,8 @@ calcRemainder1 :: Word64# -> Integer -> Integer -> (Integer, [Int128], Integer)
 calcRemainder1 0#Word64 !yc_ tAI   = (tAI, fromIntegral <$> digitsUnsigned radixW32 (fromIntegral tAI), yc_ * radixW32)
 calcRemainder1 !dgt64# !yc_ tAI   =
   let !i = fromIntegral (W64# dgt64#)
-      ycScaled = yc_ * radixW32
-      rdr = tAI - i * (double ycScaled + i)
+      !ycScaled = yc_ * radixW32
+      !rdr = tAI - i * (double ycScaled + i)
       !rdrXsInt128 = if rdr < 0 then [] else fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) --fromIntegral <$> rdrXs -- xMinusISq : negI2ycInt128 : xs -- does not work
    in (rdr, rdrXsInt128, ycScaled) -- tAI - ((double i * tc) + i * i)
 {-# INLINE calcRemainder1 #-}
