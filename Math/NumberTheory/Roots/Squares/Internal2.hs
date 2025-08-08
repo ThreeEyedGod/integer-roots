@@ -175,9 +175,9 @@ theNextIterations (Itr !currlen# !wrd64Xs yCumulated iRem !tbfx# yCumLst iRLst) 
         else
           let !(xsPass, twoLSPlaces) = fromMaybe ([], 0) (unsnoc xs)
               !updRemXs = fromIntegral twoLSPlaces : 0 : irXs
-              !tA_= undigits radixW32 updRemXs 
-              yC_ = undigits radixW32 ycXs
-              -- !(tA_, yC_) = pairUndigits radixW32 (updRemXs, ycXs) -- !tA_= undigits radixW32 updRemXs and then yC_ = undigits radixW32 ycXs
+              -- !tA_= undigits radixW32 updRemXs 
+              -- yC_ = undigits radixW32 ycXs
+              !(tA_, yC_) = pairUndigits radixW32 (updRemXs, ycXs) -- !tA_= undigits radixW32 updRemXs and then yC_ = undigits radixW32 ycXs
               !tC_ = scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
               !(# ycXsOut, !yTildeFinal#, rFinalXs #) = case nxtDgt_# tA_ tC_ of yTilde_# -> computeRem_ yC_ tA_ yTilde_# ycXs updRemXs
               !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
@@ -229,8 +229,8 @@ comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nex
 -- if the trial digit is zero skip computing remainder
 computeRem_ :: Integer -> Integer -> Word64# -> [Word64] -> [Int128] -> (# [Word64], Word64#, [Int128] #)
 computeRem_ _ _ 0#Word64 yXs rXs = (# 0:yXs, 0#Word64, rXs #)
--- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder2 yTilde_# yXs rXs of (rTrial, rTrialXs, scaledby32yC) -> handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
-computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# yc ta of (rTrial, rTrialXs, scaledby32yC) ->  handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
+computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder2 yTilde_# yc yXs rXs of (rTrial, rTrialXs, scaledby32yC) -> handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
+-- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# yc ta of (rTrial, rTrialXs, scaledby32yC) ->  handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
 -- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# ta yc of (rTrial, rTrialXs, scaledby32yC) -> handleRems (# scaledby32yC, yTilde_#, rTrial #)
 {-# INLINE computeRem_ #-}
 
@@ -262,17 +262,17 @@ handleRems2 (# !ycXs, !yi64#, !ri_, !ri_Xs, ycScaled_ #)
 {-# INLINE handleRems2 #-}
 
 -- Calculate remainder accompanying a 'digit'
-calcRemainder2 :: Word64# -> [Word64] -> [Int128] -> (Integer, [Int128], Integer)
-calcRemainder2 !dgt64# !ycXs rXs@(x : 0 : xs) =
+calcRemainder2 :: Word64# -> Integer -> [Word64] -> [Int128] -> (Integer, [Int128], Integer)
+calcRemainder2 !dgt64# !yc_ !ycXs rXs@(x : 0 : xs) =
   let !i = W64# dgt64# -- W64
       !xMinusISq = x - fromIntegral (W64# (dgt64# `timesWord64#` dgt64#))  -- int128
-      !yc = undigits_ radixW32 ycXs
+      !yc = yc_--undigits_ radixW32 ycXs
       !negI2ycInteger = negate (fromIntegral i *  double yc)--negate i2yc_ -- integer and it will be negative 
       !rdrXs = fromIntegral xMinusISq : negI2ycInteger : (fromIntegral <$> xs) -- this works !
       !rdr = undigits_ radixW32 rdrXs -- (i * double yc_ * radixW32 + i*i)
       !rdrXsInt128 = if rdr < 0 then [] else fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) --fromIntegral <$> rdrXs -- xMinusISq : negI2ycInt128 : xs -- does not work
    in (rdr, rdrXsInt128, yc * radixW32) -- tAI - ((double i * tc) + i * i)
-calcRemainder2 _ _ _ = error "error"
+calcRemainder2 _ _ _ _ = error "error"
 {-# INLINE calcRemainder2 #-}
 
 -- Calculate remainder accompanying a 'digit'
