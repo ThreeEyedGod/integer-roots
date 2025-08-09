@@ -229,8 +229,8 @@ comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nex
 -- if the trial digit is zero skip computing remainder
 computeRem_ :: Integer -> Integer -> Word64# -> [Word64] -> [Int96] -> (# [Word64], Word64#, [Int96] #)
 computeRem_ _ _ 0#Word64 yXs rXs = (# 0:yXs, 0#Word64, rXs #)
--- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder2 yTilde_# yc yXs rXs of (rTrial, rTrialXs, scaledby32yC) -> handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
-computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# yc ta of (rTrial, rTrialXs, scaledby32yC) ->  handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
+computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder2 yTilde_# yc yXs rXs of (rTrial, rTrialXs, scaledby32yC) -> handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
+-- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# yc ta of (rTrial, rTrialXs, scaledby32yC) ->  handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
 -- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# ta yc of (rTrial, rTrialXs, scaledby32yC) -> handleRems (# scaledby32yC, yTilde_#, rTrial #)
 {-# INLINE computeRem_ #-}
 
@@ -273,12 +273,13 @@ handleRems2 (# !ycXs, !yi64#, !ri_, !ri_Xs, ycScaled_ #)
 
 -- Calculate remainder accompanying a 'digit'
 calcRemainder2 :: Word64# -> Integer -> [Word64] -> [Int96] -> (Integer, [Int96], Integer)
+calcRemainder2 0#Word64 !yc_ _ rXs = (undigits radixW32 rXs, rXs, yc_ * radixW32)
 calcRemainder2 !dgt64# !yc_ !ycXs rXs@(x : 0 : xs) =
   let !i = W64# dgt64# -- W64
       !xMinusISq = x - fromIntegral (W64# (dgt64# `timesWord64#` dgt64#))  -- Integer
       !yc = yc_--undigits_ radixW32 ycXs
       !negI2ycInteger = negate (fromIntegral i *  double yc)--negate i2yc_ -- integer and it will be negative 
-      !rdrXs = xMinusISq : fromIntegral negI2ycInteger : xs -- this works !
+      !rdrXs = fromIntegral xMinusISq : negI2ycInteger : (fromIntegral <$> xs) -- keep this as integer list and this works !
       !rdr = undigits_ radixW32 rdrXs -- (i * double yc_ * radixW32 + i*i)
       !rdrXsInteger = if rdr < 0 then [] else fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) --fromIntegral <$> rdrXs -- xMinusISq : negI2ycInteger : xs -- does not work
    in (rdr, rdrXsInteger, yc * radixW32) -- tAI - ((double i * tc) + i * i)
@@ -295,31 +296,6 @@ calcRemainder1 !dgt64# !yc_ tAI   =
       !rdrXsInteger = if rdr < 0 then [] else fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) --fromIntegral <$> rdrXs -- xMinusISq : negI2ycInteger : xs -- does not work
    in (rdr, rdrXsInteger, ycScaled) -- tAI - ((double i * tc) + i * i)
 {-# INLINE calcRemainder1 #-}
-
--- handleRems :: (Int, Integer, Integer, Integer, Integer) -> (Integer, Integer)
--- handleRems (pos, yi, ri, tA, tB)
---   | (ri < 0) && (yi > 0) = (nextDownDgt0, calcNewRemainder tA tB nextDownDgt0) -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
---   | (ri >= 0) && noExcessLength = (yi, ri) -- all ok just continue no need for any other check if pos =0 then this check is not useful
---   | (ri > 0) && (pos > 0) && excessLengthBy3 = (yi, adjustedRemainder3) -- handleRems (pos, yCurrListReversed, yi, adjustedRemainder3, tA, tB)
---   | (ri > 0) && firstRemainderBoundCheckFail = (nextUpDgt1, calcNewRemainder tA tB nextUpDgt1)
---   | (ri > 0) && secondRemainderBoundCheckFail = (nextUpDgt2, calcNewRemainder tA tB nextUpDgt2)
---   | otherwise = (yi, ri)
---   where
---     b = radixW32
---     riCurrSqrtRatio = ri `quot` currSqrt
---     noExcessLength = riCurrSqrtRatio < 2 -- quick escape all good 
---     excessLengthBy3 = lenCurrRemainder >= lenCurrSqrt + 3
---     firstRemainderBoundCheckFail = not (isValidRemainder1 ri currSqrt pos)
---     secondRemainderBoundCheckFail = not (isValidRemainder2 ri currSqrt pos)
---     lenCurrRemainder = 1 + integerLogBase' b ri -- //TODO THIS TAKES UP A CHUNK OF TIME length (digits (fromIntegral b) ri) makes little diff
---     lenCurrSqrt = 1 + integerLogBase' b yi 
---     currSqrt = tB * radixW32 + yi -- //TODO this seems inefficient something can be done here ... 
---     modulus3 = b ^ 3
---     adjustedRemainder3 = ri `mod` modulus3
---     nextDownDgt0 = findNextDigitDown (tA, tB) (yi, ri) pos yi 0 isValidRemainder0
---     nextUpDgt1 = findNextDigitUp (tA, tB) (yi, ri) pos yi (radixW32 - 1) isValidRemainder1
---     nextUpDgt2 = findNextDigitUp (tA, tB) (yi, ri) pos yi (radixW32 - 1) isValidRemainder2
-
 
 -- -- Fix remainder accompanying a 'next downed digit'
 fixRemainder :: Integer -> Integer -> Integer
