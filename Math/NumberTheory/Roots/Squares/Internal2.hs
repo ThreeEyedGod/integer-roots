@@ -8,7 +8,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
-{-# OPTIONS_GHC -O2 -threaded -optl-m64 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=160 -fmax-worker-args=32 #-}
+{-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 
@@ -35,7 +35,7 @@ import Data.DoubleWord (Int96)
 import Control.Arrow ((***))
 import Data.Bits (finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Bits.Floating (nextDown, nextUp)
-import Data.FastDigits (digitsUnsigned, undigits, digits)
+import Data.FastDigits (digitsUnsigned, undigits)
 import Data.List
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
@@ -45,38 +45,28 @@ import GHC.Exts
     Int (..),
     Int#,
     Int64#,
-    Word32#,
     Word64#,
-    castWord64ToDouble#,
-    double2Int#,
     eqInt64#,
     eqWord64#,
     fmaddDouble#,
     geInt64#,
-    gtInt64#,
-    gtWord64#,
-    indexDoubleArray#,
     int2Double#,
     int64ToInt#,
     intToInt64#,
     isTrue#,
+    gtInt64#,
     leInt64#,
-    ltInt64#,
     minusWord#,
     plusInt64#,
     plusWord64#,
-    quotInt#,
     quotInt64#,
-    quotWord64#,
     sqrtDouble#,
     subInt64#,
     subWord64#,
     timesInt64#,
     timesWord#,
     timesWord64#,
-    uncheckedIShiftRA#,
     uncheckedShiftRL#,
-    word2Double#,
     word2Int#,
     word32ToWord#,
     word64ToInt64#,
@@ -85,7 +75,6 @@ import GHC.Exts
     (**##),
     (+#),
     (+##),
-    (-#),
     (/##),
     (<#),
     (<##),
@@ -95,26 +84,10 @@ import GHC.Exts
 import GHC.Float (divideDouble, floorDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWordListUnsafe, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatSize#, bigNatToWordList)
-import GHC.Num.Integer
-  ( Integer (..),
-    integerDecodeDouble#,
-    integerEncodeDouble,
-    integerFromInt,
-    integerFromInt#,
-    integerFromInt64#,
-    integerFromWordList,
-    integerLog2#,
-    integerLogBase,
-    integerLogBase#,
-    integerQuotRem,
-    integerShiftL#,
-    integerShiftR#,
-    integerToInt,
-  )
+import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatSize#)
+import GHC.Num.Integer ( Integer (..), integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
-import Math.NumberTheory.Logarithms (integerLog10', integerLogBase')
-
+import Math.NumberTheory.Logarithms (integerLogBase')
 -- *********** END NEW IMPORTS
 
 -- BEGIN isqrtB ****************************************************************
@@ -169,7 +142,7 @@ theNextIterations :: Itr -> Integer
 theNextIterations (Itr !currlen# !wrd64Xs yCumulated iRem !tbfx# yCumLst iRLst) = tni currlen# wrd64Xs tbfx# yCumLst iRLst
   where
     tni :: Int# -> [Word64] -> FloatingX# -> [Word64] -> [Int96] -> Integer
-    tni cl# xs t# ycXs irXs =
+    tni !cl# !xs !t# !ycXs !irXs =
       if null xs
         then undigits_ radixW32 ycXs -- yC
         else
@@ -750,6 +723,7 @@ split# d# =
 -- | Some Constants
 radixW32 :: (Integral a) => a
 radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
+{-# INLINE radixW32 #-}
 
 predRadixW32 :: (Integral a) => a
 predRadixW32 = 4294967295 -- 2 ^ finiteBitSize (0 :: Word32) -1
