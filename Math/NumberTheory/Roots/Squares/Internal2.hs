@@ -730,6 +730,7 @@ predRadixW32 = 4294967295 -- 2 ^ finiteBitSize (0 :: Word32) -1
 
 secndPlaceW32Radix :: Integer
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
+{-# INLINE secndPlaceW32Radix #-}
 
 radixW32Squared :: Integer
 radixW32Squared = 18446744073709551616 -- secndPlaceRadix
@@ -739,6 +740,7 @@ radixW32Cubed = 79228162514264337593543950336 -- secndPlaceRadix * radixW32
 
 sqrtOf2 :: Double
 sqrtOf2 = 1.4142135623730950488016887242097
+{-# INLINE sqrtOf2 #-}
 
 maxDouble :: Double
 maxDouble = 1.7976931348623157e308
