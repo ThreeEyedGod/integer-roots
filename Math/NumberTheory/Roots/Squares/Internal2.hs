@@ -46,6 +46,12 @@ import GHC.Exts
     Int#,
     Int64#,
     Word64#,
+    Word#, 
+    int2Word#, 
+    word2Int#,
+    minusWord#,
+    plusWord#,
+    uncheckedShiftL#,
     eqInt64#,
     eqWord64#,
     fmaddDouble#,
@@ -60,6 +66,7 @@ import GHC.Exts
     plusInt64#,
     plusWord64#,
     quotInt64#,
+    remInt64#, 
     sqrtDouble#,
     subInt64#,
     subWord64#,
@@ -84,10 +91,11 @@ import GHC.Exts
 import GHC.Float (divideDouble, floorDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatSize#)
+import GHC.Num.BigNat (BigNat#, BigNat, bigNatIsZero, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer ( Integer (..), integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Logarithms (integerLogBase')
+import GHC.Integer.Logarithms (wordLog2#)
 -- *********** END NEW IMPORTS
 
 -- BEGIN isqrtB ****************************************************************
@@ -578,13 +586,36 @@ sqrtSplitDbl (FloatingX d e) -- //FIXME FOR zero case
   | otherwise = (sqrtOf2 * sqrt d, shiftR (e - 1) 1) -- odd
 {-# INLINE sqrtSplitDbl #-}
 
+-- -- | actual sqrt call to the hardware for custom type happens here
+-- sqrtSplitDbl# :: FloatingX# -> (# Double#, Int64# #)
+-- sqrtSplitDbl# (FloatingX# d# e#)
+--   | isTrue# (d# ==## 0.00##) = case minBound :: Int64 of I64# mb# -> (# 0.0##, mb# #)
+--   | even (I64# e#) = (# sqrtDouble# d#, e# `quotInt64#` 2#Int64 #) -- even
+--   | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, (e# `subInt64#` 1#Int64) `quotInt64#` 2#Int64 #) -- odd sqrt2 times sqrt d#
+--   -- | otherwise = (# sqrtDouble# 2.00## *## d#, (e# `subInt64#` 1#Int64) `quotInt64#` 2#Int64 #) -- odd sqrt2 times sqrt d#
+-- {-# INLINE sqrtSplitDbl# #-}
+
 -- | actual sqrt call to the hardware for custom type happens here
 sqrtSplitDbl# :: FloatingX# -> (# Double#, Int64# #)
 sqrtSplitDbl# (FloatingX# d# e#)
-  | isTrue# (d# ==## 0.00##) = case minBound :: Int64 of I64# mb# -> (# 0.0##, mb# #)
-  | even (I64# e#) = (# sqrtDouble# d#, e# `quotInt64#` 2#Int64 #) -- even
-  | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, (e# `subInt64#` 1#Int64) `quotInt64#` 2#Int64 #) -- odd sqrt2 times sqrt d#
+  -- | isTrue# (d# ==## 0.00##) = case minBound :: Int64 of I64# mb# -> (# 0.0##, mb# #)
+  | yesEven = (# sqrtDouble# d#, quo64# #) -- even
+  | otherwise = (# sqrtDouble# 2.00## *## d#, quo64# #) -- odd sqrt2 times sqrt d#
+ where 
+  !(# yesEven, quo64# #) = _evenInt64# e#
 {-# INLINE sqrtSplitDbl# #-}
+
+_even, _odd       :: (Integral a) => a -> (Bool, a)
+_even n          =  let !(q,r) = n `quotRem` 2 in (r == 0, q) 
+_odd             =  _even
+{-# INLINE _even  #-}
+{-# INLINE _odd  #-}
+
+_evenInt64#, _oddInt64#       :: Int64# -> (# Bool, Int64# #)
+_evenInt64# n#         =   (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #) 
+_oddInt64#             =  _evenInt64#
+{-# INLINE _evenInt64#  #-}
+{-# INLINE _oddInt64# #-}
 
 sqrtDX :: Double -> Double
 sqrtDX d
@@ -697,16 +728,25 @@ unsafeword64ToFloatingX## w# = case W64# w# of i -> unsafeword64ToFloatingX# i
 {-# INLINE cI2D2_ #-}
 cI2D2_ :: BigNat# -> (# Double#, Int64# #)
 cI2D2_ bn#
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
-  | otherwise = case bigNatLog2# bn# of
+  | isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
+  -- | otherwise = case bigNatLog2# bn# of
+  | otherwise = case _bigNatLog2# bn# bnsz# of
       l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
         h# -> case bigNatShiftR# bn# (2## `timesWord#` h#) of
           mbn# -> (# bigNatEncodeDouble# mbn# 0#, 2#Int64 `timesInt64#` intToInt64# (word2Int# h#) #)
   where
-    -- threshold for shifting vs. direct fromInteger
-    -- we shift when we expect more than 256 bits
+    !bnsz# = bigNatSize# bn# 
     thresh# :: Int#
-    thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
+    !thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
+
+-- | Base 2 logarithm a bit faster
+_bigNatLog2# :: BigNat# -> Int# -> Word#
+_bigNatLog2# a s
+   | bigNatIsZero a = 0##
+   | otherwise           =
+      -- let i = int2Word# (bigNatSize# a) `minusWord#` 1##
+      let i = int2Word# s `minusWord#` 1##
+      in int2Word# (wordLog2# (bigNatIndex# a (word2Int# i))) `plusWord#` (i `uncheckedShiftL#` 6#) --WORD_SIZE_BITS_SHIFT#)
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
