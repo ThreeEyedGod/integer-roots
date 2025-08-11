@@ -732,8 +732,8 @@ cI2D2_ bn#
   -- | otherwise = case bigNatLog2# bn# of
   | otherwise = case _bigNatLog2# bn# bnsz# of
       l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
-        h# -> case bigNatShiftR# bn# (2## `timesWord#` h#) of
-          mbn# -> (# bigNatEncodeDouble# mbn# 0#, 2#Int64 `timesInt64#` intToInt64# (word2Int# h#) #)
+        h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
+          mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
   where
     !bnsz# = bigNatSize# bn# 
     thresh# :: Int#
