@@ -91,7 +91,7 @@ import GHC.Exts
 import GHC.Float (divideDouble, floorDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.BigNat (BigNat#, BigNat, bigNatIsZero, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatSize#)
+import GHC.Num.BigNat (BigNat#, bigNatIsZero, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer ( Integer (..), integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Logarithms (integerLogBase')
@@ -236,17 +236,17 @@ handleRems2 (# !ycXs, !yi64#, !ri_, !ri_Xs, ycScaled_ #)
           !adjYc = pred ycyi
           !rdr = fixRemainder adjYc ri_ -- this is an integer, in digitsUnsigned the argument is a natural below
        in (# W64# yAdj# : ycXs, yAdj#, fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | ri_ > 0 && excessLengthBy3 = let  
-                            !modulus3 = radixW32 ^ 3
-                            !adjustedRemainder3 = ri_ `mod` modulus3
-                            !riAdjustedXs = fromIntegral <$> digitsUnsigned radixW32 (fromIntegral adjustedRemainder3)
-                          in (# ycXsOutAsIs, yi64#, riAdjustedXs #)
+  -- | ri_ > 0 && excessLengthBy3 = let  -- is this check needed ?
+  --                           !modulus3 = radixW32 ^ 3
+  --                           !adjustedRemainder3 = ri_ `mod` modulus3
+  --                           !riAdjustedXs = fromIntegral <$> digitsUnsigned radixW32 (fromIntegral adjustedRemainder3)
+  --                         in (# ycXsOutAsIs, yi64#, riAdjustedXs #)
   | otherwise = (# ycXsOutAsIs, yi64#, ri_Xs #)
   where
     yiW64 = W64# yi64#
     yi = fromIntegral yiW64
     ycyi = ycScaled_ + yi -- accumulating the growing square root
-    ycXsOutAsIs = yiW64: ycXs
+    ycXsOutAsIs = yiW64 : ycXs
     lenCurrRemainder = 1 + integerLogBase' radixW32 yi -- //TODO THIS TAKES UP A CHUNK OF TIME length (digits (fromIntegral b) ri) makes little diff
     lenCurrSqrt = 1 + integerLogBase' radixW32 yi
     excessLengthBy3 = lenCurrRemainder >= lenCurrSqrt + 3
