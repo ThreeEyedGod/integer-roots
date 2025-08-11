@@ -139,10 +139,10 @@ stageList xs =
   if even l
     then
       let !(rstEvenLen, lastTwo) = splitLastTwo xs l
-       in (True, mkIW32EvenRestLst True rstEvenLen, lastTwo)
+       in (True, mkIW32EvenRestLst l True rstEvenLen, lastTwo)
     else
       let !(rstEvenLen, lastOne) = splitLastOne xs l
-       in (False, mkIW32EvenRestLst True rstEvenLen, lastOne)
+       in (False, mkIW32EvenRestLst l True rstEvenLen, lastOne)
   where
     !l = length xs
 
@@ -320,9 +320,8 @@ pairUp _ [_] = error "pairUp: Invalid singleton list"
 pairUp False _ = error "pairUp: Invalid odd length of list"
 
 {-# INLINE integerOfNxtPairsLst #-}
-integerOfNxtPairsLst :: [(Word32, Word32)] -> [Word64]
-integerOfNxtPairsLst = map iFrmTupleBaseW32 
--- integerOfNxtPairsLst = parallelMap Chunk 6 iFrmTupleBaseW32
+integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Word64]
+integerOfNxtPairsLst l = if l < 8 then map iFrmTupleBaseW32 else parallelMap Chunk 2 iFrmTupleBaseW32 -- assuming even dual core 
 
 -- | Strategies that may be used with parallel calls
 data Strats
@@ -343,8 +342,8 @@ iFrmTupleBaseW32 :: (Word32, Word32) -> Word64
 iFrmTupleBaseW32 xs = word64FromRvsrdTuple xs radixW32
 
 {-# INLINE mkIW32EvenRestLst #-}
-mkIW32EvenRestLst :: Bool -> [Word32] -> [Word64]
-mkIW32EvenRestLst evenLen xs = integerOfNxtPairsLst (pairUp evenLen xs)
+mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64]
+mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUp evenLen xs)
 
 --- END helpers
 --- BEGIN Core numeric helper functions
