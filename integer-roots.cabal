@@ -31,6 +31,7 @@ library
    ,ghc-prim >= 0.13.0
    ,data-dword >= 0.3.2.1
    ,integer-logarithms >= 1.0.4
+   ,parallel >= 3.2.2.0
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
   else

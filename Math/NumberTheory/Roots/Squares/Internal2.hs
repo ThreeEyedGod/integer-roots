@@ -31,6 +31,7 @@ where
 -- \*********** BEGIN NEW IMPORTS
 
 -- import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length, (!?))
+import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.DoubleWord (Int96)
 import Control.Arrow ((***))
 import Data.Bits (finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -91,7 +92,7 @@ import GHC.Exts
 import GHC.Float (divideDouble, floorDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.BigNat (BigNat#, bigNatIsZero, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
+import GHC.Num.BigNat (BigNat#, bigNatIsZero, bigNatLog2#, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer ( Integer (..), integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Logarithms (integerLogBase')
@@ -320,7 +321,22 @@ pairUp False _ = error "pairUp: Invalid odd length of list"
 
 {-# INLINE integerOfNxtPairsLst #-}
 integerOfNxtPairsLst :: [(Word32, Word32)] -> [Word64]
-integerOfNxtPairsLst = map iFrmTupleBaseW32
+integerOfNxtPairsLst = map iFrmTupleBaseW32 
+-- integerOfNxtPairsLst = parallelMap Chunk 6 iFrmTupleBaseW32
+
+-- | Strategies that may be used with parallel calls
+data Strats
+  = Chunk
+  | Buffer
+  | Split
+  deriving (Eq)
+
+-- | parallel map with 3 optional strategies
+parallelMap :: (NFData a, NFData b) => Strats -> Int -> (a->b) -> [a] -> [b]
+parallelMap strat stratParm f = case strat of
+  Chunk -> withStrategy (parListChunk stratParm rdeepseq) . map f
+  Buffer -> withStrategy (parBuffer stratParm rpar) . map f
+  Split -> withStrategy (parListSplitAt stratParm rdeepseq rdeepseq) . map f
 
 {-# INLINE iFrmTupleBaseW32 #-}
 iFrmTupleBaseW32 :: (Word32, Word32) -> Word64
@@ -729,8 +745,8 @@ unsafeword64ToFloatingX## w# = case W64# w# of i -> unsafeword64ToFloatingX# i
 cI2D2_ :: BigNat# -> (# Double#, Int64# #)
 cI2D2_ bn#
   | isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
-  -- | otherwise = case bigNatLog2# bn# of
-  | otherwise = case _bigNatLog2# bn# bnsz# of
+  | otherwise = case bigNatLog2# bn# of
+  -- | otherwise = case _bigNatLog2# bn# bnsz# of
       l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
         h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
           mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #) 
