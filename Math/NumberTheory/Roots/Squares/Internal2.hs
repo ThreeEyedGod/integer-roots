@@ -564,7 +564,7 @@ fsqraddFloatingX# (FloatingX# sA# expA#) (FloatingX# sC# expC#)
   | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
   | otherwise = case updateDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
   where
-    twoTimesExpA# = 2#Int64 `timesInt64#` expA# -- lazy till its needed in otherwise
+    !twoTimesExpA# = 2#Int64 `timesInt64#` expA# 
     !diff# = expC# `subInt64#` twoTimesExpA#
 
 {-# INLINE fm1addFloatingX# #-}
@@ -733,7 +733,7 @@ cI2D2_ bn#
   | otherwise = case _bigNatLog2# bn# bnsz# of
       l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
         h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
-          mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
+          mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #) 
   where
     !bnsz# = bigNatSize# bn# 
     thresh# :: Int#
@@ -741,7 +741,7 @@ cI2D2_ bn#
 
 -- | Base 2 logarithm a bit faster
 _bigNatLog2# :: BigNat# -> Int# -> Word#
-_bigNatLog2# a s
+_bigNatLog2# a s -- s = bigNatSize# a 
    | bigNatIsZero a = 0##
    | otherwise           =
       -- let i = int2Word# (bigNatSize# a) `minusWord#` 1##
