@@ -32,6 +32,8 @@ library
    ,data-dword >= 0.3.2.1
    ,integer-logarithms >= 1.0.4
    ,parallel >= 3.2.2.0
+   ,containers >= 0.7
+   -- 0.8 of containers results in a confilct
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
   else
