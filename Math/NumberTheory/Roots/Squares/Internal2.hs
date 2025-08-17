@@ -281,11 +281,10 @@ computeRemFitted yc ta yTilde_# = let
       !i = fromIntegral (W64# yTilde_#)
       !intToUse = allWithin yc ta i 
       !rdr = case intToUse of 
-                  -- Is32 -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in  fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
-                  -- (Is64) -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in  fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
+                  -- going for broke : (Is32; Is64) -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
                   -- (Is96; Is128) -> let (i128, ycScaled128, ta128) = (fromIntegral $ W64# yTilde_# :: Int128, fromIntegral ycScaled :: Int128, fromIntegral ta :: Int128) in fromIntegral (ta128 - i128 * (2 *  ycScaled128 + i128))
-                  Is256 -> let (i256, ycScaled256, ta256) = (fromIntegral $ W64# yTilde_# :: Int256, fromIntegral ycScaled :: Int256, fromIntegral ta :: Int256) in case i256 `safeAdd256` ycScaled256 of 
-                                          Right iPlusycScaled -> case ycScaled256 `safeAdd256` iPlusycScaled of 
+                  Is256 -> let !(i256, ycScaled256, ta256) = (fromIntegral $ W64# yTilde_# :: Int256, fromIntegral ycScaled :: Int256, fromIntegral ta :: Int256) in case i256 `safePosAdd256` ycScaled256 of 
+                                          Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
                                               Right iPlusDoubleYcScaled -> case i256 `safeMul256` iPlusDoubleYcScaled of 
                                                   Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + ta256 of rdr256 -> fromIntegral rdr256
                                                   -- Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled `safeAdd256` ta256 of 
