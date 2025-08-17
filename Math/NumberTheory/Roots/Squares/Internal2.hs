@@ -258,7 +258,7 @@ theNextIterationsSeq (Itr_ !currlen# !wrd64Seq yCumulated iRem !tbfx#) = tniISq 
               !(sqPass, twoLSPlaces) = breakDownSeq sq
               !tA_ = tA * secndPlaceW32Radix + fromIntegral twoLSPlaces
               !tC_ = scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
-              !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgt_# tA_ tC_ of yTilde_# -> computeRemII256 yC_ tA_ yTilde_#
+              !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgt_# tA_ tC_ of yTilde_# -> computeRemFitted yC_ tA_ yTilde_#
               !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
            in tniISq (cl# +# 1#) sqPass tcfx# ycUpdated remFinal--rFinalXs
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
@@ -434,12 +434,12 @@ computeRemFitted yc ta yTilde_# = let
       !i = fromIntegral (W64# yTilde_#)
       !intToUse = allWithin yc ta i 
       !rdr = case intToUse of 
-                  Is32 -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in  fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
+                  -- Is32 -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in  fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
                   -- (Is64) -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in  fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
                   -- (Is96; Is128) -> let (i128, ycScaled128, ta128) = (fromIntegral $ W64# yTilde_# :: Int128, fromIntegral ycScaled :: Int128, fromIntegral ta :: Int128) in fromIntegral (ta128 - i128 * (2 *  ycScaled128 + i128))
-                  Is256 -> let (i256, ycScaled256, ta256) = (fromIntegral $ W64# yTilde_# :: Word256, fromIntegral ycScaled :: Word256, fromIntegral ta :: Word256) in case i256 `safeAddW256` ycScaled256 of 
-                                          Right iPlusycScaled -> case ycScaled256 `safeAddW256` iPlusycScaled of 
-                                              Right iPlusDoubleYcScaled -> case i256 `safeMulW256` iPlusDoubleYcScaled of 
+                  Is256 -> let (i256, ycScaled256, ta256) = (fromIntegral $ W64# yTilde_# :: Int256, fromIntegral ycScaled :: Int256, fromIntegral ta :: Int256) in case i256 `safeAdd256` ycScaled256 of 
+                                          Right iPlusycScaled -> case ycScaled256 `safeAdd256` iPlusycScaled of 
+                                              Right iPlusDoubleYcScaled -> case i256 `safeMul256` iPlusDoubleYcScaled of 
                                                   Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + ta256 of rdr256 -> fromIntegral rdr256
                                                   -- Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled `safeAdd256` ta256 of 
                                                   --     Right rdr64 -> fromIntegral rdr256 
@@ -605,6 +605,7 @@ safeAdd256 x y =
      else Right result
 {-# INLINE safeAdd256 #-}
 
+-- //todo not working ?
 safeAddW256 :: Word256 -> Word256 -> Either Integer Word256
 safeAddW256 x y =
   let !result = x + y
@@ -613,6 +614,7 @@ safeAddW256 x y =
      else Right result
 {-# INLINE safeAddW256 #-}
 
+-- //todo not working ?
 safeSubW256 :: Word256 -> Word256 -> Either Integer Word256
 safeSubW256 x y =
   let !result = x + (negate y)
@@ -629,6 +631,7 @@ safePosAdd256 x y =
      else Right result
 {-# INLINE safePosAdd256 #-}
 
+
 safeMul256 :: Int256 -> Int256 -> Either Integer Int256
 safeMul256 x y =
   let !result = x * y
@@ -638,6 +641,7 @@ safeMul256 x y =
      else Right result
 {-# INLINE safeMul256 #-}
 
+-- //todo not working ?
 safeMulW256 :: Word256 -> Word256 -> Either Integer Word256
 safeMulW256 x y =
   let !result = x * y
