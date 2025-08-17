@@ -279,6 +279,15 @@ computeRemFitted yc ta yTilde_# = let
       !i = fromIntegral (W64# yTilde_#)
       !intToUse = maxIntSizeAcross yc ta i 
       !(ycScaled, rdr) = case intToUse of 
+                  Is64 -> case radixW32 `safePosMul64` fromIntegral yc of 
+                              Right ycScaled64 -> case fromIntegral (W64# yTilde_#) `safePosAdd64` ycScaled64 of 
+                                          Right iPlusycScaled -> case ycScaled64 `safePosAdd64` iPlusycScaled of 
+                                              Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul64` iPlusDoubleYcScaled of 
+                                                  Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr64 -> (fromIntegral ycScaled64,fromIntegral rdr64)
+                                                  Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - iTimesiPlusDoubleYcScaledIN)
+                                              Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
+                                          Left iPlusycScaledIN ->  (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
+                              Left ycScaled' -> (ycScaled, ta - i * (double ycScaled' + i))
                   Is256 -> case radixW32 `safePosMul256` fromIntegral yc of 
                               Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of 
                                           Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
@@ -362,6 +371,15 @@ safeMul64 x y =
      then Left (toInteger x * toInteger y)
      else Right result
 {-# INLINE safeMul64 #-}
+
+safePosMul64 :: Int64 -> Int64 -> Either Integer Int64
+safePosMul64 x y =
+  let !result = x * y
+      -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
+  in if result `div` y /= x
+     then Left (toInteger x * toInteger y)
+     else Right result
+{-# INLINE safePosMul64 #-}
 
 safeAdd128 :: Int128 -> Int128 -> Either Integer Int128
 safeAdd128 x y =
