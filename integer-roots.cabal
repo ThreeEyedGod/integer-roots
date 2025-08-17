@@ -47,6 +47,7 @@ library
     Math.NumberTheory.Roots.Cubes
     Math.NumberTheory.Roots.Fourth
     Math.NumberTheory.Roots.General
+    Math.NumberTheory.Roots.General_
     Math.NumberTheory.Roots.Squares
     Math.NumberTheory.Roots.Squares_
     Math.NumberTheory.Roots.Squares.Internal
@@ -68,7 +69,9 @@ test-suite integer-roots-tests
     tasty-smallcheck >=0.8 && <0.9
   other-modules:
     Math.NumberTheory.Roots.CubesTests
+    Math.NumberTheory.Roots.CubesTests_
     Math.NumberTheory.Roots.FourthTests
+    Math.NumberTheory.Roots.FourthTests_
     Math.NumberTheory.Roots.GeneralTests
     Math.NumberTheory.Roots.GeneralTests_
     Math.NumberTheory.Roots.SquaresTests

@@ -16,18 +16,25 @@ main
     (\(QuickCheckTests n) -> QuickCheckTests (max n 10000))
   $ adjustOption
     (\(SmallCheckDepth n) -> SmallCheckDepth (max n 100))
-  $ tests
+  $ tests_
+
+alltests :: TestTree 
+alltests = sequentialTestGroup "BOTH " AllFinish [tests, tests_] 
 
 tests :: TestTree
 tests = testGroup "Root Tests"
   [ 
-  --  testGroup "All"
-  --   [ Squares.testSuite
-  --   , Cubes.testSuite
-  --   , Fourth.testSuite
-  --   , General.testSuite
-  --   ]
-  -- , 
+   testGroup "All"
+    [ Squares.testSuite
+    , Cubes.testSuite
+    , Fourth.testSuite
+    , General.testSuite
+    ]
+  ]
+
+tests_ :: TestTree
+tests_ = testGroup "Root Tests"
+  [ 
   testGroup "All_"
     [ Squares_.testSuite
     , Cubes.testSuite

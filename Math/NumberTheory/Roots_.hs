@@ -26,4 +26,4 @@ module Math.NumberTheory.Roots_
 
 import Math.NumberTheory.Roots.Squares_
 import Math.NumberTheory.Roots.Cubes
-import Math.NumberTheory.Roots.General
+import Math.NumberTheory.Roots.General_
