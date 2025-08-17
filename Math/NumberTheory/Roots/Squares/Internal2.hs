@@ -214,10 +214,9 @@ theNextIterationsSeq (Itr_ !currlen# !wrd64Seq yCumulated iRem !tbfx#) = tniISq 
 --         _ -> Nothing
 
 breakDownSeq :: Data.Sequence.Seq Word64 -> (Data.Sequence.Seq Word64, Word64)
-breakDownSeq s = case Data.Sequence.viewr s of
-        rest :> x -> (rest, x)
+breakDownSeq !s = case Data.Sequence.viewr s of
+        !rest :> !x -> (rest, x)
         _ -> (Data.Sequence.empty, 0)
-
 
 -- | Using (***): lifts two arrows to work on a pair of inputs
 pairUndigits :: (Integral a, Integral b, Integral c) => a -> ([b], [c]) -> (Integer, Integer)
@@ -277,23 +276,19 @@ computeRemXs _ _ _ = error "wrong"
 computeRemFitted :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
 computeRemFitted yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
 computeRemFitted yc ta yTilde_# = let 
-      !ycScaled = yc * radixW32
       !i = fromIntegral (W64# yTilde_#)
-      !intToUse = allWithin yc ta i 
-      !rdr = case intToUse of 
-                  -- going for broke : (Is32; Is64) -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
-                  -- (Is96; Is128) -> let (i128, ycScaled128, ta128) = (fromIntegral $ W64# yTilde_# :: Int128, fromIntegral ycScaled :: Int128, fromIntegral ta :: Int128) in fromIntegral (ta128 - i128 * (2 *  ycScaled128 + i128))
-                  Is256 -> let !(i256, ycScaled256, ta256) = (fromIntegral $ W64# yTilde_# :: Int256, fromIntegral ycScaled :: Int256, fromIntegral ta :: Int256) in case i256 `safePosAdd256` ycScaled256 of 
+      !intToUse = maxIntSizeAcross yc ta i 
+      !(ycScaled, rdr) = case intToUse of 
+                  Is256 -> case radixW32 `safePosMul256` fromIntegral yc of 
+                              Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of 
                                           Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
-                                              Right iPlusDoubleYcScaled -> case i256 `safeMul256` iPlusDoubleYcScaled of 
-                                                  Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + ta256 of rdr256 -> fromIntegral rdr256
-                                                  -- Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled `safeAdd256` ta256 of 
-                                                  --     Right rdr64 -> fromIntegral rdr256 
-                                                  --     Left rdrIN -> rdrIN
-                                                  Left iTimesiPlusDoubleYcScaledIN ->  ta - iTimesiPlusDoubleYcScaledIN
-                                              Left iPlusDoubleYcScaledIN ->  ta - i * iPlusDoubleYcScaledIN
-                                          Left iPlusycScaledIN ->  ta - i * (iPlusycScaledIN + ycScaled)
-                  (IsIN; _) -> ta - i * (double ycScaled + i)
+                                              Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul256` iPlusDoubleYcScaled of 
+                                                  Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr256 -> (fromIntegral ycScaled256,fromIntegral rdr256)
+                                                  Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
+                                              Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
+                                          Left iPlusycScaledIN ->  (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
+                              Left ycScaled' -> (ycScaled, ta - i * (double ycScaled' + i))
+                  (IsIN; _) -> let ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled +  i)) + 1 #) else (# yTilde_#, rdr #) 
     in (# fromIntegral (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
 {-# INLINE computeRemFitted #-}
@@ -333,11 +328,11 @@ data MaxBounds
   | Is128
   | Is256
   | IsIN
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord) -- Ord for using maximum later on 
 
-allWithin :: Integer -> Integer -> Integer -> MaxBounds 
-allWithin n1 n2 n3 = maximum (fromMaybe IsIN <$> firstTrueOf <$> lazyXsFits <$> [n1,n2,n3])
-{-# INLINE allWithin #-}
+maxIntSizeAcross :: Integer -> Integer -> Integer -> MaxBounds 
+maxIntSizeAcross n1 n2 n3 = maximum (fromMaybe IsIN <$> firstTrueOf <$> lazyXsFits <$> [n1,n2,n3])
+{-# INLINE maxIntSizeAcross #-}
 
 lazyXsFits :: Integer -> [Maybe MaxBounds]
 lazyXsFits n = [if fitsInMaxInt32 n then Just Is32 else Nothing, if fitsInMaxInt64 n then Just Is64 else Nothing, if fitsInMaxInt96 n then Just Is96 else Nothing, if fitsInMaxInt128 n then Just Is128 else Nothing, if fitsInMaxWord256 n then Just Is256 else Nothing, Just IsIN]
@@ -453,6 +448,15 @@ safeMul256 x y =
      then Left (toInteger x * toInteger y)
      else Right result
 {-# INLINE safeMul256 #-}
+
+safePosMul256 :: Int256 -> Int256 -> Either Integer Int256
+safePosMul256 x y =
+  let !result = x * y
+      -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
+  in if result `div` y /= x
+     then Left (toInteger x * toInteger y)
+     else Right result
+{-# INLINE safePosMul256 #-}
 
 -- //todo not working ?
 safeMulW256 :: Word256 -> Word256 -> Either Integer Word256

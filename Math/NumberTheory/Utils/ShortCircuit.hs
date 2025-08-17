@@ -133,3 +133,4 @@ instance Shortcircuit (Either a b) where
 
 validateList :: (a -> Either e a) -> [a] -> Either e [a]
 validateList = traverse
+
