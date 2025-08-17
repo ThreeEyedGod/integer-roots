@@ -434,7 +434,8 @@ computeRemFitted yc ta yTilde_# = let
       !i = fromIntegral (W64# yTilde_#)
       !intToUse = allWithin yc ta i 
       !rdr = case intToUse of 
-                  -- (Is32; Is64) -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in  fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
+                  Is32 -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in  fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
+                  -- (Is64) -> let (i64, ycScaled64, ta64) = (fromIntegral (W64# yTilde_#) :: Int64, fromIntegral ycScaled :: Int64, fromIntegral ta :: Int64) in  fromIntegral (ta64 - i64 * (2 * ycScaled64 + i64))
                   -- (Is96; Is128) -> let (i128, ycScaled128, ta128) = (fromIntegral $ W64# yTilde_# :: Int128, fromIntegral ycScaled :: Int128, fromIntegral ta :: Int128) in fromIntegral (ta128 - i128 * (2 *  ycScaled128 + i128))
                   Is256 -> let (i256, ycScaled256, ta256) = (fromIntegral $ W64# yTilde_# :: Word256, fromIntegral ycScaled :: Word256, fromIntegral ta :: Word256) in case i256 `safeAddW256` ycScaled256 of 
                                           Right iPlusycScaled -> case ycScaled256 `safeAddW256` iPlusycScaled of 
