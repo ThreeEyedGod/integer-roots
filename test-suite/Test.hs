@@ -5,6 +5,7 @@ import Test.Tasty.SmallCheck
 import qualified Math.NumberTheory.Roots.CubesTests as Cubes
 import qualified Math.NumberTheory.Roots.FourthTests as Fourth
 import qualified Math.NumberTheory.Roots.GeneralTests as General
+import qualified Math.NumberTheory.Roots.GeneralTests as General_
 import qualified Math.NumberTheory.Roots.SquaresTests as Squares
 import qualified Math.NumberTheory.Roots.SquaresTests_ as Squares_
 
@@ -31,6 +32,6 @@ tests = testGroup "Root Tests"
     [ Squares_.testSuite
     , Cubes.testSuite
     , Fourth.testSuite
-    , General.testSuite
+    , General_.testSuite
     ]
   ]
