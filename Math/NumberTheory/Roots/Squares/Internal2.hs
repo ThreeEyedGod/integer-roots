@@ -866,9 +866,11 @@ add# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
           !(D# !scaleD#) = fromIntegral (I64# scale#)
           !scaledLittle# = sLittle# *## (2.00## **## scaleD#)
           !resSignif# = sBig# +## scaledLittle#
-       in if isTrue# (resSignif# >=## 2.0##)
-            then FloatingX# (resSignif# *## 0.5##) (expBig# `plusInt64#` 1#Int64)
-            else FloatingX# resSignif# expBig#
+      --  in if isTrue# (resSignif# >=## 2.0##)
+      --       then FloatingX# (resSignif# *## 0.5##) (expBig# `plusInt64#` 1#Int64)
+      --       else FloatingX# resSignif# expBig#
+       in 
+          FloatingX# resSignif# expBig#
 
 {-# INLINE mul# #-}
 mul# :: FloatingX# -> FloatingX# -> FloatingX#
@@ -882,9 +884,11 @@ mul# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) =
   -- \| otherwise
   let !resExp# = expA# `plusInt64#` expB#
       !resSignif# = sA# *## sB#
-   in if isTrue# (resSignif# >=## 2.0##)
-        then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
-        else FloatingX# resSignif# resExp#
+  --  in if isTrue# (resSignif# >=## 2.0##) -- why is this not needed 
+  --       then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
+  --       else FloatingX# resSignif# resExp#
+   in 
+      FloatingX# resSignif# resExp#
 
 {-# INLINE sqr# #-}
 sqr# :: FloatingX# -> FloatingX#
@@ -931,14 +935,16 @@ unsafeDivide# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) =
       !resSignif# = s1# /## s2#
       -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
       -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
-      !(# finalSignif#, finalExp# #) =
-        if isTrue# (resSignif# <## 1.0##)
-          then (# resSignif# *## 2.0##, resExp# `subInt64#` 1#Int64 #)
-          else (# resSignif#, resExp# #)
+      !(# finalSignif#, finalExp# #) = (# resSignif#, resExp# #)
+      -- this following normalizrion code does not seem to be needed !!!!!!!! Double Check
+      -- !(# finalSignif#, finalExp# #) =
+      --   if isTrue# (resSignif# <## 1.0##)
+      --     then (# resSignif# *## 2.0##, resExp# `subInt64#` 1#Int64 #)
+      --     else (# resSignif#, resExp# #)
    in -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
       -- //TODO fix this next line
       -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
-      if isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` 0#Int64)
+      if isTrue# (finalSignif# <## 1.0##) && isTrue# (finalExp# `leInt64#` 0#Int64)
         then zero#
         else FloatingX# finalSignif# finalExp#
 
@@ -1131,6 +1137,7 @@ _bigNatLog2# a s -- s = bigNatSize# a
       -- let i = int2Word# (bigNatSize# a) `minusWord#` 1##
       let i = int2Word# s `minusWord#` 1##
       in int2Word# (wordLog2# (bigNatIndex# a (word2Int# i))) `plusWord#` (i `uncheckedShiftL#` 6#) --WORD_SIZE_BITS_SHIFT#)
+{-# INLINE _bigNatLog2# #-}
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
