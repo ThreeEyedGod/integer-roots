@@ -287,7 +287,7 @@ computeRemFitted yc ta yTilde_# = let
                                                   Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - iTimesiPlusDoubleYcScaledIN)
                                               Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
                                           Left iPlusycScaledIN ->  (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
-                              Left ycScaled' -> (ycScaled, ta - i * (double ycScaled' + i))
+                              Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
                   (Is64;Is96;Is128) -> case radixW32 `safePosMul256` fromIntegral yc of 
                               Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of 
                                           Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
@@ -296,7 +296,7 @@ computeRemFitted yc ta yTilde_# = let
                                                   Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
                                               Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
                                           Left iPlusycScaledIN ->  (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
-                              Left ycScaled' -> (ycScaled, ta - i * (double ycScaled' + i))
+                              Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
                   (Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled +  i)) + 1 #) else (# yTilde_#, rdr #) 
     in (# fromIntegral (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
