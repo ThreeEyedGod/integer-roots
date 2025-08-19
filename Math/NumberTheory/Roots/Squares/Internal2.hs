@@ -770,7 +770,7 @@ sqrtSplitDbl# :: FloatingX# -> (# Double#, Int64# #)
 sqrtSplitDbl# (FloatingX# d# e#)
   -- | isTrue# (d# ==## 0.00##) = case minBound :: Int64 of I64# mb# -> (# 0.0##, mb# #)
   | yesEven = (# sqrtDouble# d#, quo64# #) -- even
-  | otherwise = (# sqrtDouble# 2.00## *## d#, quo64# #) -- odd sqrt2 times sqrt d#
+  | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, quo64# #) -- odd sqrt2 times sqrt d#
  where 
   !(# yesEven, quo64# #) = _evenInt64# e#
 {-# INLINE sqrtSplitDbl# #-}
