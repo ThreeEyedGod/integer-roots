@@ -35,7 +35,6 @@ where
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.DoubleWord (Int96, Int256)
 import Data.WideWord (Int128, Word256, zeroInt128) -- he says it's coded to be as fast as possible
-import Control.Arrow ((***), (&&&))
 import Data.Bits (finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.FastDigits (digitsUnsigned, undigits)
@@ -124,8 +123,7 @@ theFi xs
             let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
                 ysq# = yT64# `timesWord64#` yT64#
                 diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleFirstRem (# [], yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-            --  in handleFirstRem (# [], yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
        in ItrLst_ 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#) 
   | otherwise =
       let yT64# = largestNSqLTEOdd## i#
@@ -407,8 +405,8 @@ safeMulW256 x y =
      else Right result
 {-# INLINE safeMulW256 #-}
 
-handleFirstRem :: (# [Word64], Word64#, Integer #) -> (# Integer, Word64#, Integer #)
-handleFirstRem (# ycXs, yi64#, ri_ #)
+handleFirstRem :: (# Word64#, Integer #) -> (# Integer, Word64#, Integer #)
+handleFirstRem (# yi64#, ri_ #)
   | ri_ < 0 =
       let !yAdj# = yi64# `subWord64#` 1#Word64
           !adjYc = pred ycyi
@@ -416,13 +414,12 @@ handleFirstRem (# ycXs, yi64#, ri_ #)
        in (# adjYc, yAdj#, rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
   | otherwise = (# ycyi, yi64#, ri_ #)
   where
-    -- !ycyi = ycScaled_ + fromIntegral (W64# yi64#) -- accumulating the growing square root
-    !ycyi = undigits radixW32 (W64# yi64# : ycXs) -- accumulating the growing square root
+    !ycyi = fromIntegral (W64# yi64#) -- accumulating the growing square root
 {-# INLINE handleFirstRem #-}
 
 -- -- Fix remainder accompanying a 'next downed digit'
 fixRemainder :: Integer -> Integer -> Integer
-fixRemainder !tcplusdgtadj !rdr = rdr + double tcplusdgtadj + 1
+fixRemainder !newYc !rdr = rdr + double newYc + 1
 {-# INLINE fixRemainder #-}
 
 -- | HELPER functions
