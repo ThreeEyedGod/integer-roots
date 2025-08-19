@@ -178,7 +178,7 @@ nxtDgt 0 !_ = 0#Word64
 nxtDgt (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
 nxtDgt n@(IP bn#) tcfx#
   | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
-  | otherwise = comput_ (preComput_ bn# tcfx#)
+  | otherwise = computFx (preComputFx bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
@@ -197,13 +197,13 @@ preComput a# tcfx# =
    in (# a#, c#, r# #)
 {-# INLINE preComput #-}
 
-preComput_ :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComput_ tA__bn# tCFX# = case unsafebigNat2FloatingX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
-{-# INLINE preComput_ #-}
+preComputFx :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
+preComputFx tA__bn# tCFX# = case unsafebigNat2FloatingX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+{-# INLINE preComputFx #-}
 
-comput_ :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
-comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
-{-# INLINE comput_ #-}
+computFx :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
+computFx (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+{-# INLINE computFx #-}
 
 computeRem :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
 computeRem yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
