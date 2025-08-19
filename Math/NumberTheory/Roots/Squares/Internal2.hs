@@ -118,12 +118,13 @@ import Math.NumberTheory.Utils.ShortCircuit (firstTrueOf)
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 -- isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
-isqrtB n = fromInteger . theNextIterationsSeq . theFi_ . dgtsLstBase32 . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsSeqOpt . theFi_ . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 
 -- | Iteration loop data - these records have vectors / lists in them
 data Itr = Itr {lv# :: {-# UNPACK #-} !Int#, lstW32_ :: {-# UNPACK #-} ![Word64], yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: {-# UNPACK #-} !FloatingX#, yCumLst :: ![Word64], iR :: ![Int96]} deriving (Eq)
 data Itr_ = Itr_ {lv_# :: {-# UNPACK #-} !Int#, seqW32_ :: {-# UNPACK #-} !(Data.Sequence.Seq Word64), yCumulative__ :: !Integer, iRem__ :: {-# UNPACK #-} !Integer, tb_# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
+data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
 theFi :: [Word32] -> Itr
 theFi xs
@@ -209,6 +210,30 @@ theNextIterationsSeq (Itr_ !currlen# !wrd64Seq yCumulated iRem !tbfx#) = tniISq 
            in tniISq (cl# +# 1#) sqPass tcfx# ycUpdated remFinal--rFinalXs
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
+-- processRight delegates to the Foldable instance
+processRight :: (Word64 -> acc -> acc) -> acc -> Data.Sequence.Seq Word64 -> acc
+processRight = foldr
+{-# INLINE processRight #-}
+
+theNextIterationsSeqOpt :: Itr_ -> Integer
+-- theNextIterationsSeqOpt (Itr_ !currlen# !wrd64Seq yCumulatedAcc0 iRem !tbfx#) = yCumulative___ $ processRight (\xw64 accItr__ -> tniISqWord64 xw64 accItr__) (Itr__ currlen# yCumulatedAcc0 iRem tbfx#) wrd64Seq
+theNextIterationsSeqOpt (Itr_ !currlen# !wrd64Seq !yCumulatedAcc0 !iRem !tbfx#) = yCumulative___ $ processRight tniISqWord64 (Itr__ currlen# yCumulatedAcc0 iRem tbfx#) wrd64Seq
+  where
+    {-# INLINE tniISqWord64 #-}
+    tniISqWord64 :: Word64 -> Itr__ -> Itr__
+    tniISqWord64 sqW64 (Itr__ !cl# !yCAcc_ !tA !t# )  =
+          let 
+              -- !(xsPass, twoLSPlaces) = fromMaybe ([], 0) (unsnoc xs)
+              -- !(xsPass, twoLSPlaces) = (init &&& last)  --(init xs, last xs)
+              -- !(sqPass, twoLSPlaces) = fromMaybe (Data.Sequence.empty,0) (breakDownSeq sq)
+              -- !(sqPass, twoLSPlaces) = breakDownSeq sq
+              !tA_ = tA * secndPlaceW32Radix + fromIntegral sqW64
+              !tC_ = scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
+              !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgt_# tA_ tC_ of yTilde_# -> computeRemFitted yCAcc_ tA_ yTilde_#
+              !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
+           in (Itr__ (cl# +# 1#)  ycUpdated remFinal tcfx#) --rFinalXs
+-- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
+
 
 -- breakDownSeq :: Data.Sequence.Seq Word64 -> Maybe (Data.Sequence.Seq Word64, Word64)
 -- breakDownSeq s = case Data.Sequence.viewr s of
@@ -290,9 +315,10 @@ computeRemFitted :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Intege
 computeRemFitted yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
 computeRemFitted yc ta yTilde_# = let 
       !i = fromIntegral (W64# yTilde_#)
+      -- !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       !intToUse = maxIntSizeAcross yc ta i 
       !(ycScaled, rdr) = case intToUse of 
-                  -- Is32 -> twiceFmulAdd yc ta yTilde_#
+                  Is32 -> twiceFmulAdd yc ta yTilde_#
                   -- Is32 -> case radixW32 `safePosMul64` fromIntegral yc of 
                   --             Right ycScaled64 -> case fromIntegral (W64# yTilde_#) `safePosAdd64` ycScaled64 of 
                   --                         Right iPlusycScaled -> case ycScaled64 `safePosAdd64` iPlusycScaled of 
