@@ -899,8 +899,8 @@ unsafeword64ToFloatingX## w# = case W64# w# of i -> unsafeword64ToFloatingX# i
 cI2D2_ :: BigNat# -> (# Double#, Int64# #)
 cI2D2_ bn#
   | isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
-  | otherwise = case bigNatLog2# bn# of
-  -- | otherwise = case _bigNatLog2# bn# bnsz# of
+  -- | otherwise = case bigNatLog2# bn# of
+  | otherwise = case _bigNatLog2# bn# bnsz# of
       l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
         h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
           mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #) 
@@ -993,12 +993,24 @@ nextUpFX# (FloatingX# s# e#)
   -- | otherwise = case nextUp# s# of interimS# -> if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
   | otherwise = case nextUp# s# of interimS# -> FloatingX# interimS# e#
 
+{-# INLINE nextUpFXNormalized# #-}
+nextUpFXNormalized# :: FloatingX# -> FloatingX#
+nextUpFXNormalized# (FloatingX# s# e#)
+  | isTrue# (s# ==## 0.0##) = minValue#
+  | otherwise = case nextUp# s# of interimS# -> if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
+
 {-# INLINE nextDownFX# #-}
 nextDownFX# :: FloatingX# -> FloatingX#
 nextDownFX# x@(FloatingX# s# e#)
   | isTrue# (s# ==## 0.0##) || x == minValue# = zero#
   -- | otherwise = case nextDown# s# of interimS# -> if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#
   | otherwise = case nextDown# s# of interimS# -> FloatingX# interimS# e#
+
+{-# INLINE nextDownFXNormalized# #-}
+nextDownFXNormalized# :: FloatingX# -> FloatingX#
+nextDownFXNormalized# x@(FloatingX# s# e#)
+  | isTrue# (s# ==## 0.0##) || x == minValue# = zero#
+  | otherwise = case nextDown# s# of interimS# -> if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#
 
 --- *********************
 -- -- Integer square root with remainder, using the Karatsuba Square Root
