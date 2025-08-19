@@ -24,8 +24,6 @@ source-repository head
 library
   build-depends:
     base >=4.9 && <5
-    -- vector, fast-digits and floating-bits used by internal2 (isqrtB)
-  --  ,vector >= 0.13.2.0 
    ,fast-digits >= 0.3.2.0
    ,floating-bits >= 0.3.1.0
    ,ghc-prim >= 0.13.0
@@ -33,8 +31,7 @@ library
    ,wide-word >= 0.1.7.1
    ,integer-logarithms >= 1.0.4
    ,parallel >= 3.2.2.0
-   ,containers >= 0.7
-   -- 0.8 of containers results in a confilct
+   -- Note if ever using containers 0.8 of containers results in a confilct
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
   else

@@ -32,7 +32,6 @@ where
 
 -- \*********** BEGIN NEW IMPORTS
 
--- import qualified Data.Vector.Unboxed as VU (Vector, unsafeIndex, unsafeHead, null, uncons, fromList, singleton, unsafeDrop, length, (!?))
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.DoubleWord (Int96, Int256)
 import Data.WideWord (Int128, Word256, zeroInt128) -- he says it's coded to be as fast as possible
@@ -100,10 +99,7 @@ import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.BigNat (BigNat#, bigNatIsZero, bigNatLog2#, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer ( Integer (..), integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
-import Math.NumberTheory.Logarithms (integerLogBase')
 import GHC.Integer.Logarithms (wordLog2#)
-import qualified Data.Sequence (Seq, empty, singleton, fromList, null, length, splitAt) -- 0.8 does not work results in conflicts
-import Data.Sequence ( ViewR( EmptyR ) , ViewL( EmptyL ), ViewL( (:<) ), ViewR( (:>) ), (<|), pattern (:<|), viewr, viewl, Seq (Empty))
 import Math.NumberTheory.Utils.ShortCircuit (firstTrueOf)
 -- *********** END NEW IMPORTS
 
@@ -117,52 +113,12 @@ import Math.NumberTheory.Utils.ShortCircuit (firstTrueOf)
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
--- isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
--- isqrtB n = fromInteger . theNextIterationsSeqOpt . theFi_ . dgtsLstBase32 . fromIntegral $ n
 isqrtB n = fromInteger . theNextIterationsListOpt . theFi___ . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 
 -- | Iteration loop data - these records have vectors / lists in them
-data Itr = Itr {lv# :: {-# UNPACK #-} !Int#, lstW32_ :: {-# UNPACK #-} ![Word64], yCumulative :: !Integer, iRem_ :: {-# UNPACK #-} !Integer, tb# :: {-# UNPACK #-} !FloatingX#, yCumLst :: ![Word64], iR :: ![Int96]} deriving (Eq)
-data Itr_ = Itr_ {lv_# :: {-# UNPACK #-} !Int#, seqW32_ :: {-# UNPACK #-} !(Data.Sequence.Seq Word64), yCumulative__ :: !Integer, iRem__ :: {-# UNPACK #-} !Integer, tb_# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 data ItrLst_ = ItrLst_ {lvlst# :: {-# UNPACK #-} !Int#, lstW32 :: {-# UNPACK #-} ![Word64], yCumulative_ :: !Integer, iRem :: {-# UNPACK #-} !Integer, tb___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
-
-theFi :: [Word32] -> Itr
-theFi xs
-  | evenLen =
-      let !(# ycOutXs, !yc, !y1#, !remInteger #) =
-            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                ysq# = yT64# `timesWord64#` yT64#
-                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleRems (# [], 0, yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-       in Itr 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#) ycOutXs [fromIntegral remInteger]
-  | otherwise =
-      let yT64# = largestNSqLTEOdd## i#
-          y = W64# yT64#
-          !remInteger = fromIntegral $ W64# (i# `subWord64#` (yT64# `timesWord64#` yT64#)) -- no chance this will be negative
-       in Itr 1# passXs (fromIntegral y) remInteger (unsafeword64ToFloatingX## yT64#) [y] [fromIntegral remInteger]
-  where
-    !(evenLen, passXs, dxs') = stageList xs
-    i# = word64FromRvsrd2ElemList# dxs'
-
-theFi_ :: [Word32] -> Itr_
-theFi_ xs
-  | evenLen =
-      let !(# !yc, !y1#, !remInteger #) =
-            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                ysq# = yT64# `timesWord64#` yT64#
-                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleRemsSeq (# [], yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-       in Itr_ 1# passSeq yc remInteger (unsafeword64ToFloatingX## y1#) 
-  | otherwise =
-      let yT64# = largestNSqLTEOdd## i#
-          y = W64# yT64#
-          !remInteger = fromIntegral $ W64# (i# `subWord64#` (yT64# `timesWord64#` yT64#)) -- no chance this will be negative
-       in Itr_ 1# passSeq (fromIntegral y) remInteger (unsafeword64ToFloatingX## yT64#)
-  where
-    !(evenLen, passSeq, dseq') = stageSeq xs
-    i# = word64FromRvsrd2ElemSeq# dseq'
 
 theFi___ :: [Word32] -> ItrLst_
 theFi___ xs
@@ -195,65 +151,6 @@ stageList xs =
   where
     !l = length xs
 
-{-# INLINE stageSeq #-}
-stageSeq :: [Word32] -> (Bool, Data.Sequence.Seq Word64, Data.Sequence.Seq Word32)
-stageSeq sq =
-  if even l
-    then
-      let !(rstEvenLen, lastTwo) = splitLastTwoSeq sq l
-       in (True, mkIW32EvenRestSeq l True rstEvenLen, lastTwo)
-    else
-      let !(rstEvenLen, lastOne) = splitLastOneSeq sq l
-       in (False, mkIW32EvenRestSeq l True rstEvenLen, lastOne)
-  where
-    !l = length sq
--- Keep it this way: Inlining this lowers performance.
-theNextIterationsSeq :: Itr_ -> Integer
--- theNextIterations (Itr !currlen# !wrd64Xs yCumulated iRem !tbfx# yCumLst iRLst) = tni currlen# wrd64Xs tbfx# yCumLst iRLst
--- theNextIterations (Itr !currlen# !wrd64Xs yCumulated iRem !tbfx# yCumLst iRLst) = tniI currlen# wrd64Xs tbfx# yCumulated iRem
-theNextIterationsSeq (Itr_ !currlen# !wrd64Seq yCumulated iRem !tbfx#) = tniISq currlen# wrd64Seq tbfx# yCumulated iRem
-  where
-    tniISq :: Int# -> Data.Sequence.Seq Word64 -> FloatingX# -> Integer -> Integer -> Integer
-    tniISq !cl# !sq !t# !yC_ !tA =
-      if Data.Sequence.null sq
-        then yC_
-        else
-          let 
-              -- !(xsPass, twoLSPlaces) = fromMaybe ([], 0) (unsnoc xs)
-              -- !(xsPass, twoLSPlaces) = (init &&& last)  --(init xs, last xs)
-              -- !(sqPass, twoLSPlaces) = fromMaybe (Data.Sequence.empty,0) (breakDownSeq sq)
-              !(sqPass, twoLSPlaces) = breakDownSeq sq
-              !tA_ = tA * secndPlaceW32Radix + fromIntegral twoLSPlaces
-              !tC_ = scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
-              !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgt_# tA_ tC_ of yTilde_# -> computeRemFitted yC_ tA_ yTilde_#
-              !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
-           in tniISq (cl# +# 1#) sqPass tcfx# ycUpdated remFinal--rFinalXs
--- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
-
--- processRight delegates to the Foldable instance
-processRight :: (Word64 -> acc -> acc) -> acc -> Data.Sequence.Seq Word64 -> acc
-processRight = foldr
-{-# INLINE processRight #-}
-
-theNextIterationsSeqOpt :: Itr_ -> Integer
--- theNextIterationsSeqOpt (Itr_ !currlen# !wrd64Seq yCumulatedAcc0 iRem !tbfx#) = yCumulative___ $ processRight (\xw64 accItr__ -> tniISqWord64 xw64 accItr__) (Itr__ currlen# yCumulatedAcc0 iRem tbfx#) wrd64Seq
-theNextIterationsSeqOpt (Itr_ !currlen# !wrd64Seq !yCumulatedAcc0 !iRem !tbfx#) = yCumulative___ $ processRight tniISqWord64 (Itr__ currlen# yCumulatedAcc0 iRem tbfx#) wrd64Seq
-  where
-    {-# INLINE tniISqWord64 #-}
-    tniISqWord64 :: Word64 -> Itr__ -> Itr__
-    tniISqWord64 sqW64 (Itr__ !cl# !yCAcc_ !tA !t# )  =
-          let 
-              -- !(xsPass, twoLSPlaces) = fromMaybe ([], 0) (unsnoc xs)
-              -- !(xsPass, twoLSPlaces) = (init &&& last)  --(init xs, last xs)
-              -- !(sqPass, twoLSPlaces) = fromMaybe (Data.Sequence.empty,0) (breakDownSeq sq)
-              -- !(sqPass, twoLSPlaces) = breakDownSeq sq
-              !tA_ = tA * secndPlaceW32Radix + fromIntegral sqW64
-              !tC_ = scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
-              !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgt_# tA_ tC_ of yTilde_# -> computeRemFitted yCAcc_ tA_ yTilde_#
-              !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
-           in (Itr__ (cl# +# 1#)  ycUpdated remFinal tcfx#) --rFinalXs
--- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
-
 theNextIterationsListOpt :: ItrLst_ -> Integer
 -- theNextIterationsSeqOpt (Itr_ !currlen# !wrd64Seq yCumulatedAcc0 iRem !tbfx#) = yCumulative___ $ processRight (\xw64 accItr__ -> tniISqWord64 xw64 accItr__) (Itr__ currlen# yCumulatedAcc0 iRem tbfx#) wrd64Seq
 theNextIterationsListOpt (ItrLst_ !currlen# !wrd64Seq !yCumulatedAcc0 !iRem !tbfx#) = yCumulative___ $ foldr tniISqWord64 (Itr__ currlen# yCumulatedAcc0 iRem tbfx#) wrd64Seq
@@ -272,17 +169,6 @@ theNextIterationsListOpt (ItrLst_ !currlen# !wrd64Seq !yCumulatedAcc0 !iRem !tbf
               !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
            in (Itr__ (cl# +# 1#)  ycUpdated remFinal tcfx#) --rFinalXs
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
-
-
--- breakDownSeq :: Data.Sequence.Seq Word64 -> Maybe (Data.Sequence.Seq Word64, Word64)
--- breakDownSeq s = case Data.Sequence.viewr s of
---         rest :> x -> Just (rest, x)
---         _ -> Nothing
-
-breakDownSeq :: Data.Sequence.Seq Word64 -> (Data.Sequence.Seq Word64, Word64)
-breakDownSeq !s = case Data.Sequence.viewr s of
-        !rest :> !x -> (rest, x)
-        _ -> (Data.Sequence.empty, 0)
 
 -- | Using (***): lifts two arrows to work on a pair of inputs
 pairUndigits :: (Integral a, Integral b, Integral c) => a -> ([b], [c]) -> (Integer, Integer)
@@ -324,32 +210,6 @@ comput_ :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
 comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE comput_ #-}
 
-computeRemXs :: Word64# -> [Word64] -> [Int96] -> (# [Word64], Word64#, [Int96] #)
-computeRemXs 0#Word64 yXs rXs = (# 0:yXs, 0#Word64, rXs #)
-computeRemXs yTilde_# yXs rXs@(x : 0 : xs ) = let 
-      !i = W64# yTilde_#-- W64
-      xMinusISq = x - fromIntegral (W64# (yTilde_# `timesWord64#` yTilde_#))  -- Integer
-      yc_ = undigits_ radixW32 yXs 
-      negI2ycInteger = negate (fromIntegral i *  double yc_)--negate i2yc_ -- integer and it will be negative 
-      rdrXs = fromIntegral xMinusISq : negI2ycInteger : (fromIntegral <$> xs) -- keep this as integer list and this works !
-      !rdr = undigits_ radixW32 rdrXs -- (i * double yc_ * radixW32 + i*i)
-      -- !rdr = ta - fromIntegral i * (double yc * radixW32 + fromIntegral i)
-      !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred ((yc_ * radixW32) + fromIntegral i)) + 1 #) else (# yTilde_#, rdr #) 
-    in (# W64# yAdj# : yXs, yAdj#, fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdrAdj) #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-computeRemXs _ _ _ = error "wrong"
-{-# INLINE computeRemXs #-}
-
-twiceFmulAdd :: Integer -> Integer -> Word64# -> (Integer, Integer)
-twiceFmulAdd yc ta i# = let 
-                          !ycScaled = radixW32 * yc
-                          !yc_# = integerToDouble# ycScaled 
-                          !ta_# = integerToDouble# ta
-                          !i_# = word2Double# (word64ToWord# i#) 
-                          !lastTerm# = fmaddDouble# 2.00## yc_# i_#
-                          !bothTerms# = fnmaddDouble# i_# lastTerm# ta_# 
-                        in (ycScaled, floorDouble (D# bothTerms#))
--- let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-
 computeRemFitted :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
 computeRemFitted yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
 computeRemFitted yc ta yTilde_# = let 
@@ -380,10 +240,6 @@ computeRemFitted yc ta yTilde_# = let
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled +  i)) + 1 #) else (# yTilde_#, rdr #) 
     in (# fromIntegral (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
 {-# INLINE computeRemFitted #-}
-
-fitsInInt64 :: Integral a => a -> Bool 
-fitsInInt64 x = fromIntegral x >= toInteger (minBound :: Int64)
-             && fromIntegral x <= toInteger (maxBound :: Int64)
 
 fitsInMaxInt32 :: Integer -> Bool 
 fitsInMaxInt32 x = x <= toInteger (maxBound :: Int32)
@@ -566,26 +422,6 @@ safeMulW256 x y =
 {-# INLINE safeMulW256 #-}
 
 
-computeRemIXS :: Integer -> Integer -> Word64# -> [Word64] -> (# [Word64], Word64#, Integer #)
-computeRemIXS _ ta 0#Word64 yXs  = (# 0:yXs, 0#Word64, ta #)
-computeRemIXS yc ta yTilde_# yXs = let 
-      !i = W64# yTilde_#-- W64
-      !rdr = ta - fromIntegral i * (double yc * radixW32 + fromIntegral i)
-      !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred ((yc * radixW32) + fromIntegral i)) + 1 #) else (# yTilde_#, rdr #) 
-    in (# W64# yAdj# : yXs, yAdj#, rdrAdj #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-{-# INLINE computeRemIXS #-}
-
--- | compute the remainder. It may be that the trial "digit" may need to be reworked
--- that happens in handleRems_
--- if the trial digit is zero skip computing remainder
-computeRem_ :: Integer -> Integer -> Word64# -> [Word64] -> [Int96] -> (# [Word64], Word64#, [Int96] #)
-computeRem_ _ _ 0#Word64 yXs rXs = (# 0:yXs, 0#Word64, rXs #)
-computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder2 yTilde_# yc yXs rXs of (rTrial, rTrialXs, scaledby32yC) -> handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
--- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# yc ta of (rTrial, rTrialXs, scaledby32yC) ->  handleRems2 (# yXs, yTilde_#, rTrial, rTrialXs, scaledby32yC #)
--- computeRem_ yc ta yTilde_# yXs rXs = case calcRemainder1 yTilde_# ta yc of (rTrial, rTrialXs, scaledby32yC) -> handleRems (# scaledby32yC, yTilde_#, rTrial #)
-{-# INLINE computeRem_ #-}
-
-
 handleRemsSeq :: (# [Word64], Word64#, Integer #) -> (# Integer, Word64#, Integer #)
 handleRemsSeq (# ycXs, yi64#, ri_ #)
   | ri_ < 0 =
@@ -613,56 +449,6 @@ handleRems (# ycXs, ycScaled_, yi64#, ri_ #)
     !ycyi = undigits radixW32 (W64# yi64# : ycXs) -- accumulating the growing square root
 {-# INLINE handleRems #-}
 
-handleRems2 :: (# [Word64], Word64#, Integer, [Int96], Integer #) -> (# [Word64], Word64#, [Int96] #)
-handleRems2 (# !ycXs, !yi64#, !ri_, !ri_Xs, ycScaled_ #)
-  | ri_ < 0 =
-      let !yAdj# = yi64# `subWord64#` 1#Word64
-          -- !ycyi = undigits_ radixW32 ycXsOutAsIs -- accumulating the growing square root
-          !adjYc = pred ycyi
-          !rdr = fixRemainder adjYc ri_ -- this is an integer, in digitsUnsigned the argument is a natural below
-       in (# W64# yAdj# : ycXs, yAdj#, fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  -- | ri_ > 0 && excessLengthBy3 = let  -- is this check needed ?
-  --                           !modulus3 = radixW32 ^ 3
-  --                           !adjustedRemainder3 = ri_ `mod` modulus3
-  --                           !riAdjustedXs = fromIntegral <$> digitsUnsigned radixW32 (fromIntegral adjustedRemainder3)
-  --                         in (# ycXsOutAsIs, yi64#, riAdjustedXs #)
-  | otherwise = (# ycXsOutAsIs, yi64#, ri_Xs #)
-  where
-    yiW64 = W64# yi64#
-    yi = fromIntegral yiW64
-    ycyi = ycScaled_ + yi -- accumulating the growing square root
-    ycXsOutAsIs = yiW64 : ycXs
-    lenCurrRemainder = 1 + integerLogBase' radixW32 yi -- //TODO THIS TAKES UP A CHUNK OF TIME length (digits (fromIntegral b) ri) makes little diff
-    lenCurrSqrt = 1 + integerLogBase' radixW32 yi
-    excessLengthBy3 = lenCurrRemainder >= lenCurrSqrt + 3
-{-# INLINE handleRems2 #-}
-
--- Calculate remainder accompanying a 'digit'
-calcRemainder2 :: Word64# -> Integer -> [Word64] -> [Int96] -> (Integer, [Int96], Integer)
-calcRemainder2 0#Word64 !yc_ _ rXs = (undigits radixW32 rXs, rXs, yc_ * radixW32)
-calcRemainder2 !dgt64# !yc_ !ycXs rXs@(x : 0 : xs) =
-  let !i = W64# dgt64# -- W64
-      !xMinusISq = x - fromIntegral (W64# (dgt64# `timesWord64#` dgt64#))  -- Integer
-      !yc = yc_--undigits_ radixW32 ycXs
-      !negI2ycInteger = negate (fromIntegral i *  double yc)--negate i2yc_ -- integer and it will be negative 
-      !rdrXs = fromIntegral xMinusISq : negI2ycInteger : (fromIntegral <$> xs) -- keep this as integer list and this works !
-      !rdr = undigits_ radixW32 rdrXs -- (i * double yc_ * radixW32 + i*i)
-      !rdrXsInteger = if rdr < 0 then [] else fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) --fromIntegral <$> rdrXs -- xMinusISq : negI2ycInteger : xs -- does not work
-   in (rdr, rdrXsInteger, yc * radixW32) -- tAI - ((double i * tc) + i * i)
-calcRemainder2 _ _ _ _ = error "error"
-{-# INLINE calcRemainder2 #-}
-
--- Calculate remainder accompanying a 'digit'
-calcRemainder1 :: Word64# -> Integer -> Integer -> (Integer, [Int96], Integer)
-calcRemainder1 0#Word64 !yc_ tAI   = (tAI, fromIntegral <$> digitsUnsigned radixW32 (fromIntegral tAI), yc_ * radixW32)
-calcRemainder1 !dgt64# !yc_ tAI   =
-  let !i = fromIntegral (W64# dgt64#)
-      !ycScaled = yc_ * radixW32
-      !rdr = tAI - i * (double ycScaled + i)
-      !rdrXsInteger = if rdr < 0 then [] else fromIntegral <$> digitsUnsigned radixW32 (fromIntegral rdr) --fromIntegral <$> rdrXs -- xMinusISq : negI2ycInteger : xs -- does not work
-   in (rdr, rdrXsInteger, ycScaled) -- tAI - ((double i * tc) + i * i)
-{-# INLINE calcRemainder1 #-}
-
 -- -- Fix remainder accompanying a 'next downed digit'
 fixRemainder :: Integer -> Integer -> Integer
 fixRemainder !tcplusdgtadj !rdr = rdr + double tcplusdgtadj + 1
@@ -681,14 +467,6 @@ word64FromRvsrd2ElemList# [llsb, lmsb] = word64FromRvsrdTuple# (llsb, lmsb) 4294
 word64FromRvsrd2ElemList# (_ : _ : _) = error "word64FromRvsrd2ElemList# : more than 2 elems list"
 {-# INLINE word64FromRvsrd2ElemList# #-}
 
--- | Word64# from a "reversed" Seq of at least 1 and at most 2 Word32 digits
-word64FromRvsrd2ElemSeq# :: Data.Sequence.Seq Word32 -> Word64#
-word64FromRvsrd2ElemSeq# Data.Sequence.Empty = error "word64FromRvsrd2ElemSeq# : null list"
-word64FromRvsrd2ElemSeq# (llsb :<| Data.Sequence.Empty) = word64FromRvsrdTuple# (llsb, 0) 4294967296#Word64
-word64FromRvsrd2ElemSeq# (llsb :<| lmsb :<| Data.Sequence.Empty) = word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
-word64FromRvsrd2ElemSeq# (_ :<| _ :<| _ :<| _) = error "word64FromRvsrd2ElemSeq# : more than 2 elems list"
-{-# INLINE word64FromRvsrd2ElemSeq# #-}
-
 {-# INLINE mkIW32Lst #-}
 
 -- | Spit out the Word32 List from digitsUnsigned which comes in reversed format.
@@ -700,17 +478,10 @@ mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b)
 splitLastTwo :: [a] -> Int -> ([a], [a])
 splitLastTwo xs l = splitAt (l - 2) xs
 
-{-# INLINE splitLastTwoSeq #-}
-splitLastTwoSeq :: [a] -> Int -> (Data.Sequence.Seq a, Data.Sequence.Seq a)
-splitLastTwoSeq xs l = Data.Sequence.splitAt (l - 2) (Data.Sequence.fromList xs)
 
 {-# INLINE splitLastOne #-}
 splitLastOne :: [a] -> Int -> ([a], [a])
 splitLastOne xs l = splitAt (l - 1) xs
-
-{-# INLINE splitLastOneSeq #-}
-splitLastOneSeq :: [a] -> Int -> (Data.Sequence.Seq a, Data.Sequence.Seq a)
-splitLastOneSeq xs l = Data.Sequence.splitAt (l - 1) (Data.Sequence.fromList xs)
 
 {-# INLINE pairUp #-}
 pairUp :: Bool -> [a] -> [(a, a)]
@@ -719,38 +490,10 @@ pairUp True [] = []
 pairUp _ [_] = error "pairUp: Invalid singleton list"
 pairUp False _ = error "pairUp: Invalid odd length of list"
 
-{-# INLINE pairUpSeq #-}
-pairUpSeq
-  :: Bool            -- ^ allow an unmatched final element?
-  -> Seq a           -- ^ input sequence
-  -> Seq (a, a)      -- ^ output sequence of pairs
-pairUpSeq allowIncomplete = go
-  where
-    go xs = case Data.Sequence.viewl xs of
-      -- at least one element: x
-      x :< xs' -> case viewl xs' of
-        -- at least two elements: x,y
-        y :< rest ->
-          -- cons (x,y) and continue
-          (x, y) <| go rest
-
-        -- exactly one element x, and nothing else
-        EmptyL
-          | allowIncomplete -> Data.Sequence.empty
-          | otherwise       ->
-              error "pairUpSeq: Invalid odd length of sequence"
-
-      -- no elements → done
-      EmptyL -> Data.Sequence.empty
-
 {-# INLINE integerOfNxtPairsLst #-}
 integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Word64]
 integerOfNxtPairsLst l = if l < 8 then map iFrmTupleBaseW32 else parallelMap Chunk 2 iFrmTupleBaseW32 -- assuming even dual core 
 -- integerOfNxtPairsLst l = map iFrmTupleBaseW32
-
-{-# INLINE integerOfNxtPairsSeq #-}
-integerOfNxtPairsSeq :: Int -> Data.Sequence.Seq (Word32, Word32) -> Data.Sequence.Seq Word64
-integerOfNxtPairsSeq _ = fmap iFrmTupleBaseW32
 
 -- | Strategies that may be used with parallel calls
 data Strats
@@ -773,10 +516,6 @@ iFrmTupleBaseW32 tu = word64FromRvsrdTuple tu radixW32
 {-# INLINE mkIW32EvenRestLst #-}
 mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64]
 mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUp evenLen xs)
-
-{-# INLINE mkIW32EvenRestSeq #-}
-mkIW32EvenRestSeq :: Int -> Bool -> Data.Sequence.Seq Word32 -> Data.Sequence.Seq Word64
-mkIW32EvenRestSeq len evenLen sq = integerOfNxtPairsSeq len (pairUpSeq evenLen sq)
 
 
 --- END helpers
