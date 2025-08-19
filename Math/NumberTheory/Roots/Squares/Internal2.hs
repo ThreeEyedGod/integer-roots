@@ -37,8 +37,10 @@ import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
 import GHC.Exts
   ( build, 
+    word2Double#,
     Double (..),
     Double#,
+    Word (..),
     Int (..),
     Int#,
     Int64#,
@@ -84,11 +86,13 @@ import GHC.Exts
     (<##),
     (==##),
     (>=##),
+    and#,
+    not#
   )
 import GHC.Float (divideDouble, floorDouble)
 import GHC.Int (Int32, Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.BigNat (BigNat#, bigNatIsZero, bigNatLog2#, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
+import GHC.Num.BigNat (BigNat#,bigNatLeWord#, bigNatIsZero, bigNatLog2#, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer ( Integer (..), integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import GHC.Integer.Logarithms (wordLog2#)
@@ -958,16 +962,81 @@ unsafeword64ToFloatingX## w# = case W64# w# of i -> unsafeword64ToFloatingX# i
 {-# INLINE cI2D2_ #-}
 cI2D2_ :: BigNat# -> (# Double#, Int64# #)
 cI2D2_ bn#
-  | isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
+     | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) = let d# = word2Double# (bigNatIndex# bn# 0#) in (# d#, 0#Int64 #)
+  -- | isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
   -- | otherwise = case bigNatLog2# bn# of
   | otherwise = case _bigNatLog2# bn# bnsz# of
-      l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
-        h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
+      l# -> case l# `minusWord#` 94## of 
+        rawSh# -> let !shift# = rawSh# `and#` (not# 1##) in case bigNatShiftR# bn# shift# of
+      -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
+      --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
           mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #) 
   where
-    !bnsz# = bigNatSize# bn# 
+    bnsz# = bigNatSize# bn# 
     thresh# :: Int#
     !thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
+
+-- {-# INLINE cI2D2_FAST #-}
+-- cI2D2_FAST :: BigNat# -> (# Double#, Int64# #)
+-- cI2D2_FAST bn# =
+--   case bigNatSize# bn# of
+
+--     -- Single‐Word shortcut, exact up to 2^53–1
+--     1# | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) ->
+--           let w# = bigNatIndex# bn# 0# 
+--           in (# wordToDouble# w#, 0# #)
+
+--     -- General path: only touch two Words
+--     sz# ->
+--       -- 1) Bit-length l = (sz-1)*64 + log2(topWord)
+--       let hi#    = sz# -# 1#
+--           topW#  = bigNatIndex# bn# (word2Int# (int2Word# hi#))
+--           l#     = wordLog2# topW# `plusWord#` (int2Word# hi# `uncheckedShiftL#` 6#)
+
+--           -- 2) How many bits to drop to get a 53-bit mantissa
+--           rawSh# = l# `minusWord#` 52##
+
+--           -- 3) Split that into whole-Word and intra-Word shifts
+--           (wSh#, bSh#) = rawSh# `quotRemWord#` 64##
+
+--           -- 4) Pick the two relevant Words
+--           idx1# = word2Int# (int2Word# hi# `minusWord#` wSh#)
+--           idx2# = idx1# -# 1#
+--           w1#   = bigNatIndex# bn# idx1#
+--           w2#   = if isTrue# (idx2# >=# 0#) then bigNatIndex# bn# idx2# else 0##
+
+--           -- 5) Assemble a 64-bit “payload” containing the top ~66 bits
+--           payload# =
+--             (w1# `uncheckedShiftL#` (64# `minusWord#` bSh#))
+--               `or#`
+--             (w2# `uncheckedShiftRL#` bSh#)
+
+--           -- 6) Peel off 53 mantissa bits (and keep the low 11 for rounding)
+--           mantRaw# = payload# `uncheckedShiftRL#` 11#  -- 64-53 = 11
+
+--           -- 7) Half-even rounding using the next bit + sticky
+--           (# mant53#, expInc# #) = roundHalfEven mantRaw# payload#
+
+--           -- 8) Build the final exponent + mantissa bitpattern
+--           finalExp# = int2Word# rawSh# `plusWord#` 1023##
+--           bits#     = (finalExp# `uncheckedShiftL#` 52##) `or#` mant53#
+
+--       in (# wordToDouble# bits#, intToInt64# rawSh# #)
+
+
+-- -- | Half-even rounding of a candidate 53-bit mantissa.
+-- roundHalfEven :: Word# -> Word# -> (# Word#, Word# #)
+-- roundHalfEven m# payload# =
+--   let roundBit# = payload# `and#` (1## `uncheckedShiftL#` 10#)  -- the 11th low bit
+--       sticky#   = (payload# `and#` ((1## `uncheckedShiftL#` 10#) `minusWord#` 1##))
+--                   `neWord#` 0##
+--       linkUp#   = (roundBit# `neWord#` 0## &&# (sticky# ||# (m# `and#` 1##) /=# 0##))
+--       m'#       = if isTrue# linkUp# then m# `plusWord#` 1## else m#
+--   in
+--     if isTrue# (m'# `eqWord#` (1## `uncheckedShiftL#` 53##))
+--       then (# 0##, 1## #)  -- carry into exponent
+--       else (# m'# `and#` (1## `uncheckedShiftL#` 52## `minusWord#` 1##), 0## #)
+
 
 -- | Base 2 logarithm a bit faster
 _bigNatLog2# :: BigNat# -> Int# -> Word#
