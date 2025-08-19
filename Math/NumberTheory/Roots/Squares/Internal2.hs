@@ -174,7 +174,7 @@ nxtDgt (IP bn#) tcfx#
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
-nxtDgt (IN _) !_ = error "nxtDgt_ :: Invalid negative integer argument"
+nxtDgt (IN _) !_ = error "nxtDgt :: Invalid negative integer argument"
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Word64#
@@ -436,7 +436,6 @@ word64FromRvsrd2ElemList# (_ : _ : _) = error "word64FromRvsrd2ElemList# : more 
 {-# INLINE word64FromRvsrd2ElemList# #-}
 
 {-# INLINE mkIW32Lst #-}
-
 -- | Spit out the Word32 List from digitsUnsigned which comes in reversed format.
 mkIW32Lst :: Integer -> Word -> [Word32]
 mkIW32Lst 0 _ = [0] -- safety
@@ -457,10 +456,10 @@ pairUp True [] = []
 pairUp _ [_] = error "pairUp: Invalid singleton list"
 pairUp False _ = error "pairUp: Invalid odd length of list"
 
+-- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s
 {-# INLINE integerOfNxtPairsLst #-}
 integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Word64]
-integerOfNxtPairsLst l = if l < 8 then map iFrmTupleBaseW32 else parallelMap Chunk 2 iFrmTupleBaseW32 -- assuming even dual core 
--- integerOfNxtPairsLst l = map iFrmTupleBaseW32
+integerOfNxtPairsLst l = if l < 8 then map iFrmTupleBaseW32 else parallelMap Split 2 iFrmTupleBaseW32 -- assuming even dual core Split/Buffer work better than Chunk
 
 -- | Strategies that may be used with parallel calls
 data Strats
