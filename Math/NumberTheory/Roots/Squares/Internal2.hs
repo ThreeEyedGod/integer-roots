@@ -1,10 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
--- addition
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
--- addition
--- used everywhere within
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OrPatterns #-}
@@ -13,8 +10,6 @@
 {-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
-
--- {-# OPTIONS_GHC -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
 -- |
 -- Module:      Math.NumberTheory.Roots.Squares.Internal
@@ -99,8 +94,6 @@ import GHC.Integer.Logarithms (wordLog2#)
 import Math.NumberTheory.Utils.ShortCircuit (firstTrueOf)
 -- *********** END NEW IMPORTS
 
--- BEGIN isqrtB ****************************************************************
-
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
 --- https ://arxiv.org/abs/2406.07751
@@ -149,11 +142,11 @@ stageList xs =
     !l = length xs
 
 theNextIterations :: ItrLst_ -> Integer
-theNextIterations (ItrLst_ !currlen# !wrd64Seq !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldr tniISqWord64 (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Seq
+theNextIterations (ItrLst_ !currlen# !wrd64Seq !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Seq
   where
-    {-# INLINE tniISqWord64 #-}
-    tniISqWord64 :: Word64 -> Itr__ -> Itr__
-    tniISqWord64 sqW64 (Itr__ !cl# !yCAcc_ !tA !t# )  =
+    {-# INLINE tni #-}
+    tni :: Word64 -> Itr__ -> Itr__
+    tni sqW64 (Itr__ !cl# !yCAcc_ !tA !t# )  =
           let 
               !tA_ = tA * secndPlaceW32Radix + fromIntegral sqW64
               !tC_ = scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
@@ -211,7 +204,7 @@ computeRem yc ta yTilde_# = let
                   --                             Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
                   --                         Left iPlusycScaledIN ->  (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
                   --             Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-                  (Is64;Is96;Is128) -> case radixW32 `safePosMul256` fromIntegral yc of 
+                  (Is32;Is64;Is96) -> case radixW32 `safePosMul256` fromIntegral yc of 
                               Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of 
                                           Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
                                               Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul256` iPlusDoubleYcScaled of 
@@ -220,7 +213,7 @@ computeRem yc ta yTilde_# = let
                                               Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
                                           Left iPlusycScaledIN ->  (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
                               Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-                  (Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
+                  (Is128;Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled +  i)) + 1 #) else (# yTilde_#, rdr #) 
     in (# fromIntegral (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
 {-# INLINE computeRem #-}
@@ -456,7 +449,7 @@ pairUp True [] = []
 pairUp _ [_] = error "pairUp: Invalid singleton list"
 pairUp False _ = error "pairUp: Invalid odd length of list"
 
--- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s
+-- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s list
 {-# INLINE integerOfNxtPairsLst #-}
 integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Word64]
 integerOfNxtPairsLst l = if l < 8 then map iFrmTupleBaseW32 else parallelMap Split 2 iFrmTupleBaseW32 -- assuming even dual core Split/Buffer work better than Chunk
@@ -771,7 +764,7 @@ unsafeDivFx# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) =
 
 {-# INLINE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
-fsqraddFloatingX# (FloatingX# sA# expA#) (FloatingX# sC# expC#)
+fsqraddFloatingX# !(FloatingX# sA# expA#) !(FloatingX# sC# expC#)
   | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
   | otherwise = case updateDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
   where
