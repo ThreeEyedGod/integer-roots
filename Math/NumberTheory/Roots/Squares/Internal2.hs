@@ -124,7 +124,8 @@ theFi xs
             let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
                 ysq# = yT64# `timesWord64#` yT64#
                 diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleRem (# [], yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+             in handleFirstRem (# [], yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+            --  in handleFirstRem (# [], yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
        in ItrLst_ 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#) 
   | otherwise =
       let yT64# = largestNSqLTEOdd## i#
@@ -163,18 +164,13 @@ theNextIterations (ItrLst_ !currlen# !wrd64Seq !yCumulatedAcc0 !rmndr !tbfx#) = 
            in (Itr__ (cl# +# 1#)  ycUpdated remFinal tcfx#) --rFinalXs
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
--- | Using (***): lifts two arrows to work on a pair of inputs
-pairUndigits :: (Integral a, Integral b, Integral c) => a -> ([b], [c]) -> (Integer, Integer)
-pairUndigits base = undigits_ base *** undigits_ base
-{-# INLINE pairUndigits #-}
-
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt :: Integer -> FloatingX# -> Word64#
 nxtDgt 0 !_ = 0#Word64
 nxtDgt (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
-nxtDgt n@(IP bn#) tcfx#
+nxtDgt (IP bn#) tcfx#
   | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
   | otherwise = computFx (preComputFx bn# tcfx#)
   where
@@ -185,8 +181,6 @@ nxtDgt (IN _) !_ = error "nxtDgt_ :: Invalid negative integer argument"
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Word64#
 computDouble# !tAFX# !tCFX# !radFX# = case floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) of (W64# w#) -> hndlOvflwW32## w#
-
--- computDouble# !tAFX# !tCFX# !radFX# = let !(I64# i#) = floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (fmaddDouble# (sqrtDouble# (nextDown# radFX#)) 1.00## (nextDown# tCFX#)) ))) in hndlOvflwW32# i#
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
 preComput a# tcfx# =
@@ -413,8 +407,8 @@ safeMulW256 x y =
      else Right result
 {-# INLINE safeMulW256 #-}
 
-handleRem :: (# [Word64], Word64#, Integer #) -> (# Integer, Word64#, Integer #)
-handleRem (# ycXs, yi64#, ri_ #)
+handleFirstRem :: (# [Word64], Word64#, Integer #) -> (# Integer, Word64#, Integer #)
+handleFirstRem (# ycXs, yi64#, ri_ #)
   | ri_ < 0 =
       let !yAdj# = yi64# `subWord64#` 1#Word64
           !adjYc = pred ycyi
@@ -424,7 +418,7 @@ handleRem (# ycXs, yi64#, ri_ #)
   where
     -- !ycyi = ycScaled_ + fromIntegral (W64# yi64#) -- accumulating the growing square root
     !ycyi = undigits radixW32 (W64# yi64# : ycXs) -- accumulating the growing square root
-{-# INLINE handleRem #-}
+{-# INLINE handleFirstRem #-}
 
 -- -- Fix remainder accompanying a 'next downed digit'
 fixRemainder :: Integer -> Integer -> Integer
@@ -646,9 +640,6 @@ addFx# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
           !(D# !scaleD#) = fromIntegral (I64# scale#)
           !scaledLittle# = sLittle# *## (2.00## **## scaleD#)
           !resSignif# = sBig# +## scaledLittle#
-      --  in if isTrue# (resSignif# >=## 2.0##)
-      --       then FloatingX# (resSignif# *## 0.5##) (expBig# `plusInt64#` 1#Int64)
-      --       else FloatingX# resSignif# expBig#
        in 
           FloatingX# resSignif# expBig#
 
@@ -674,38 +665,38 @@ addFxNorm# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
 
 {-# INLINE mulFx# #-}
 mulFx# :: FloatingX# -> FloatingX# -> FloatingX#
--- mul# (FloatingX# 1.0## 0#) b = b
--- mul# a (FloatingX# 1.00## 0.00##) = a
-mulFx# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) =
-  -- \| isTrue# (sA# ==## 0.00##) = zero#
-  -- \| isTrue# (sB# ==## 0.00##) = zero#
-  -- \| isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = b
-  -- \| isTrue# (sB# ==## 1.00##) && isTrue# (expB# `eqInt64#` 0#Int64) = a
-  -- \| otherwise
-  let !resExp# = expA# `plusInt64#` expB#
-      !resSignif# = sA# *## sB#
-  --  in if isTrue# (resSignif# >=## 2.0##) -- why is this not needed 
-  --       then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
-  --       else FloatingX# resSignif# resExp#
-   in 
-      FloatingX# resSignif# resExp#
+mulFx# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) = let 
+                  !resExp# = expA# `plusInt64#` expB#
+                  !resSignif# = sA# *## sB#
+              in 
+                  FloatingX# resSignif# resExp#
+
+{-# INLINE mulFx_# #-}
+mulFx_# :: FloatingX# -> FloatingX# -> FloatingX#
+mulFx_# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) 
+   | isTrue# (sA# ==## 0.00##) = zero#
+   | isTrue# (sB# ==## 0.00##) = zero#
+   | isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = b
+   | isTrue# (sB# ==## 1.00##) && isTrue# (expB# `eqInt64#` 0#Int64) = a
+   | otherwise  = let 
+                  !resExp# = expA# `plusInt64#` expB#
+                  !resSignif# = sA# *## sB#
+              in 
+                  FloatingX# resSignif# resExp#
 
 {-# INLINE mulFxNorm# #-}
 mulFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
--- mul# (FloatingX# 1.0## 0#) b = b
--- mul# a (FloatingX# 1.00## 0.00##) = a
-mulFxNorm# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) =
-  -- \| isTrue# (sA# ==## 0.00##) = zero#
-  -- \| isTrue# (sB# ==## 0.00##) = zero#
-  -- \| isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = b
-  -- \| isTrue# (sB# ==## 1.00##) && isTrue# (expB# `eqInt64#` 0#Int64) = a
-  -- \| otherwise
+mulFxNorm# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) 
+   | isTrue# (sA# ==## 0.00##) = zero#
+   | isTrue# (sB# ==## 0.00##) = zero#
+   | isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = b
+   | isTrue# (sB# ==## 1.00##) && isTrue# (expB# `eqInt64#` 0#Int64) = a
+   | otherwise = 
   let !resExp# = expA# `plusInt64#` expB#
       !resSignif# = sA# *## sB#
    in if isTrue# (resSignif# >=## 2.0##) -- why is this not needed 
         then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
         else FloatingX# resSignif# resExp#
-
 
 {-# INLINE sqr# #-}
 sqr# :: FloatingX# -> FloatingX#
@@ -775,11 +766,6 @@ unsafeDivFx# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) =
       -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
       -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
       !(# finalSignif#, finalExp# #) = (# resSignif#, resExp# #)
-      -- this following normalizrion code does not seem to be needed !!!!!!!! Double Check
-      -- !(# finalSignif#, finalExp# #) =
-      --   if isTrue# (resSignif# <## 1.0##)
-      --     then (# resSignif# *## 2.0##, resExp# `subInt64#` 1#Int64 #)
-      --     else (# resSignif#, resExp# #)
    in -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
       -- //TODO fix this next line
       -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
@@ -834,6 +820,7 @@ sqrtSplitDbl# (FloatingX# d# e#)
   !(# yesEven, quo64# #) = _evenInt64# e#
 {-# INLINE sqrtSplitDbl# #-}
 
+-- | custom even and odd to handle what we need 
 _even, _odd       :: (Integral a) => a -> (Bool, a)
 _even n          =  let !(q,r) = n `quotRem` 2 in (r == 0, q) 
 _odd             =  _even
