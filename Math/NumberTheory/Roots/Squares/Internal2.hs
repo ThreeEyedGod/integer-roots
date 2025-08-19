@@ -93,7 +93,7 @@ import GHC.Exts
     (==##),
     (>=##),
   )
-import GHC.Float (divideDouble, floorDouble, integerToDouble#)
+import GHC.Float (divideDouble, floorDouble)
 import GHC.Int (Int32, Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.BigNat (BigNat#, bigNatIsZero, bigNatLog2#, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
@@ -113,15 +113,15 @@ import Math.NumberTheory.Utils.ShortCircuit (firstTrueOf)
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
-isqrtB n = fromInteger . theNextIterationsListOpt . theFi___ . dgtsLstBase32 . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 
 -- | Iteration loop data - these records have vectors / lists in them
 data ItrLst_ = ItrLst_ {lvlst# :: {-# UNPACK #-} !Int#, lstW32 :: {-# UNPACK #-} ![Word64], yCumulative_ :: !Integer, iRem :: {-# UNPACK #-} !Integer, tb___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
-theFi___ :: [Word32] -> ItrLst_
-theFi___ xs
+theFi :: [Word32] -> ItrLst_
+theFi xs
   | evenLen =
       let !(# !yc, !y1#, !remInteger #) =
             let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
@@ -151,21 +151,16 @@ stageList xs =
   where
     !l = length xs
 
-theNextIterationsListOpt :: ItrLst_ -> Integer
--- theNextIterationsSeqOpt (Itr_ !currlen# !wrd64Seq yCumulatedAcc0 iRem !tbfx#) = yCumulative___ $ processRight (\xw64 accItr__ -> tniISqWord64 xw64 accItr__) (Itr__ currlen# yCumulatedAcc0 iRem tbfx#) wrd64Seq
-theNextIterationsListOpt (ItrLst_ !currlen# !wrd64Seq !yCumulatedAcc0 !iRem !tbfx#) = yCumulative___ $ foldr tniISqWord64 (Itr__ currlen# yCumulatedAcc0 iRem tbfx#) wrd64Seq
+theNextIterations :: ItrLst_ -> Integer
+theNextIterations (ItrLst_ !currlen# !wrd64Seq !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldr tniISqWord64 (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Seq
   where
     {-# INLINE tniISqWord64 #-}
     tniISqWord64 :: Word64 -> Itr__ -> Itr__
     tniISqWord64 sqW64 (Itr__ !cl# !yCAcc_ !tA !t# )  =
           let 
-              -- !(xsPass, twoLSPlaces) = fromMaybe ([], 0) (unsnoc xs)
-              -- !(xsPass, twoLSPlaces) = (init &&& last)  --(init xs, last xs)
-              -- !(sqPass, twoLSPlaces) = fromMaybe (Data.Sequence.empty,0) (breakDownSeq sq)
-              -- !(sqPass, twoLSPlaces) = breakDownSeq sq
               !tA_ = tA * secndPlaceW32Radix + fromIntegral sqW64
               !tC_ = scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
-              !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgt_# tA_ tC_ of yTilde_# -> computeRemFitted yCAcc_ tA_ yTilde_#
+              !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgt tA_ tC_ of yTilde_# -> computeRem yCAcc_ tA_ yTilde_#
               !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
            in (Itr__ (cl# +# 1#)  ycUpdated remFinal tcfx#) --rFinalXs
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
@@ -178,16 +173,16 @@ pairUndigits base = undigits_ base *** undigits_ base
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
-nxtDgt_# :: Integer -> FloatingX# -> Word64#
-nxtDgt_# 0 !_ = 0#Word64
-nxtDgt_# (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
-nxtDgt_# n@(IP bn#) tcfx#
+nxtDgt :: Integer -> FloatingX# -> Word64#
+nxtDgt 0 !_ = 0#Word64
+nxtDgt (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
+nxtDgt n@(IP bn#) tcfx#
   | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
   | otherwise = comput_ (preComput_ bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
-nxtDgt_# (IN _) !_ = error "nxtDgt_ :: Invalid negative integer argument"
+nxtDgt (IN _) !_ = error "nxtDgt_ :: Invalid negative integer argument"
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Word64#
@@ -210,9 +205,9 @@ comput_ :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
 comput_ (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE comput_ #-}
 
-computeRemFitted :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
-computeRemFitted yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
-computeRemFitted yc ta yTilde_# = let 
+computeRem :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
+computeRem yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
+computeRem yc ta yTilde_# = let 
       !i = fromIntegral (W64# yTilde_#)
       !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       -- !intToUse = maxIntSizeAcross yc ta i 
@@ -239,7 +234,7 @@ computeRemFitted yc ta yTilde_# = let
       --             (Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled +  i)) + 1 #) else (# yTilde_#, rdr #) 
     in (# fromIntegral (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-{-# INLINE computeRemFitted #-}
+{-# INLINE computeRem #-}
 
 fitsInMaxInt32 :: Integer -> Bool 
 fitsInMaxInt32 x = x <= toInteger (maxBound :: Int32)
