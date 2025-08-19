@@ -26,7 +26,7 @@ module Math.NumberTheory.Roots.Squares.Internal2
 where
 
 -- \*********** BEGIN NEW IMPORTS
-
+import Data.List  (unfoldr)
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.DoubleWord (Int96, Int256)
 import Data.WideWord (Int128, Word256, zeroInt128) -- he says it's coded to be as fast as possible
@@ -36,7 +36,8 @@ import Data.FastDigits (digitsUnsigned, undigits)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
 import GHC.Exts
-  ( Double (..),
+  ( build, 
+    Double (..),
     Double#,
     Int (..),
     Int#,
@@ -142,7 +143,7 @@ stageList xs =
     !l = length xs
 
 theNextIterations :: ItrLst_ -> Integer
-theNextIterations (ItrLst_ !currlen# !wrd64Seq !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Seq
+theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
   where
     {-# INLINE tni #-}
     tni :: Word64 -> Itr__ -> Itr__
@@ -192,9 +193,9 @@ computeRem :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
 computeRem yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
 computeRem yc ta yTilde_# = let 
       !i = fromIntegral (W64# yTilde_#)
-      -- !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-      !intToUse = maxIntSizeAcross yc ta i 
-      !(ycScaled, rdr) = case intToUse of 
+      !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
+      -- !intToUse = maxIntSizeAcross yc ta i 
+      -- !(ycScaled, rdr) = case intToUse of 
                   -- Is32 -> case radixW32 `safePosMul64` fromIntegral yc of 
                   --             Right ycScaled64 -> case fromIntegral (W64# yTilde_#) `safePosAdd64` ycScaled64 of 
                   --                         Right iPlusycScaled -> case ycScaled64 `safePosAdd64` iPlusycScaled of 
@@ -204,18 +205,18 @@ computeRem yc ta yTilde_# = let
                   --                             Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
                   --                         Left iPlusycScaledIN ->  (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
                   --             Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-                  (Is32;Is64;Is96) -> case radixW32 `safePosMul256` fromIntegral yc of 
-                              Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of 
-                                          Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
-                                              Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul256` iPlusDoubleYcScaled of 
-                                                  Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr256 -> (fromIntegral ycScaled256,fromIntegral rdr256)
-                                                  Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
-                                              Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
-                                          Left iPlusycScaledIN ->  (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
-                              Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-                  (Is128;Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
+                  -- (Is32;Is64;Is96) -> case radixW32 `safePosMul256` fromIntegral yc of 
+                  --             Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of 
+                  --                         Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
+                  --                             Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul256` iPlusDoubleYcScaled of 
+                  --                                 Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr256 -> (fromIntegral ycScaled256,fromIntegral rdr256)
+                  --                                 Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
+                  --                             Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
+                  --                         Left iPlusycScaledIN ->  (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
+                  --             Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
+                  -- (Is128;Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled +  i)) + 1 #) else (# yTilde_#, rdr #) 
-    in (# fromIntegral (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+    in (# fromIntegral (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) 
 {-# INLINE computeRem #-}
 
 fitsInMaxInt32 :: Integer -> Bool 
@@ -449,6 +450,30 @@ pairUp True [] = []
 pairUp _ [_] = error "pairUp: Invalid singleton list"
 pairUp False _ = error "pairUp: Invalid odd length of list"
 
+{-# INLINE pairUpAcc #-}
+pairUpAcc :: [a] -> [(a, a)]
+pairUpAcc xs = go xs []
+  where
+    go (x : y : zs) !acc = go zs ((x,y) : acc)
+    go []           acc  = reverse acc
+    go [_]          _    = error "pairUp: odd length"
+
+{-# INLINE pairUpUnfold #-}
+pairUpUnfold :: [a] -> [(a, a)]
+pairUpUnfold = unfoldr step
+  where
+    step (x : y : zs) = Just ((x,y), zs)
+    step []           = Nothing
+    step [_]          = error "pairUp: odd length"
+
+{-# INLINE pairUpBuild #-}
+pairUpBuild :: [a] -> [(a,a)]
+pairUpBuild xs = build (\c n -> go c n xs)
+  where
+    go c n (x : y : zs) = c (x,y) (go c n zs)
+    go _ n []           = n
+    go _ _ [_]          = error "pairUp: odd length"
+
 -- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s list
 {-# INLINE integerOfNxtPairsLst #-}
 integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Word64]
@@ -474,8 +499,7 @@ iFrmTupleBaseW32 tu = word64FromRvsrdTuple tu radixW32
 
 {-# INLINE mkIW32EvenRestLst #-}
 mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64]
-mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUp evenLen xs)
-
+mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) --(pairUpUnfold xs) --(pairUpAcc xs) --(pairUp evenLen xs)
 
 --- END helpers
 --- BEGIN Core numeric helper functions
@@ -881,6 +905,7 @@ unsafefx2Double (FloatingX d@(D# d#) e) =
 {-# INLINE unsafefx2Double #-}
 
 unsafefx2Double## :: FloatingX# -> Double#
+unsafefx2Double## (FloatingX# d# 0#Int64) = d#
 unsafefx2Double## (FloatingX# d# e#) =
   -- \| isTrue# (ex# <# 0#) = case fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) of (D# do#) -> do# -- this is necessary
   -- \| otherwise
