@@ -642,7 +642,7 @@ minValue# = FloatingX# 1.0## 0#Int64
 
 {-# INLINE (!/##) #-}
 (!/##) :: FloatingX# -> FloatingX# -> FloatingX#
-(!/##) x y = x `unsafeDivFx#` y
+(!/##) x y = x `unsafeDivFx#` y ---- note this is the unsafest version of divide
 
 {-# INLINE (!**+##) #-}
 (!**+##) :: FloatingX# -> FloatingX# -> FloatingX#
@@ -796,6 +796,10 @@ unsafeDivFx# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) =
       if isTrue# (finalSignif# <## 1.0##) && isTrue# (finalExp# `leInt64#` 0#Int64)
         then zero#
         else FloatingX# finalSignif# finalExp#
+
+{-# INLINE unsafestDivFx# #-}
+unsafestDivFx# :: FloatingX# -> FloatingX# -> FloatingX#
+unsafestDivFx# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) =FloatingX# (s1# /## s2#) (e1# `subInt64#` e2#)
 
 {-# INLINE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
