@@ -16,8 +16,12 @@ main =
           , bench "New Humoungous Integer " $ whnf New.integerSquareRoot (2^129+1013)
           , bench "Old Gargantuan Integer" $ whnf Old.integerSquareRoot (2^257+1013)
           , bench "New Gargantuan Integer" $ whnf New.integerSquareRoot (2^257+1013)
-          , bench "Old Googolplex Integer " $ whnf Old.integerSquareRoot (2^1027+1013)
-          , bench "New Googolplex Integer " $ whnf New.integerSquareRoot (2^1027+1013)
+          , bench "Old Googolplex Integer " $ whnf Old.integerSquareRoot (2^511+1013)
+          , bench "New Googolplex Integer " $ whnf New.integerSquareRoot (2^511+1013)
+          , bench "Old FZeight Integer " $ whnf Old.integerSquareRoot (2^1023+1013)
+          , bench "New FZeight Integer " $ whnf New.integerSquareRoot (2^1023+1013)
+          , bench "Old Boogol Integer " $ whnf Old.integerSquareRoot (2^2046+1013)
+          , bench "New Boogol Integer " $ whnf New.integerSquareRoot (2^2046+1013)
         ]
     ]
 

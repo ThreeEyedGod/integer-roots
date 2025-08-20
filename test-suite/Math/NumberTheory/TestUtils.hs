@@ -33,6 +33,9 @@ module Math.NumberTheory.TestUtils
   , Huge(..)
   , Humoungous(..)
   , Gargantuan(..)
+  , Googolplex(..)
+  , FZeight(..)
+  , Boogol(..)
   , testIntegralProperty
   , testIntegral2Property
   , testSmallAndQuick
@@ -50,7 +53,7 @@ import Data.Word
 import Numeric.Natural
 
 import Math.NumberTheory.TestUtils.Wrappers
-    ( AnySign(..), Huge(..), Power(..), Humoungous(..), Gargantuan(..) )
+    ( AnySign(..), Huge(..), Power(..), Humoungous(..), Gargantuan(..), Googolplex (..), FZeight(..), Boogol(..))
 
 instance Arbitrary Natural where
   arbitrary = fromInteger <$> (arbitrary `suchThat` (>= 0))
@@ -122,10 +125,16 @@ testIntegralProperty name f = testGroup name
   , QC.testProperty "quickcheck Large Word"    ((f :: wrapper Word    -> bool) . getLarge)
   , QC.testProperty "quickcheck Huge  Integer" ((f :: wrapper Integer -> bool) . getHuge)
   , QC.testProperty "quickcheck Huge  Natural" ((f :: wrapper Natural -> bool) . getHuge)
-  -- , QC.testProperty "quickcheck Humoungous  Integer" ((f :: wrapper Integer -> bool) . getHumoungous)
-  -- , QC.testProperty "quickcheck Humoungous  Natural" ((f :: wrapper Natural -> bool) . getHumoungous)
-  -- , QC.testProperty "quickcheck Gargantuan  Integer" ((f :: wrapper Integer -> bool) . getGargantuan)
-  -- , QC.testProperty "quickcheck Gargantuan  Natural" ((f :: wrapper Natural -> bool) . getGargantuan)
+  , QC.testProperty "quickcheck Humoungous  Integer" ((f :: wrapper Integer -> bool) . getHumoungous)
+  , QC.testProperty "quickcheck Humoungous  Natural" ((f :: wrapper Natural -> bool) . getHumoungous)
+  , QC.testProperty "quickcheck Gargantuan  Integer" ((f :: wrapper Integer -> bool) . getGargantuan)
+  , QC.testProperty "quickcheck Gargantuan  Natural" ((f :: wrapper Natural -> bool) . getGargantuan)
+  , QC.testProperty "quickcheck Googolplex  Integer" ((f :: wrapper Integer -> bool) . getGoogolplex)
+  , QC.testProperty "quickcheck Googolplex  Natural" ((f :: wrapper Natural -> bool) . getGoogolplex)
+  , QC.testProperty "quickcheck FZeight  Integer" ((f :: wrapper Integer -> bool) . getFZeight)
+  , QC.testProperty "quickcheck FZeight  Natural" ((f :: wrapper Natural -> bool) . getFZeight)
+  , QC.testProperty "quickcheck Boogol  Integer" ((f :: wrapper Integer -> bool) . getBoogol)
+  , QC.testProperty "quickcheck Boogol  Natural" ((f :: wrapper Natural -> bool) . getBoogol)
   ]
 
 testIntegral2Property
@@ -202,10 +211,16 @@ testIntegral2Property name f = testGroup name
   , QC.testProperty "quickcheck Huge  Natural Word"    ((f :: wrapper1 Natural -> wrapper2 Word    -> bool) . fmap getHuge)
   , QC.testProperty "quickcheck Huge  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . fmap getHuge)
   , QC.testProperty "quickcheck Huge  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . fmap getHuge)
-  -- , QC.testProperty "quickcheck Humoungous  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getHumoungous)
-  -- , QC.testProperty "quickcheck Humoungous  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getHumoungous)
-  -- , QC.testProperty "quickcheck Gargantuan  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getGargantuan)
-  -- , QC.testProperty "quickcheck Gargantuan  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getGargantuan)
+  , QC.testProperty "quickcheck Humoungous  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getHumoungous)
+  , QC.testProperty "quickcheck Humoungous  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getHumoungous)
+  , QC.testProperty "quickcheck Gargantuan  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getGargantuan)
+  , QC.testProperty "quickcheck Gargantuan  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getGargantuan)
+  , QC.testProperty "quickcheck Googolplex  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getGoogolplex)
+  , QC.testProperty "quickcheck Googolplex  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getGoogolplex)
+  , QC.testProperty "quickcheck FZeight  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getFZeight)
+  , QC.testProperty "quickcheck FZeight  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getFZeight)
+  , QC.testProperty "quickcheck Boogol  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getBoogol)
+  , QC.testProperty "quickcheck Boogol  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getBoogol)
   ]
 
 testSmallAndQuick
