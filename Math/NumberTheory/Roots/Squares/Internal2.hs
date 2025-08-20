@@ -984,7 +984,7 @@ cI2D2_ bn#
 --     -- Single‐Word shortcut, exact up to 2^53–1
 --     1# | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) ->
 --           let w# = bigNatIndex# bn# 0# 
---           in (# wordToDouble# w#, 0# #)
+--           in (# word2Double# w#, 0#Int64 #)
 
 --     -- General path: only touch two Words
 --     sz# ->
@@ -1021,7 +1021,7 @@ cI2D2_ bn#
 --           finalExp# = int2Word# rawSh# `plusWord#` 1023##
 --           bits#     = (finalExp# `uncheckedShiftL#` 52##) `or#` mant53#
 
---       in (# wordToDouble# bits#, intToInt64# rawSh# #)
+--       in (# word2Double# bits#, intToInt64# rawSh# #)
 
 
 -- -- | Half-even rounding of a candidate 53-bit mantissa.
