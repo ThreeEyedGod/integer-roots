@@ -134,8 +134,8 @@ theFi xs
       let yT64# = largestNSqLTEOdd## i#
           y = W64# yT64#
           ysq# = yT64# `timesWord64#` yT64#
-          !remInteger = fromIntegral $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
-       in ItrLst_ 1# passXs (fromIntegral y) remInteger (unsafeword64ToFloatingX## yT64#)
+          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
+       in ItrLst_ 1# passXs (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
   where
     !(evenLen, passXs, dxs') = stageList xs
     i# = word64FromRvsrd2ElemList# dxs'
@@ -154,13 +154,14 @@ stageList xs =
     !l = length xs
 
 theNextIterations :: ItrLst_ -> Integer
-theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
+theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) = 
+  yCumulative___ $ foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
   where
     {-# INLINE tni #-}
     tni :: Word64 -> Itr__ -> Itr__
     tni sqW64 (Itr__ !cl# !yCAcc_ !tA !t# )  =
           let 
-              !tA_ = tA * secndPlaceW32Radix + fromIntegral sqW64
+              !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
               !tC_ = scaleByPower2 32#Int64 t# -- sqrtF previous digits being scaled right here
               !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgt tA_ tC_ of yTilde_# -> computeRem yCAcc_ tA_ yTilde_#
               !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tC_ !+## unsafeword64ToFloatingX## yTildeFinal# else tC_ -- recall tcfx is already scaled by 32. Do not use normalize here
@@ -203,7 +204,7 @@ computFx (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorX## (nextUpFX# (ne
 computeRem :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
 computeRem yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
 computeRem yc ta yTilde_# = let 
-      !i = fromIntegral (W64# yTilde_#)
+      !i = toInteger (W64# yTilde_#)
       !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       -- !intToUse = maxIntSizeAcross yc ta i 
       -- !(ycScaled, rdr) = case intToUse of 
@@ -227,7 +228,7 @@ computeRem yc ta yTilde_# = let
                   --             Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
                   -- (Is128;Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled +  i)) + 1 #) else (# yTilde_#, rdr #) 
-    in (# fromIntegral (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) 
+    in (# toInteger (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) 
 {-# INLINE computeRem #-}
 
 fitsInMaxInt32 :: Integer -> Bool 
@@ -519,11 +520,12 @@ mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) --(
 {-# INLINE intgrFromRvsrdTuple #-}
 
 -- | Integer from a "reversed" tuple of Word32 digits
+-- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259
 intgrFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer
 intgrFromRvsrdTuple (0, 0) 0 = 0
-intgrFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
-intgrFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
-intgrFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
+intgrFromRvsrdTuple (0, lMSB) base = toInteger lMSB * base
+intgrFromRvsrdTuple (lLSB, 0) _ = toInteger lLSB
+intgrFromRvsrdTuple (lLSB, lMSB) base = toInteger lMSB * base + toInteger lLSB
 
 {-# INLINE word64FromRvsrdTuple #-}
 
