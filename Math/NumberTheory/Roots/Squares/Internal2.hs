@@ -175,8 +175,8 @@ nxtDgt :: Integer -> FloatingX# -> Word64#
 nxtDgt 0 !_ = 0#Word64
 nxtDgt (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
 nxtDgt (IP bn#) tcfx#
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
-  | otherwise = computFx (preComputFx bn# tcfx#)
+     | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
+     | otherwise = computFx (preComputFx bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
@@ -194,7 +194,7 @@ preComput a# tcfx# =
 {-# INLINE preComput #-}
 
 preComputFx :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComputFx tA__bn# tCFX# = case unsafebigNat2FloatingX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+preComputFx tA__bn# tCFX# = case unsafeGtWordbn2FX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComputFx #-}
 
 computFx :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
@@ -955,6 +955,10 @@ bigNat2FloatingX## ibn#
 unsafebigNat2FloatingX## :: BigNat# -> FloatingX#
 unsafebigNat2FloatingX## ibn# = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
+{-# INLINE unsafeGtWordbn2FX## #-}
+unsafeGtWordbn2FX## :: BigNat# -> FloatingX#
+unsafeGtWordbn2FX## ibn# = case bnToFxGtWord# ibn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+
 {-# INLINE int64ToFloatingX# #-}
 int64ToFloatingX# :: Int64 -> FloatingX#
 int64ToFloatingX# i
@@ -989,6 +993,16 @@ cI2D2_ bn#
   --   thresh# :: Int#
   --   !thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
 
+{-# INLINE bnToFxGtWord# #-}
+bnToFxGtWord# :: BigNat# -> (# Double#, Int64# #)
+bnToFxGtWord# bn# = case bigNatLog2# bn# of
+    --  | otherwise = case _bigNatLog2# bn# bnsz# of
+          l# -> case l# `minusWord#` 94## of 
+            rawSh# -> let !shift# = rawSh# `and#` (not# 1##) in case bigNatShiftR# bn# shift# of
+          -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
+          --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
+              mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #) 
+  
 {-# INLINE cI2D2_FAST #-}
 cI2D2_FAST :: BigNat# -> (# Double#, Int64# #)
 cI2D2_FAST bn# =
