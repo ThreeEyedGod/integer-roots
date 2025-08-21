@@ -25,9 +25,9 @@ module Math.NumberTheory.Roots.Squares.Internal2
   )
 where
 
--- Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
+-- //FIXME Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
 
--- Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
+-- //FIXME Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.List  (unfoldr)
