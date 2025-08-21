@@ -7,7 +7,7 @@
 {-# LANGUAGE OrPatterns #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
-{-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 #-}
+{-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 
@@ -24,6 +24,10 @@ module Math.NumberTheory.Roots.Squares.Internal2
     isqrtB
   )
 where
+
+-- Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
+
+-- Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.List  (unfoldr)
@@ -57,6 +61,7 @@ import GHC.Exts
     geInt64#,
     int2Double#,
     int64ToInt#,
+    int64ToWord64#,
     intToInt64#,
     isTrue#,
     gtInt64#,
@@ -115,7 +120,7 @@ import Math.NumberTheory.Utils.ShortCircuit (firstTrueOf)
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
-{-# INLINEABLE isqrtB #-}
+-- {-# INLINEABLE isqrtB #-}
 
 -- | Iteration loop data - these records have vectors / lists in them
 data ItrLst_ = ItrLst_ {lvlst# :: {-# UNPACK #-} !Int#, lstW32 :: {-# UNPACK #-} ![Word64], yCumulative_ :: !Integer, iRem :: {-# UNPACK #-} !Integer, tb___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
