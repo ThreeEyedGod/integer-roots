@@ -27,7 +27,7 @@ where
 -- //FIXME Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
 
 -- \*********** BEGIN NEW IMPORTS
-import Math.NumberTheory.Utils.ArthMtic_ (fromInt64, sqrtOf2, split, split#, nextUp#, nextDown#, updateDouble#, _even, _odd, _evenInt64#, _oddInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (maxDouble, fromInt64, sqrtOf2, split, split#, nextUp#, nextDown#, updateDouble#, _even, _odd, _evenInt64#, _oddInt64#)
 import Data.List  (unfoldr)
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.DoubleWord (Int96, Int256)
@@ -512,12 +512,12 @@ double2Fx## d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 bigNat2FloatingX## :: BigNat# -> FloatingX#
 bigNat2FloatingX## ibn#
   | bigNatIsZero ibn# = zeroFx#
-  -- \| itsOKtoUsePlainDoubleCalc = double2FloatingX## iDouble#
-  | otherwise = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# -- cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-  -- where
-  --   !(D# maxDouble#) = maxDouble
-  --   !iDouble# =  bigNatEncodeDouble# ibn# 0#
-  --   !itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
+  | itsOKtoUsePlainDoubleCalc = double2Fx## iDouble#
+  | otherwise = unsafebigNat2FloatingX## ibn# 
+  where
+    !(D# maxDouble#) = maxDouble
+    !iDouble# =  bigNatEncodeDouble# ibn# 0#
+    !itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
 {-# INLINE unsafebigNat2FloatingX## #-}
 unsafebigNat2FloatingX## :: BigNat# -> FloatingX#

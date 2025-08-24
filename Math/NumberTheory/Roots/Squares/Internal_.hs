@@ -230,7 +230,7 @@ theNextIterations' (ItrLst'_ !currlen# !intgrXs !yCumulatedAcc0 !rmndr !tbfx#) =
 nxtDgtW64# :: Integer -> FloatingX# -> Word64#
 nxtDgtW64# 0 !_ = 0#Word64
 nxtDgtW64# (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDoubleW64# a# c# r#
-nxtDgtW64# (IP bn#) tcfx#
+nxtDgtW64# (IP bn#) tcfx#  -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- handles regular double as well
      | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDoubleW64# a# c# r#
      | otherwise = computFxW64# (preComputFx## bn# tcfx#)
   where
@@ -304,6 +304,11 @@ preComput a# tcfx# =
 preComputFx :: BigNat -> FloatingX -> (FloatingX, FloatingX, FloatingX)
 preComputFx tA__bn tCFX = case unsafeGtWordbn2Fx tA__bn of tAFX -> (tAFX, tCFX, tCFX !**+ tAFX) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComputFx #-}
+
+-- | handles small/regular double as well. So just not bigNat only
+allInclusivePreComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
+allInclusivePreComputFx## tA__bn# tCFX# = case bigNat2FloatingX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+{-# INLINE allInclusivePreComputFx## #-}
 
 preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add

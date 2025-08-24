@@ -49,6 +49,7 @@ module Math.NumberTheory.Utils.ArthMtic_ (
 , largestNSqLTEEven##
 , largestNSqLTEOdd##
 , dgtsLstBase32
+, maxDouble
 )
 where
 
