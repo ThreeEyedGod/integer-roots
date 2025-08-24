@@ -8,7 +8,7 @@ Short-circuit evaluation.
 -}
 
 
-module Math.NumberTheory.Utils.ShortCircuit
+module Math.NumberTheory.Utils.ShortCircuit_
 (
   -- * Type classes
   HasFalse(..)

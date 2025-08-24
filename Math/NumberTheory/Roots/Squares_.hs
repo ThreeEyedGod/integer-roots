@@ -28,7 +28,7 @@ import Data.Bits (finiteBitSize, (.&.))
 import GHC.Exts (Ptr(..))
 import Numeric.Natural (Natural)
 
-import Math.NumberTheory.Roots.Squares.Internal2
+import Math.NumberTheory.Roots.Squares.Internal_
 import Math.NumberTheory.Utils.BitMask (indexBitSet)
 
 -- | For a non-negative input \( n \)
