@@ -31,7 +31,6 @@ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.List  (unfoldr)
-import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.DoubleWord (Int96, Int256)
 import Data.WideWord (Int128, Word256, zeroInt128) -- he says it's coded to be as fast as possible
 import Data.Bits (finiteBitSize, complement, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -108,7 +107,6 @@ import GHC.Num.BigNat (BigNat(..), BigNat#,BigNat,bigNatLog2, bigNatShiftR, bigN
 import GHC.Num.Integer ( Integer (..), integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import GHC.Integer.Logarithms (wordLog2#)
-import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
 import Math.NumberTheory.Utils.ArthMtic_ 
 import Math.NumberTheory.Utils.FloatingX_ 
 -- *********** END NEW IMPORTS
@@ -118,17 +116,11 @@ import Math.NumberTheory.Utils.FloatingX_
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
--- {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
--- isqrtB :: (Integral a) => a -> a
--- isqrtB 0 = 0
--- isqrtB n = fromInteger . theNextIterations' . theFi' . dgtsLstBase32 . fromIntegral $ n
--- -- {-# INLINEABLE isqrtB #-}
-
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
--- {-# INLINEABLE isqrtB #-}
+{-# INLINEABLE isqrtB #-}
 
 -- | Iteration loop data - these records have vectors / lists in them
 data ItrLst_ = ItrLst_ {lvlst# :: {-# UNPACK #-} !Int#, lstW32 :: {-# UNPACK #-} ![Word64], yCumulative_ :: !Integer, iRem :: {-# UNPACK #-} !Integer, tb___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
@@ -321,27 +313,6 @@ computeRem :: Integer -> Integer -> Integer -> (Integer, Integer, Integer)
 computeRem yc ta 0 = (yc * radixW32, 0, ta)
 computeRem yc ta i = let 
       !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-      -- !intToUse = maxIntSizeAcross yc ta i 
-      -- !(ycScaled, rdr) = case intToUse of 
-                  -- Is32 -> case radixW32 `safePosMul64` fromIntegral yc of 
-                  --             Right ycScaled64 -> case fromIntegral (W64# yTilde_#) `safePosAdd64` ycScaled64 of 
-                  --                         Right iPlusycScaled -> case ycScaled64 `safePosAdd64` iPlusycScaled of 
-                  --                             Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul64` iPlusDoubleYcScaled of 
-                  --                                 Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr64 -> (fromIntegral ycScaled64,fromIntegral rdr64)
-                  --                                 Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - iTimesiPlusDoubleYcScaledIN)
-                  --                             Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
-                  --                         Left iPlusycScaledIN ->  (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
-                  --             Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-                  -- (Is32;Is64;Is96) -> case radixW32 `safePosMul256` fromIntegral yc of 
-                  --             Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of 
-                  --                         Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
-                  --                             Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul256` iPlusDoubleYcScaled of 
-                  --                                 Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr256 -> (fromIntegral ycScaled256,fromIntegral rdr256)
-                  --                                 Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
-                  --                             Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
-                  --                         Left iPlusycScaledIN ->  (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
-                  --             Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-                  -- (Is128;Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       !(yAdj, rdrAdj) = if rdr < 0 then (pred i, rdr + double (pred (ycScaled +  i)) + 1) else (i, rdr) 
     in (yAdj + ycScaled, yAdj, rdrAdj) 
 {-# INLINE computeRem #-}
@@ -350,28 +321,28 @@ computeRemW64# :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer 
 computeRemW64# yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
 computeRemW64# yc ta yTilde_# = let 
       !i = toInteger (W64# yTilde_#)
-      !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-      -- !intToUse = maxIntSizeAcross yc ta i 
-      -- !(ycScaled, rdr) = case intToUse of 
-                  -- Is32 -> case radixW32 `safePosMul64` fromIntegral yc of 
-                  --             Right ycScaled64 -> case fromIntegral (W64# yTilde_#) `safePosAdd64` ycScaled64 of 
-                  --                         Right iPlusycScaled -> case ycScaled64 `safePosAdd64` iPlusycScaled of 
-                  --                             Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul64` iPlusDoubleYcScaled of 
-                  --                                 Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr64 -> (fromIntegral ycScaled64,fromIntegral rdr64)
-                  --                                 Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - iTimesiPlusDoubleYcScaledIN)
-                  --                             Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
-                  --                         Left iPlusycScaledIN ->  (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
-                  --             Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-                  -- (Is32;Is64;Is96) -> case radixW32 `safePosMul256` fromIntegral yc of 
-                  --             Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of 
-                  --                         Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
-                  --                             Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul256` iPlusDoubleYcScaled of 
-                  --                                 Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr256 -> (fromIntegral ycScaled256,fromIntegral rdr256)
-                  --                                 Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
-                  --                             Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
-                  --                         Left iPlusycScaledIN ->  (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
-                  --             Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-                  -- (Is128;Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
+      -- !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
+      !intToUse = maxIntSizeAcross yc ta i 
+      !(ycScaled, rdr) = case intToUse of 
+                  Is32 -> case radixW32 `safePosMul64` fromIntegral yc of 
+                              Right ycScaled64 -> case fromIntegral (W64# yTilde_#) `safePosAdd64` ycScaled64 of 
+                                          Right iPlusycScaled -> case ycScaled64 `safePosAdd64` iPlusycScaled of 
+                                              Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul64` iPlusDoubleYcScaled of 
+                                                  Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr64 -> (fromIntegral ycScaled64,fromIntegral rdr64)
+                                                  Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - iTimesiPlusDoubleYcScaledIN)
+                                              Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
+                                          Left iPlusycScaledIN ->  (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
+                              Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
+                  (Is32;Is64;Is96) -> case radixW32 `safePosMul256` fromIntegral yc of 
+                              Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of 
+                                          Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of 
+                                              Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#)  `safePosMul256` iPlusDoubleYcScaled of 
+                                                  Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr256 -> (fromIntegral ycScaled256,fromIntegral rdr256)
+                                                  Left iTimesiPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
+                                              Left iPlusDoubleYcScaledIN ->  (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
+                                          Left iPlusycScaledIN ->  (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
+                              Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
+                  (Is128;Is256;IsIN;_) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled +  i)) + 1 #) else (# yTilde_#, rdr #) 
     in (# toInteger (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #) 
 {-# INLINE computeRemW64# #-}

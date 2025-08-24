@@ -19,7 +19,7 @@
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
-module Math.NumberTheory.Utils.FloatingX_
+module Math.NumberTheory.Utils.FloatingX_ 
 where
 
 -- //FIXME Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
@@ -106,7 +106,6 @@ import GHC.Num.BigNat (BigNat(..), BigNat#,BigNat,bigNatLog2, bigNatShiftR, bigN
 import GHC.Num.Integer ( Integer (..), integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import GHC.Integer.Logarithms (wordLog2#)
-import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
 -- *********** END NEW IMPORTS
 
 -- | Square root using Fabio Romano's Faster Bombelli method.

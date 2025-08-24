@@ -19,7 +19,37 @@
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
-module Math.NumberTheory.Utils.ArthMtic_
+module Math.NumberTheory.Utils.ArthMtic_ (
+  maxIntSizeAcross 
+, _evenInt64#
+, _oddInt64#
+, _even
+, _odd
+, nextDown#
+, nextUp#
+, updateDouble#
+, split
+, split#
+, fromInt64
+, sqrtOf2
+, MaxBounds (..)
+, double
+, radixW32
+, safePosAdd256
+, safePosMul256
+, safePosMul64
+, safePosAdd64
+, hndlOvflwW32
+, hndlOvflwW32##
+, secndPlaceW32Radix
+, mkIW32EvenRestLst
+, splitLastOne
+, splitLastTwo
+, word64FromRvsrd2ElemList#
+, largestNSqLTEEven##
+, largestNSqLTEOdd##
+, dgtsLstBase32
+)
 where
 
 -- //FIXME Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
@@ -352,9 +382,8 @@ pairUpBuild xs = build (\c n -> go c n xs)
 {-# INLINE integerOfNxtPairsLst #-}
 {-# SPECIALIZE integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Word64] #-}
 {-# SPECIALIZE integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Integer] #-}
-integerOfNxtPairsLst :: Integral a => Int -> [(Word32, Word32)] -> [a]
--- integerOfNxtPairsLst l = if l < 8 then map iFrmTupleBaseW32 else parallelMap Split 2 iFrmTupleBaseW32 -- assuming even dual core Split/Buffer work better than Chunk
-integerOfNxtPairsLst l =  map iFrmTupleBaseW32 -- //FIXME why does parallel not compile
+integerOfNxtPairsLst :: (NFData a, Integral a) => Int -> [(Word32, Word32)] -> [a]
+integerOfNxtPairsLst l = if l < 8 then map iFrmTupleBaseW32 else parallelMap Split 2 iFrmTupleBaseW32 -- assuming even dual core Split/Buffer work better than Chunk
 
 -- | Strategies that may be used with parallel calls
 data Strats
@@ -381,7 +410,7 @@ iFrmTupleBaseW32 tu = integralFromRvsrdTuple tu radixW32
 {-# INLINE mkIW32EvenRestLst #-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Integer]#-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64]#-}
-mkIW32EvenRestLst :: Integral a => Int -> Bool -> [Word32] -> [a]
+mkIW32EvenRestLst :: (NFData a, Integral a) => Int -> Bool -> [Word32] -> [a]
 mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) --(pairUpUnfold xs) --(pairUpAcc xs) --(pairUp evenLen xs)
 
 --- END helpers
