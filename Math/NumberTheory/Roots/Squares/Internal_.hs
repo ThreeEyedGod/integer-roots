@@ -232,7 +232,7 @@ nxtDgtW64# 0 !_ = 0#Word64
 nxtDgtW64# (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDoubleW64# a# c# r#
 nxtDgtW64# (IP bn#) tcfx#
      | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDoubleW64# a# c# r#
-     | otherwise = computFxW64# (preComputFx# bn# tcfx#)
+     | otherwise = computFxW64# (preComputFx## bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
@@ -246,7 +246,7 @@ nxtDgt# 0 _ = 0
 nxtDgt# (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
 nxtDgt# (IP bn#) tcfx#
      | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
-     | otherwise = computFx# (preComputFx# bn# tcfx#)
+     | otherwise = computFx# (preComputFx## bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
@@ -305,9 +305,9 @@ preComputFx :: BigNat -> FloatingX -> (FloatingX, FloatingX, FloatingX)
 preComputFx tA__bn tCFX = case unsafeGtWordbn2Fx tA__bn of tAFX -> (tAFX, tCFX, tCFX !**+ tAFX) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComputFx #-}
 
-preComputFx# :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComputFx# tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
-{-# INLINE preComputFx# #-}
+preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
+preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+{-# INLINE preComputFx## #-}
 
 computeRem :: Integer -> Integer -> Integer -> (Integer, Integer, Integer)
 computeRem yc ta 0 = (yc * radixW32, 0, ta)
