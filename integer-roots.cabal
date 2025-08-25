@@ -31,6 +31,7 @@ library
    ,wide-word >= 0.1.7.1
    ,integer-logarithms >= 1.0.4
    ,parallel >= 3.2.2.0
+   ,primitive >= 0.9.1.0
    -- Note if ever using containers 0.8 of containers results in a confilct
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2

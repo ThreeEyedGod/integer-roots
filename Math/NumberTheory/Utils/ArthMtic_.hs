@@ -41,6 +41,7 @@ module Math.NumberTheory.Utils.ArthMtic_ (
 , safePosAdd64
 , hndlOvflwW32
 , hndlOvflwW32##
+, hndlOvflwI32##
 , secndPlaceW32Radix
 , mkIW32EvenRestLst
 , splitLastOne
@@ -411,6 +412,7 @@ iFrmTupleBaseW32 tu = integralFromRvsrdTuple tu radixW32
 {-# INLINE mkIW32EvenRestLst #-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Integer]#-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64]#-}
+{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word]#-}
 mkIW32EvenRestLst :: (NFData a, Integral a) => Int -> Bool -> [Word32] -> [a]
 mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) --(pairUpUnfold xs) --(pairUpAcc xs) --(pairUp evenLen xs)
 
@@ -495,6 +497,13 @@ hndlOvflwW32## w64# = if isTrue# (w64# `eqWord64#` maxW32#) then predmaxW32# els
   where
     !(W64# maxW32#) = radixW32
     !(W64# predmaxW32#) = predRadixW32
+
+{-# INLINE hndlOvflwI32## #-}
+hndlOvflwI32## :: Int64# -> Int64#
+hndlOvflwI32## i64# = if isTrue# (i64# `eqInt64#` maxW32#) then predmaxW32# else i64#
+  where
+    !(I64# maxW32#) = radixW32
+    !(I64# predmaxW32#) = predRadixW32
 
 {-# INLINE wrd2wrd32 #-}
 wrd2wrd32 :: [Word] -> [Word32]
