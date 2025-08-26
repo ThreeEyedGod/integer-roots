@@ -51,6 +51,8 @@ module Math.NumberTheory.Utils.ArthMtic_ (
 , largestNSqLTEOdd##
 , dgtsLstBase32
 , maxDouble
+, maxSafeInteger
+, maxUnsafeInteger
 )
 where
 

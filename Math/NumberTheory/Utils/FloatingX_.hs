@@ -27,7 +27,7 @@ where
 -- //FIXME Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
 
 -- \*********** BEGIN NEW IMPORTS
-import Math.NumberTheory.Utils.ArthMtic_ (maxDouble, fromInt64, sqrtOf2, split, split#, nextUp#, nextDown#, updateDouble#, _even, _odd, _evenInt64#, _oddInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (maxSafeInteger, maxUnsafeInteger, maxDouble, fromInt64, sqrtOf2, split, split#, nextUp#, nextDown#, updateDouble#, _even, _odd, _evenInt64#, _oddInt64#)
 import Data.List  (unfoldr)
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.DoubleWord (Int96, Int256)
@@ -101,7 +101,7 @@ import GHC.Exts
   )
 import GHC.Float (divideDouble, powerDouble, timesDouble, floorDouble, integerToDouble#,int2Double, plusDouble,minusDouble)
 import GHC.Int (Int32, Int64 (I64#))
-import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
+import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Num.BigNat (BigNat(..), BigNat#,BigNat,bigNatLog2, bigNatShiftR, bigNatLeWord#, bigNatIsZero, bigNatLog2#, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer ( Integer (..), integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
@@ -527,6 +527,10 @@ bigNat2FloatingX## ibn#
 unsafebigNat2FloatingX## :: BigNat# -> FloatingX#
 unsafebigNat2FloatingX## ibn# = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
+{-# INLINE unsafeN2Fx# #-}
+unsafeN2Fx# :: Integer -> FloatingX#
+unsafeN2Fx# n = case convNToDblExp n of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+
 {-# INLINE unsafeGtWordbn2Fx## #-}
 unsafeGtWordbn2Fx## :: BigNat# -> FloatingX#
 unsafeGtWordbn2Fx## ibn# = case bnToFxGtWord# ibn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
@@ -569,6 +573,15 @@ cI2D2_ bn#
   --   bnsz# = bigNatSize# bn# 
   --   thresh# :: Int#
   --   !thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
+
+{-# INLINE convNToDblExp #-}
+convNToDblExp :: Integer -> (# Double#, Int64# #)
+convNToDblExp n
+     | n <= maxUnsafeInteger = let !(D# d#) = fromIntegral n in (# d#, 0#Int64 #) -- don't use maxsafeInteger
+     | otherwise = case integerLog2# n of
+          l# -> case l# `minusWord#` 94## of 
+            rawSh# -> let !shift# = rawSh# `and#` (not# 1##) in case shiftRInteger n (word2Int# shift#) of
+              mbn -> case fromIntegral mbn of (D# dmbn#) -> (# dmbn#, intToInt64# (word2Int# shift#) #) 
 
 {-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> (# Double#, Int64# #)
