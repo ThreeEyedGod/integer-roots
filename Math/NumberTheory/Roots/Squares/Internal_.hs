@@ -29,7 +29,9 @@ where
 
 -- //FIXME Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
 
+-- // FIXME Specialized Data Structures: Choose appropriate containers like unboxed vectors instead of lists for large datasets
 -- \*********** BEGIN NEW IMPORTS
+import qualified Data.Vector.Unboxed as VU
 import Data.Primitive.ByteArray (byteArrayFromList, foldrByteArray, ByteArray)
 import Data.List  (unfoldr)
 import Data.DoubleWord (Int96, Int256)
@@ -120,12 +122,14 @@ import Math.NumberTheory.Utils.FloatingX_
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
-isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsUV . theFiUV . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 
 -- | Iteration loop data - these records have vectors / lists in them
 data ItrLst_ = ItrLst_ {lvlst# :: {-# UNPACK #-} !Int#, lstW32 :: {-# UNPACK #-} ![Word64], yCumulative_ :: !Integer, iRem :: {-# UNPACK #-} !Integer, tb___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
-data ItrBA = ItrBA {lBA :: Int#, ba ::  !ByteArray, ycBA :: Integer, irBA :: !Integer, tbBAFx :: !FloatingX#} deriving (Eq)
+data ItrBA = ItrBA {lBA :: Int#, ba :: !ByteArray, ycBA :: Integer, irBA :: !Integer, tbBAFx :: !FloatingX#} deriving (Eq)
+data ItrUV = ItrUV {luv :: Int#, uv :: !(VU.Vector Word64), ycuv :: !Integer, iruv :: !Integer, tbuvFx :: !FloatingX#} deriving (Eq)
 data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
 theFi :: [Word32] -> ItrLst_
@@ -166,6 +170,25 @@ theFiBA xs
     !(evenLen, passBA, dxs') = stageBA xs
     i# = word64FromRvsrd2ElemList# dxs'
 
+theFiUV :: [Word32] -> ItrUV
+theFiUV xs
+  | evenLen =
+      let !(# !yc, !y1#, !remInteger #) =
+            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
+                ysq# = yT64# `timesWord64#` yT64#
+                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
+             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+       in ItrUV 1# passUV yc remInteger (unsafeword64ToFloatingX## y1#) 
+  | otherwise =
+      let yT64# = largestNSqLTEOdd## i#
+          y = W64# yT64#
+          ysq# = yT64# `timesWord64#` yT64#
+          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
+       in ItrUV 1# passUV (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
+  where
+    !(evenLen, passUV, dxs') = stageUV xs
+    i# = word64FromRvsrd2ElemList# dxs'
+
 {-# INLINE stageList #-}
 stageList :: [Word32] -> (Bool, [Word64], [Word32])
 stageList xs =
@@ -192,6 +215,19 @@ stageBA xs =
   where
     !l = length xs
 
+{-# INLINE stageUV #-}
+stageUV :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
+stageUV xs =
+  if even l
+    then
+      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
+       in (True, VU.fromList (mkIW32EvenRestLst l True rstEvenLen), lastTwo)
+    else
+      let !(rstEvenLen, lastOne) = splitLastOne xs l
+       in (False, VU.fromList (mkIW32EvenRestLst l True rstEvenLen), lastOne)
+  where
+    !l = length xs
+
 theNextIterations :: ItrLst_ -> Integer
 theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) = 
   yCumulative___ $ foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
@@ -210,6 +246,21 @@ theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
 theNextIterationsBA :: ItrBA -> Integer
 theNextIterationsBA (ItrBA !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) = 
   yCumulative___ $ foldrByteArray tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
+  where
+    {-# INLINE tni #-}
+    tni :: Word64 -> Itr__ -> Itr__
+    tni sqW64 (Itr__ !cl# !yCAcc_ !tA !t# )  =
+          let 
+              !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
+              !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+              !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgtW64# tA_ tCFx# of yTilde_# -> computeRemW64# yCAcc_ tA_ yTilde_#
+              !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
+           in (Itr__ (cl# +# 1#)  ycUpdated remFinal tcfx#) --rFinalXs
+-- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
+
+theNextIterationsUV :: ItrUV -> Integer
+theNextIterationsUV (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) = 
+  yCumulative___ $ VU.foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
   where
     {-# INLINE tni #-}
     tni :: Word64 -> Itr__ -> Itr__
