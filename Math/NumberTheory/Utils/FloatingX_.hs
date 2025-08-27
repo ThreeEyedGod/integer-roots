@@ -531,6 +531,11 @@ unsafebigNat2FloatingX## ibn# = case cI2D2_ ibn# of (# s#, e_# #) -> FloatingX# 
 unsafeN2Fx# :: Integer -> FloatingX#
 unsafeN2Fx# n = case convNToDblExp n of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
+-- | untested. questionable. 
+{-# INLINE unsafeN2Fx #-}
+unsafeN2Fx :: Integer -> FloatingX
+unsafeN2Fx n = case convNToDblExp n of (# s#, e_# #) -> FloatingX (D# s#) (I64# e_#) -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
+
 {-# INLINE unsafeGtWordbn2Fx## #-}
 unsafeGtWordbn2Fx## :: BigNat# -> FloatingX#
 unsafeGtWordbn2Fx## ibn# = case bnToFxGtWord# ibn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble

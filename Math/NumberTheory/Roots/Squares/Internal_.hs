@@ -273,6 +273,21 @@ theNextIterationsUV (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
            in (Itr__ (cl# +# 1#)  ycUpdated remFinal tcfx#) --rFinalXs
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
+-- | does not work 
+theNextIterationsUVI :: ItrUV -> Integer
+theNextIterationsUVI (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) = 
+  yCumulative___ $ VU.foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
+  where
+    {-# INLINE tni #-}
+    tni :: Word64 -> Itr__ -> Itr__
+    tni sqW64 (Itr__ !cl# !yCAcc_ !tA t@(FloatingX# s# e#) )  =
+          let 
+              !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
+              !tCFx = scaleByPower2 32 (FloatingX (D# s#) (I64# e#)) -- sqrtF previous digits being scaled right here
+              !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgt tA_ tCFx of yTilde -> computeRem yCAcc_ tA_ yTilde
+              !tcfx@(FloatingX (D# s_#) (I64# e_#)) = if isTrue# (cl# <# 3#) then nextDownFX $ tCFx !+ unsafeN2Fx yTildeFinal else (FloatingX (D# s#) (I64# e#)) -- recall tcfx is already scaled by 32. Do not use normalize here
+           in (Itr__ (cl# +# 1#)  ycUpdated remFinal (FloatingX# s_# e_#)) --rFinalXs
+-- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
 -- | Iteration loop data - these records have vectors / lists in them
 data ItrLst'_ = ItrLst'_ {lvlst'# :: {-# UNPACK #-} !Int#, lstW32' :: {-# UNPACK #-} ![Integer], yCumulative'_ :: !Integer, iRem' :: {-# UNPACK #-} !Integer, tb'___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
