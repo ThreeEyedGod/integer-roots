@@ -53,6 +53,7 @@ module Math.NumberTheory.Utils.ArthMtic_ (
 , maxDouble
 , maxSafeInteger
 , maxUnsafeInteger
+, foldr'
 )
 where
 
@@ -424,6 +425,9 @@ mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) --(
 
 
 {-# INLINE integralFromRvsrdTuple #-}
+{-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer #-}
+{-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
+{-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Word256 -> Word256 #-}
 
 -- | Integer from a "reversed" tuple of Word32 digits
 -- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259
@@ -488,10 +492,10 @@ largestNSqLTEEven## w# =
 
 -- | handle overflow
 {-# INLINE hndlOvflwW32 #-}
-hndlOvflwW32 :: (Integral a) => a -> a
-hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 {-# SPECIALIZE hndlOvflwW32 :: Integer -> Integer #-}
 {-# SPECIALIZE hndlOvflwW32 :: Word64 -> Word64 #-}
+hndlOvflwW32 :: (Integral a) => a -> a
+hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
 
 {-# INLINE hndlOvflwW32## #-}
 hndlOvflwW32## :: Word64# -> Word64#
@@ -653,3 +657,10 @@ undigits_ = undigits
 {-# SPECIALIZE undigits_ :: Word64 -> [Word64] -> Integer #-}
 {-# SPECIALIZE undigits_ :: Integer -> [Integer] -> Integer #-}
 {-# SPECIALIZE undigits_ :: Integer -> [Integer] -> Integer #-}
+
+foldr' :: (a -> b -> b) -> b -> [a] -> b
+foldr' f z xs = go xs
+  where
+    go []     = z
+    go (x:xs) = f x $! go xs
+{-# INLINEABLE foldr' #-}

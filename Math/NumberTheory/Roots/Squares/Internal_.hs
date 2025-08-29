@@ -122,7 +122,8 @@ import Math.NumberTheory.Utils.FloatingX_
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
-isqrtB n = fromInteger . theNextIterationsUVI . theFiUV . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsUV . theFiUV . dgtsLstBase32 . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFiUVRvr . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 
@@ -189,6 +190,25 @@ theFiUV xs
     !(evenLen, passUV, dxs') = stageUV xs
     i# = word64FromRvsrd2ElemList# dxs'
 
+theFiUVRvr :: [Word32] -> ItrUV
+theFiUVRvr xs
+  | evenLen =
+      let !(# !yc, !y1#, !remInteger #) =
+            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
+                ysq# = yT64# `timesWord64#` yT64#
+                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
+             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+       in ItrUV 1# passUV yc remInteger (unsafeword64ToFloatingX## y1#) 
+  | otherwise =
+      let yT64# = largestNSqLTEOdd## i#
+          y = W64# yT64#
+          ysq# = yT64# `timesWord64#` yT64#
+          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
+       in ItrUV 1# passUV (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
+  where
+    !(evenLen, passUV, dxs') = stageUVrvrsd xs
+    i# = word64FromRvsrd2ElemList# dxs'
+
 {-# INLINE stageList #-}
 stageList :: [Word32] -> (Bool, [Word64], [Word32])
 stageList xs =
@@ -228,9 +248,22 @@ stageUV xs =
   where
     !l = length xs
 
+{-# INLINE stageUVrvrsd #-}
+stageUVrvrsd :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
+stageUVrvrsd xs =
+  if even l
+    then
+      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
+       in (True, VU.fromList $ reverse (mkIW32EvenRestLst l True rstEvenLen), lastTwo)
+    else
+      let !(rstEvenLen, lastOne) = splitLastOne xs l
+       in (False, VU.fromList $ reverse (mkIW32EvenRestLst l True rstEvenLen), lastOne)
+  where
+    !l = length xs
+
 theNextIterations :: ItrLst_ -> Integer
 theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) = 
-  yCumulative___ $ foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
+  yCumulative___ $ foldr' tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
   where
     {-# INLINE tni #-}
     tni :: Word64 -> Itr__ -> Itr__
@@ -260,7 +293,7 @@ theNextIterationsBA (ItrBA !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
 
 theNextIterationsUV :: ItrUV -> Integer
 theNextIterationsUV (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) = 
-  yCumulative___ $ VU.foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
+  yCumulative___ $ VU.foldr' tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
   where
     {-# INLINE tni #-}
     tni :: Word64 -> Itr__ -> Itr__
@@ -275,7 +308,7 @@ theNextIterationsUV (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
 
 theNextIterationsUVI :: ItrUV -> Integer
 theNextIterationsUVI (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) = 
-  yCumulative___ $ VU.foldr tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
+  yCumulative___ $ VU.foldr' tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
   where
     {-# INLINE tni #-}
     tni :: Word64 -> Itr__ -> Itr__
@@ -288,6 +321,24 @@ theNextIterationsUVI (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
               !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFloatingX## yTildeFinal# else (FloatingX# s'# e'#)  -- recall tcfx is already scaled by 32. Do not use normalize here
            in (Itr__ (cl# +# 1#)  ycUpdated remFinal (FloatingX# s_# e_#)) --rFinalXs
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
+{-# NOINLINE theNextIterationsUVI #-} -- //FIXME 
+
+theNextIterationsUVIrvrsd :: ItrUV -> Integer
+theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) = 
+  yCumulative___ $ VU.foldl' tniRvr (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
+  where
+    {-# INLINE tniRvr #-}
+    tniRvr :: Itr__ -> Word64 -> Itr__
+    tniRvr (Itr__ !cl# !yCAcc_ !tA t@(FloatingX# s# e#) ) sqW64  =
+          let 
+              !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
+              !tCFx@(FloatingX (D# s'#) (I64# e'#)) = scaleByPower2 32 (FloatingX (D# s#) (I64# e#)) -- sqrtF previous digits being scaled right here
+              !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgt tA_ tCFx of yTilde -> computeRem yCAcc_ tA_ yTilde
+              !(W64# yTildeFinal#) = fromIntegral yTildeFinal
+              !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFloatingX## yTildeFinal# else (FloatingX# s'# e'#)  -- recall tcfx is already scaled by 32. Do not use normalize here
+           in (Itr__ (cl# +# 1#)  ycUpdated remFinal (FloatingX# s_# e_#)) --rFinalXs
+-- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
+{-# NOINLINE theNextIterationsUVIrvrsd #-} -- //FIXME 
 
 -- | Iteration loop data - these records have vectors / lists in them
 data ItrLst'_ = ItrLst'_ {lvlst'# :: {-# UNPACK #-} !Int#, lstW32' :: {-# UNPACK #-} ![Integer], yCumulative'_ :: !Integer, iRem' :: {-# UNPACK #-} !Integer, tb'___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
@@ -391,6 +442,7 @@ nxtDgt n@(IP bn#) tcfx@(FloatingX s@(D# s#) e@(I64# e#))
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgt (IN _) !_ = error "nxtDgt :: Invalid negative integer argument"
+{-# INLINE nxtDgt #-}
 
 {-# INLINE computDouble #-}
 computDouble :: Double -> Double -> Double -> Integer
