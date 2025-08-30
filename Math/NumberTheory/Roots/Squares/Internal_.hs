@@ -6,7 +6,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OrPatterns #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
--- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
+-- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm dumps else not
 {-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
@@ -123,7 +123,8 @@ import Math.NumberTheory.Utils.FloatingX_
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 -- isqrtB n = fromInteger . theNextIterationsUV . theFiUV . dgtsLstBase32 . fromIntegral $ n
-isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFiUVRvr . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFiUVRvr . dgtsLstBase32 . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsUVI . theFiUV . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 
@@ -316,7 +317,8 @@ theNextIterationsUVI (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
           let 
               !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
               !tCFx@(FloatingX (D# s'#) (I64# e'#)) = scaleByPower2 32 (FloatingX (D# s#) (I64# e#)) -- sqrtF previous digits being scaled right here
-              !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgt tA_ tCFx of yTilde -> computeRem yCAcc_ tA_ yTilde
+              -- computeRem yCAcc_ tA_ yTilde :: manual fusing of the left code into the line below
+              !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgtFused tA_ tCFx of yTilde -> case radixW32 * yCAcc_ of ycScaled -> case (ycScaled, tA_ - yTilde * (double ycScaled + yTilde)) of (ycS', rdr) -> if rdr < 0 then (ycS'+pred yTilde, pred yTilde, rdr + double (pred (ycS' +  yTilde)) + 1) else (ycS'+yTilde, yTilde, rdr) 
               !(W64# yTildeFinal#) = fromIntegral yTildeFinal
               !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFloatingX## yTildeFinal# else (FloatingX# s'# e'#)  -- recall tcfx is already scaled by 32. Do not use normalize here
            in (Itr__ (cl# +# 1#)  ycUpdated remFinal (FloatingX# s_# e_#)) --rFinalXs
@@ -325,7 +327,7 @@ theNextIterationsUVI (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
 
 theNextIterationsUVIrvrsd :: ItrUV -> Integer
 theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) = 
-  yCumulative___ $ VU.foldl' tniRvr (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
+  yCumulative___ $ VU.foldl' tniRvr  (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
   where
     {-# INLINE tniRvr #-}
     tniRvr :: Itr__ -> Word64 -> Itr__
@@ -443,6 +445,24 @@ nxtDgt n@(IP bn#) tcfx@(FloatingX s@(D# s#) e@(I64# e#))
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgt (IN _) !_ = error "nxtDgt :: Invalid negative integer argument"
 {-# INLINE nxtDgt #-}
+
+preComputDoubleT :: Double -> FloatingX -> (Double, Double, Double)
+preComputDoubleT tADX_@(D# a#) tcfx = case unsafefx2Double tcfx of tCDX_@(D# c#) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> (tADX, tCDX, radDX) 
+
+nxtDgtFused :: Integer -> FloatingX -> Integer
+nxtDgtFused 0 _ = 0
+nxtDgtFused (IS ta#) tcfx = case (unsafefx2Double tcfx, (int2Double (I# ta#))) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
+-- nxtDgtFused (IS ta#) tcfx = case preComputDouble (int2Double (I# ta#)) tcfx of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
+nxtDgtFused n@(IP bn#) tcfx@(FloatingX s@(D# s#) e@(I64# e#))
+    --  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComputDouble (D# (bigNatEncodeDouble# bn# 0#)) tcfx of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
+     | isTrue# ((bigNatSize# bn#) <# thresh#) = case (unsafefx2Double tcfx, (D# (bigNatEncodeDouble# bn# 0#))) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
+    --  | otherwise = computFx (preComputFx (BN# bn#) (FloatingX s e)) --computFx (preComputFx bn# tcfx#)
+     | otherwise = case unsafeGtWordbn2Fx (BN# bn#) of tAFX -> hndlOvflwW32 (floorFX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFx (nextDownFX tcfx !**+ tAFX) !+ nextDownFX tcfx)))) --computFx (tAFX, tcfx, tcfx !**+ tAFX)  
+  where
+    thresh# :: Int#
+    thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
+nxtDgtFused (IN _) !_ = error "nxtDgtFused :: Invalid negative integer argument"
+{-# INLINE [0] nxtDgtFused #-} -- phase 0 seems to make a secondary difference 
 
 {-# INLINE computDouble #-}
 computDouble :: Double -> Double -> Double -> Integer

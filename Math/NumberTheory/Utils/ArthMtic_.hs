@@ -326,7 +326,7 @@ safeMulW256 x y =
 
 
 -- | HELPER functions
-{-# INLINE dgtsLstBase32 #-}
+{-# INLINE [0] dgtsLstBase32 #-}
 dgtsLstBase32 :: Integer -> [Word32]
 dgtsLstBase32 n = mkIW32Lst n radixW32
 
@@ -491,7 +491,7 @@ largestNSqLTEEven## w# =
    in r#
 
 -- | handle overflow
-{-# INLINE hndlOvflwW32 #-}
+{-# INLINE [0] hndlOvflwW32 #-} -- does delaying inlining to phase 0 make a significant difference?
 {-# SPECIALIZE hndlOvflwW32 :: Integer -> Integer #-}
 {-# SPECIALIZE hndlOvflwW32 :: Word64 -> Word64 #-}
 hndlOvflwW32 :: (Integral a) => a -> a

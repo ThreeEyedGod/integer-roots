@@ -17,7 +17,7 @@
   ],
 
   "[haskell]": {
-    "editor.defaultFormatter": "haskell.haskell",
+    "editor.defaultFormatter": "sjurmillidahl.ormolu-vscode",
     "editor.formatOnSave": true,
     "editor.hover.enabled": true
   }

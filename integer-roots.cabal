@@ -58,7 +58,7 @@ library
     Math.NumberTheory.Utils.ArthMtic_
   default-language: Haskell2010
   ghc-options: -Wall -Widentities -Wcompat
-
+  
 test-suite integer-roots-tests
   build-depends:
     base >=4.9 && <5,
