@@ -123,8 +123,8 @@ import Math.NumberTheory.Utils.FloatingX_
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 -- isqrtB n = fromInteger . theNextIterationsUV . theFiUV . dgtsLstBase32 . fromIntegral $ n
--- isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFiUVRvr . dgtsLstBase32 . fromIntegral $ n
-isqrtB n = fromInteger . theNextIterationsUVI . theFiUV . dgtsLstBase32 . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFiUVRvr . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsUVI . theFiUV . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 
@@ -462,7 +462,7 @@ nxtDgtFused n@(IP bn#) tcfx@(FloatingX s@(D# s#) e@(I64# e#))
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgtFused (IN _) !_ = error "nxtDgtFused :: Invalid negative integer argument"
-{-# INLINE [0] nxtDgtFused #-} -- phase 0 seems to make a secondary difference 
+{-# INLINE [0] nxtDgtFused #-} -- phase 0 here seems to make a secondary difference 
 
 {-# INLINE computDouble #-}
 computDouble :: Double -> Double -> Double -> Integer

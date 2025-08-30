@@ -410,7 +410,7 @@ fm1addFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#)
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# fx@(FloatingX# s# e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
 
-{-# INLINE floorX# #-}
+{-# INLINE [0] floorX# #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Int #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Int64 #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}

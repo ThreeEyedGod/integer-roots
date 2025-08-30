@@ -384,7 +384,7 @@ pairUpBuild xs = build (\c n -> go c n xs)
     go _ _ [_]          = error "pairUp: odd length"
 
 -- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s list
-{-# INLINE integerOfNxtPairsLst #-}
+{-# INLINE [0] integerOfNxtPairsLst #-}
 {-# SPECIALIZE integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Word64] #-}
 {-# SPECIALIZE integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Integer] #-}
 integerOfNxtPairsLst :: (NFData a, Integral a) => Int -> [(Word32, Word32)] -> [a]
@@ -412,7 +412,7 @@ parallelMap strat stratParm f = case strat of
 iFrmTupleBaseW32 :: Integral a => (Word32, Word32) -> a
 iFrmTupleBaseW32 tu = integralFromRvsrdTuple tu radixW32
 
-{-# INLINE mkIW32EvenRestLst #-}
+{-# INLINE [0] mkIW32EvenRestLst #-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Integer]#-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64]#-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word]#-}
@@ -424,7 +424,7 @@ mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) --(
 --- ***********************************
 
 
-{-# INLINE integralFromRvsrdTuple #-}
+{-# INLINE [0] integralFromRvsrdTuple #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Word256 -> Word256 #-}
@@ -650,7 +650,7 @@ undigits_ ::
   [b] ->
   Integer
 undigits_ = undigits
-{-# INLINE undigits_ #-}
+{-# INLINE [0] undigits_ #-}
 {-# SPECIALIZE undigits_ :: Word -> [Word] -> Integer #-}
 {-# SPECIALIZE undigits_ :: Int -> [Int] -> Integer #-}
 {-# SPECIALIZE undigits_ :: Int64 -> [Int64] -> Integer #-}
