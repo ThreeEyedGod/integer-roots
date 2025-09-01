@@ -138,20 +138,19 @@ minValueFx = FloatingX 1.0 0
 minValueFx# :: FloatingX#
 minValueFx# = FloatingX# 1.0## 0#Int64
 
-
-{-# INLINE [0] (!+) #-}
+{-# NOINLINE [0] (!+) #-}
 (!+) :: FloatingX -> FloatingX -> FloatingX
 (!+) x y = x `addFx` y
 
-{-# INLINE [0](!*) #-}
+{-# NOINLINE [0](!*) #-}
 (!*) :: FloatingX -> FloatingX -> FloatingX
 (!*) x y = x `mulFx` y
 
-{-# INLINE [0] (!/) #-}
+{-# NOINLINE [0] (!/) #-}
 (!/) :: FloatingX -> FloatingX -> FloatingX
 (!/) x y = x `unsafeDivFx` y ---- note this is the unsafest version of divide
 
-{-# INLINE [0] (!**+) #-}
+{-# NOINLINE [0] (!**+) #-}
 (!**+) :: FloatingX -> FloatingX -> FloatingX
 (!**+) x y = x `fsqraddFloatingX` y
 
@@ -210,7 +209,7 @@ fsqraddFloatingX !(FloatingX (D# sA#) expA) !(FloatingX (D# sC#) expC)
     !twoTimesExpA = 2 * expA 
     !diff@(I64# diff#) = expC - twoTimesExpA
 
-{-# INLINEABLE [0] floorFX #-} -- punting inlining to the last Phase 0 
+{-# INLINEABLE [1] floorFX #-} -- punting inlining to the last Phase 0 
 -- {-# INLINE [0] floorFX #-} -- punting inlining to the last Phase 0 
 {-# SPECIALIZE floorFX :: FloatingX -> Int #-}
 {-# SPECIALIZE floorFX :: FloatingX -> Int64 #-}
@@ -492,7 +491,7 @@ unsafefx2Double (FloatingX d@(D# d#) e) =
   where
     !(# m, n# #) = decodeDoubleInteger d#
     !ex@(I# ex#) = I# n# + fromIntegral e
-{-# INLINE [0] unsafefx2Double #-}
+{-# INLINE [2] unsafefx2Double #-}
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# d# 0#Int64) = d#
@@ -541,7 +540,7 @@ unsafeN2Fx n = case convNToDblExp n of (# s#, e_# #) -> FloatingX (D# s#) (I64# 
 unsafeGtWordbn2Fx## :: BigNat# -> FloatingX#
 unsafeGtWordbn2Fx## ibn# = case bnToFxGtWord# ibn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
-{-# INLINE unsafeGtWordbn2Fx #-}
+{-# INLINE [2] unsafeGtWordbn2Fx #-}
 unsafeGtWordbn2Fx :: BigNat -> FloatingX
 unsafeGtWordbn2Fx ibn = case bnToFxGtWord ibn of (s, e_) -> FloatingX s e_ -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
@@ -685,7 +684,7 @@ _bigNatLog2# a s -- s = bigNatSize# a
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
-{-# INLINE [0] nextUpFX #-}
+{-# INLINE [2] nextUpFX #-}
 nextUpFX :: FloatingX -> FloatingX
 nextUpFX (FloatingX s e)
   | s == 0 = minValueFx
@@ -705,7 +704,7 @@ nextUpFXNormalized# (FloatingX# s# e#)
   | isTrue# (s# ==## 0.0##) = minValueFx#
   | otherwise = case nextUp# s# of interimS# -> if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
 
-{-# INLINE [0] nextDownFX #-}
+{-# INLINE [2] nextDownFX #-}
 nextDownFX :: FloatingX -> FloatingX
 nextDownFX x@(FloatingX s e)
   | s == 0.0 || x == minValueFx = zeroFx

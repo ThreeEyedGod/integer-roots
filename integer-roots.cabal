@@ -50,6 +50,7 @@ library
     Math.NumberTheory.Roots.Squares
     Math.NumberTheory.Roots.Squares_
     Math.NumberTheory.Roots.Squares.Internal
+    Math.NumberTheory.Roots.Squares.InternalBank_
     Math.NumberTheory.Roots.Squares.Internal_
     Math.NumberTheory.Utils.BitMask
     Math.NumberTheory.Utils.FromIntegral
