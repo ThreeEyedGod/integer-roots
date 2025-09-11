@@ -126,8 +126,8 @@ data ItrUV = ItrUV {luv :: Int#, uv :: !(VU.Vector Word64), ycuv :: !Integer, ir
 
 data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
-theFi :: [Word32] -> ItrLst_
-theFi xs
+theFirstXs :: (Bool, [Word64], [Word32]) -> ItrLst_
+theFirstXs (evenLen, passXs, dxs') 
   | evenLen =
       let !(# !yc, !y1#, !remInteger #) =
             let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
@@ -142,26 +142,6 @@ theFi xs
           !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
        in ItrLst_ 1# passXs (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
   where
-    !(evenLen, passXs, dxs') = stageList xs
-    i# = word64FromRvsrd2ElemList# dxs'
-
-theFiRvrsd :: [Word32] -> ItrLst_
-theFiRvrsd xs
-  | evenLen =
-      let !(# !yc, !y1#, !remInteger #) =
-            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                ysq# = yT64# `timesWord64#` yT64#
-                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-       in ItrLst_ 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#)
-  | otherwise =
-      let yT64# = largestNSqLTEOdd## i#
-          y = W64# yT64#
-          ysq# = yT64# `timesWord64#` yT64#
-          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
-       in ItrLst_ 1# passXs (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
-  where
-    !(evenLen, passXs, dxs') = stageListRvrsd xs
     i# = word64FromRvsrd2ElemList# dxs'
 
 theFiBA :: [Word32] -> ItrBA
@@ -183,8 +163,8 @@ theFiBA xs
     !(evenLen, passBA, dxs') = stageBA xs
     i# = word64FromRvsrd2ElemList# dxs'
 
-theFiUV :: [Word32] -> ItrUV
-theFiUV xs
+theFirstUV :: (Bool, VU.Vector Word64, [Word32]) -> ItrUV
+theFirstUV (evenLen, passUV, dxs') 
   | evenLen =
       let !(# !yc, !y1#, !remInteger #) =
             let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
@@ -199,59 +179,7 @@ theFiUV xs
           !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
        in ItrUV 1# passUV (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
   where
-    !(evenLen, passUV, dxs') = stageUV xs
     i# = word64FromRvsrd2ElemList# dxs'
-
-theFiUVRvr :: [Word32] -> ItrUV
-theFiUVRvr xs
-  | evenLen =
-      let !(# !yc, !y1#, !remInteger #) =
-            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                ysq# = yT64# `timesWord64#` yT64#
-                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-       in ItrUV 1# passUV yc remInteger (unsafeword64ToFloatingX## y1#)
-  | otherwise =
-      let yT64# = largestNSqLTEOdd## i#
-          y = W64# yT64#
-          ysq# = yT64# `timesWord64#` yT64#
-          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
-       in ItrUV 1# passUV (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
-  where
-    !(evenLen, passUV, dxs') = stageUVrvrsd xs
-    i# = word64FromRvsrd2ElemList# dxs'
-
-theFi' :: [Word32] -> ItrLst'_
-theFi' xs
-  | evenLen =
-      let !(# !yc, !y1#, !remInteger #) =
-            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                ysq# = yT64# `timesWord64#` yT64#
-                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-       in ItrLst'_ 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#)
-  | otherwise =
-      let yT64# = largestNSqLTEOdd## i#
-          y = W64# yT64#
-          ysq# = yT64# `timesWord64#` yT64#
-          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
-       in ItrLst'_ 1# passXs (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
-  where
-    !(evenLen, passXs, dxs') = stageList' xs
-    i# = word64FromRvsrd2ElemList# dxs'
-
-{-# INLINE stageList' #-}
-stageList' :: [Word32] -> (Bool, [Integer], [Word32])
-stageList' xs =
-  if even l
-    then
-      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
-       in (True, mkIW32EvenRestLst l True rstEvenLen, lastTwo)
-    else
-      let !(rstEvenLen, lastOne) = splitLastOne xs l
-       in (False, mkIW32EvenRestLst l True rstEvenLen, lastOne)
-  where
-    !l = length xs
 
 {-# INLINE stageList #-}
 stageList :: [Word32] -> (Bool, [Word64], [Word32])
@@ -394,24 +322,6 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 {-# NOINLINE theNextIterationsUVIrvrsd #-} -- //FIXME
 
--- | Iteration loop data - these records have vectors / lists in them
-data ItrLst'_ = ItrLst'_ {lvlst'# :: {-# UNPACK #-} !Int#, lstW32' :: {-# UNPACK #-} ![Integer], yCumulative'_ :: !Integer, iRem' :: {-# UNPACK #-} !Integer, tb'___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
-
-data Itr'__ = Itr'__ {lv'__# :: {-# UNPACK #-} !Int#, yCumulative'___ :: !Integer, iRem'___ :: {-# UNPACK #-} !Integer, tb'__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
-
-theNextIterations' :: ItrLst'_ -> Integer
-theNextIterations' (ItrLst'_ !currlen# !intgrXs !yCumulatedAcc0 !rmndr !tbfx#) =
-  yCumulative'___ $ foldr tni (Itr'__ currlen# yCumulatedAcc0 rmndr tbfx#) intgrXs
-  where
-    {-# INLINE tni #-}
-    tni :: Integer -> Itr'__ -> Itr'__
-    tni nxtTwoDgts (Itr'__ !cl# !yCAcc_ !tA (FloatingX# s# e#)) =
-      let !tA_ = tA * secndPlaceW32Radix + nxtTwoDgts
-          !tC_@(FloatingX (D# s_) (I64# e_)) = scaleByPower2 32 (FloatingX (D# s#) (I64# e#)) -- sqrtF previous digits being scaled right here
-          !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgt tA_ tC_ of yTilde -> computeRem yCAcc_ tA_ yTilde
-          !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s_ e_) !+## unsafeword64ToFx# yTildeFinal else FloatingX# s_ e_ -- recall tcfx is already scaled by 32. Do not use normalize here
-       in (Itr'__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
-
 {-# INLINE theNextIterationsRvrsdSLCode #-}
 -- | SL = Straight Line Code 
 theNextIterationsRvrsdSLCode :: ItrLst_ -> Integer
@@ -451,9 +361,9 @@ theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rm
 nxtDgtW64# :: Integer -> FloatingX# -> Word64#
 -- nxtDgtW64# n tcfx# = computFxW64# (allInclusivePreComputNToFx## n tcfx#) -- works ! but not any faster
 nxtDgtW64# 0 !_ = 0#Word64
-nxtDgtW64# (IS ta#) tcfx# = nxtDgtDoubleFx## (int2Double# ta#) tcfx#
+nxtDgtW64# (IS ta#) tcfx# = nxtDgtDoubleFxW64## (int2Double# ta#) tcfx#
 nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFx## (bigNatEncodeDouble# bn# 0#) tcfx#
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
   -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if (tAFX# !<## threshold#) then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
  where 
@@ -464,8 +374,8 @@ nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgtW64# (IN _) !_ = error "nxtDgtW64# :: Invalid negative integer argument"
 
-nxtDgtDoubleFx## :: Double# -> FloatingX# -> Word64#
-nxtDgtDoubleFx## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
+nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
+nxtDgtDoubleFxW64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
 
 nxtDgtDoubleFxHrbie## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxHrbie## pa# tcfx# = case isTrue# (c# <## threshold#) of
@@ -477,14 +387,17 @@ nxtDgtDoubleFxHrbie## pa# tcfx# = case isTrue# (c# <## threshold#) of
 
 nxtDgtI64# :: Integer -> FloatingX# -> Int64#
 nxtDgtI64# 0 !_ = 0#Int64
-nxtDgtI64# (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDoubleI64# a# c# r#
+nxtDgtI64# (IS ta#) tcfx# = nxtDgtDoubleFxI64## (int2Double# ta#) tcfx# 
 nxtDgtI64# (IP bn#) tcfx# -- //FIXME = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- handles regular double as well
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDoubleI64# a# c# r#
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI64## (bigNatEncodeDouble# bn# 0#) tcfx# 
   | otherwise = computFxI64# (preComputFx## bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgtI64# (IN _) !_ = error "nxtDgtI64# :: Invalid negative integer argument"
+
+nxtDgtDoubleFxI64## :: Double# -> FloatingX# -> Int64#
+nxtDgtDoubleFxI64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> computDoubleI64# a# c# r#
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
 -- for small values we can go with the standard double# arithmetic
