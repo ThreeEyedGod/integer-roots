@@ -404,26 +404,32 @@ nxtDgtDoubleFxI64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r#
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt# :: Integer -> FloatingX# -> Integer
 nxtDgt# 0 _ = 0
-nxtDgt# (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
+nxtDgt# (IS ta#) tcfx# = nxtDgtDoubleFxI## (int2Double# ta#) tcfx# 
 nxtDgt# (IP bn#) tcfx#
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI## (bigNatEncodeDouble# bn# 0#) tcfx# 
   | otherwise = computFx# (preComputFx## bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgt# (IN _) !_ = error "nxtDgt :: Invalid negative integer argument"
 
+nxtDgtDoubleFxI## :: Double# -> FloatingX# -> Integer
+nxtDgtDoubleFxI## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> computDouble# a# c# r#
+
 nxtDgt :: Integer -> FloatingX -> Integer
 nxtDgt 0 _ = 0
-nxtDgt (IS ta#) tcfx = case preComputDouble (int2Double (I# ta#)) tcfx of (a, c, r) -> computDouble a c r
+nxtDgt (IS ta#) tcfx = nxtDgtDoubleFxI (int2Double (I# ta#)) tcfx 
 nxtDgt n@(IP bn#) tcfx@(FloatingX s@(D# s#) e@(I64# e#))
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComputDouble (D# (bigNatEncodeDouble# bn# 0#)) tcfx of (a, c, r) -> computDouble a c r
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI (D# (bigNatEncodeDouble# bn# 0#)) tcfx 
   | otherwise = computFx (preComputFx (BN# bn#) (FloatingX s e)) -- computFx (preComputFx bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgt (IN _) !_ = error "nxtDgt :: Invalid negative integer argument"
 {-# INLINE nxtDgt #-}
+
+nxtDgtDoubleFxI :: Double -> FloatingX -> Integer
+nxtDgtDoubleFxI pa tcfx = case inline preComputDouble pa tcfx of (a, c, r) -> computDouble a c r
 
 preComputDoubleT :: Double -> FloatingX -> (Double, Double, Double)
 preComputDoubleT tADX_@(D# a#) tcfx = case unsafefx2Double tcfx of tCDX_@(D# c#) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> (tADX, tCDX, radDX)
