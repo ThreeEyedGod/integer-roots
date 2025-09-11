@@ -7,7 +7,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm dumps else not
-{-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
+{-# OPTIONS_GHC -O2 -fkeep-auto-rules -threaded -optl-m64 -fliberate-case -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 -optc-O3 -optc-ffast-math -optc-march=native -optc-mfpmath=sse #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
@@ -103,10 +103,8 @@ import GHC.Exts
   )
 import GHC.Float (divideDouble, floorDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, timesDouble)
 import GHC.Int (Int32, Int64 (I64#))
-import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Integer.Logarithms (wordLog2#)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
-import GHC.Num.Integer (Integer (..), integerLog2#)
+import GHC.Num.Integer (Integer (..))
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
@@ -222,6 +220,38 @@ theFiUVRvr xs
   where
     !(evenLen, passUV, dxs') = stageUVrvrsd xs
     i# = word64FromRvsrd2ElemList# dxs'
+
+theFi' :: [Word32] -> ItrLst'_
+theFi' xs
+  | evenLen =
+      let !(# !yc, !y1#, !remInteger #) =
+            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
+                ysq# = yT64# `timesWord64#` yT64#
+                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
+             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+       in ItrLst'_ 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#)
+  | otherwise =
+      let yT64# = largestNSqLTEOdd## i#
+          y = W64# yT64#
+          ysq# = yT64# `timesWord64#` yT64#
+          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
+       in ItrLst'_ 1# passXs (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
+  where
+    !(evenLen, passXs, dxs') = stageList' xs
+    i# = word64FromRvsrd2ElemList# dxs'
+
+{-# INLINE stageList' #-}
+stageList' :: [Word32] -> (Bool, [Integer], [Word32])
+stageList' xs =
+  if even l
+    then
+      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
+       in (True, mkIW32EvenRestLst l True rstEvenLen, lastTwo)
+    else
+      let !(rstEvenLen, lastOne) = splitLastOne xs l
+       in (False, mkIW32EvenRestLst l True rstEvenLen, lastOne)
+  where
+    !l = length xs
 
 {-# INLINE stageList #-}
 stageList :: [Word32] -> (Bool, [Word64], [Word32])
@@ -368,38 +398,6 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
 data ItrLst'_ = ItrLst'_ {lvlst'# :: {-# UNPACK #-} !Int#, lstW32' :: {-# UNPACK #-} ![Integer], yCumulative'_ :: !Integer, iRem' :: {-# UNPACK #-} !Integer, tb'___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
 data Itr'__ = Itr'__ {lv'__# :: {-# UNPACK #-} !Int#, yCumulative'___ :: !Integer, iRem'___ :: {-# UNPACK #-} !Integer, tb'__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
-
-theFi' :: [Word32] -> ItrLst'_
-theFi' xs
-  | evenLen =
-      let !(# !yc, !y1#, !remInteger #) =
-            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                ysq# = yT64# `timesWord64#` yT64#
-                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-       in ItrLst'_ 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#)
-  | otherwise =
-      let yT64# = largestNSqLTEOdd## i#
-          y = W64# yT64#
-          ysq# = yT64# `timesWord64#` yT64#
-          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
-       in ItrLst'_ 1# passXs (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
-  where
-    !(evenLen, passXs, dxs') = stageList' xs
-    i# = word64FromRvsrd2ElemList# dxs'
-
-{-# INLINE stageList' #-}
-stageList' :: [Word32] -> (Bool, [Integer], [Word32])
-stageList' xs =
-  if even l
-    then
-      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
-       in (True, mkIW32EvenRestLst l True rstEvenLen, lastTwo)
-    else
-      let !(rstEvenLen, lastOne) = splitLastOne xs l
-       in (False, mkIW32EvenRestLst l True rstEvenLen, lastOne)
-  where
-    !l = length xs
 
 theNextIterations' :: ItrLst'_ -> Integer
 theNextIterations' (ItrLst'_ !currlen# !intgrXs !yCumulatedAcc0 !rmndr !tbfx#) =
