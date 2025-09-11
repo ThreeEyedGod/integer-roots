@@ -64,6 +64,7 @@ import GHC.Exts
     isTrue#,
     gtInt64#,
     leInt64#,
+    ltInt64#,
     minusWord#,
     plusInt64#,
     plusWord64#,
@@ -230,6 +231,9 @@ floorFX (FloatingX s e) = case fx2Double (FloatingX s e) of
 {-# INLINE (!/##) #-}
 (!/##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!/##) x y = x `unsafeDivFx#` y ---- note this is the unsafest version of divide
+
+(!<##) :: FloatingX# -> FloatingX# -> Bool
+(!<##) (FloatingX# x# xe#) (FloatingX# y# ye#) = if isTrue# (xe# `eqInt64#` ye#) then isTrue# (x# <## y#) else if isTrue# (xe# `ltInt64#` ye#) then isTrue# (x# <## y#) else False
 
 {-# INLINE (!**+##) #-}
 (!**+##) :: FloatingX# -> FloatingX# -> FloatingX#

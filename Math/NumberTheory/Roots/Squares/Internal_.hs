@@ -126,8 +126,9 @@ isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
 -- isqrtB n = fromInteger . theNextIterationsUV . theFiUV . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFiUVRvr . dgtsLstBase32 . fromIntegral $ n
-isqrtB n = fromInteger . theNextIterationsUVI . theFiUV . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsUVI . theFiUV . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterations . theFi . dgtsLstBase32 . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterationsRvrsdSLCode . theFiRvrsd . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 
 karatsubaSqrt :: Integer -> (Integer, Integer)

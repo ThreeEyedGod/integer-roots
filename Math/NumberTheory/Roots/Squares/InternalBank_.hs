@@ -147,6 +147,25 @@ theFi xs
     !(evenLen, passXs, dxs') = stageList xs
     i# = word64FromRvsrd2ElemList# dxs'
 
+theFiRvrsd :: [Word32] -> ItrLst_
+theFiRvrsd xs
+  | evenLen =
+      let !(# !yc, !y1#, !remInteger #) =
+            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
+                ysq# = yT64# `timesWord64#` yT64#
+                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
+             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+       in ItrLst_ 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#)
+  | otherwise =
+      let yT64# = largestNSqLTEOdd## i#
+          y = W64# yT64#
+          ysq# = yT64# `timesWord64#` yT64#
+          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
+       in ItrLst_ 1# passXs (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
+  where
+    !(evenLen, passXs, dxs') = stageListRvrsd xs
+    i# = word64FromRvsrd2ElemList# dxs'
+
 theFiBA :: [Word32] -> ItrBA
 theFiBA xs
   | evenLen =
@@ -214,6 +233,18 @@ stageList xs =
     else
       let !(rstEvenLen, lastOne) = splitLastOne xs l
        in (False, mkIW32EvenRestLst l True rstEvenLen, lastOne)
+  where
+    !l = length xs
+
+stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])
+stageListRvrsd xs =
+  if even l
+    then
+      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
+       in (True, reverse $ mkIW32EvenRestLst l True rstEvenLen, lastTwo)
+    else
+      let !(rstEvenLen, lastOne) = splitLastOne xs l
+       in (False, reverse $ mkIW32EvenRestLst l True rstEvenLen, lastOne)
   where
     !l = length xs
 
@@ -383,6 +414,37 @@ theNextIterations' (ItrLst'_ !currlen# !intgrXs !yCumulatedAcc0 !rmndr !tbfx#) =
           !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s_ e_) !+## unsafeword64ToFx# yTildeFinal else FloatingX# s_ e_ -- recall tcfx is already scaled by 32. Do not use normalize here
        in (Itr'__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
 
+{-# INLINE theNextIterationsRvrsdSLCode #-}
+-- | SL = Straight Line Code 
+theNextIterationsRvrsdSLCode :: ItrLst_ -> Integer
+theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
+  -- yCumulative___ $ foldl' tniRvrsd (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
+  where
+    tniRvrsdSL :: Itr__ -> Word64 -> Itr__
+    tniRvrsdSL  (Itr__ !cl# !yCAcc_ !tA !t#) sqW64 =
+      let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
+          !tCFx# = inline scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+          !(# ycUpdated, !yTildeFinal#, remFinal #) = case inline nxtDgtW64# tA_ tCFx# of yTilde_# -> inline computeRemW64# yCAcc_ tA_ yTilde_#
+          !tcfx# = if isTrue# (cl# <# 3#) then inline nextDownFX# $ tCFx# !+## inline unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
+       in (Itr__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
+    go :: [Word64] -> Itr__ -> Integer 
+    go [] itracc = yCumulative___ itracc
+    go [x1] itracc = go [] (inline tniRvrsdSL itracc x1)
+    -- ...existing code...
+    go (x1:x2:x3:x4:zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4)
+    go (x1:x2:x3:x4:x5:x6:x7:x8:zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4) x5) x6) x7) x8)
+-- ...existing code...
+    go (x1:x2:zs) (Itr__ !cl# !yCAcc_ !tA !t#) = let 
+          !tA_ = tA * secndPlaceW32Radix + toInteger x1
+          !tCFx# = inline scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+          !(# ycUpdated, !yTildeFinal#, remFinal #) = case inline nxtDgtW64# tA_ tCFx# of yTilde_# -> inline computeRemW64# yCAcc_ tA_ yTilde_#
+          !tcfx# = if isTrue# (cl# <# 3#) then inline nextDownFX# $ tCFx# !+## inline unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here       
+          !tA__ = remFinal * secndPlaceW32Radix + toInteger x2
+          !tCFx__# = inline scaleByPower2# 32#Int64 tcfx# -- sqrtF previous digits being scaled right here
+          !(# ycUpdated__, !yTildeFinal__#, remFinal__ #) = case inline nxtDgtW64# tA__ tCFx__# of yTilde__# -> inline computeRemW64# ycUpdated tA__ yTilde__#
+          !tcfx__# = if isTrue# ((cl# +# 1#) <# 3#) then inline nextDownFX# $ tCFx__# !+## inline unsafeword64ToFloatingX## yTildeFinal__# else tCFx__# -- recall tcfx is already scaled by 32. Do not use normalize here       
+       in go zs (Itr__ (cl# +# 2#) ycUpdated__ remFinal__ tcfx__#)-- rFinalXs
+
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
 -- | Next Digit. In our model a 32 bit digit.   This is the core of the algorithm
@@ -391,14 +453,29 @@ theNextIterations' (ItrLst'_ !currlen# !intgrXs !yCumulatedAcc0 !rmndr !tbfx#) =
 nxtDgtW64# :: Integer -> FloatingX# -> Word64#
 -- nxtDgtW64# n tcfx# = computFxW64# (allInclusivePreComputNToFx## n tcfx#) -- works ! but not any faster
 nxtDgtW64# 0 !_ = 0#Word64
-nxtDgtW64# (IS ta#) tcfx# = case preComput (int2Double# ta#) tcfx# of (# a#, c#, r# #) -> computDoubleW64# a# c# r#
+nxtDgtW64# (IS ta#) tcfx# = nxtDgtDoubleFx## (int2Double# ta#) tcfx#
 nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComput (bigNatEncodeDouble# bn# 0#) tcfx# of (# a#, c#, r# #) -> computDoubleW64# a# c# r#
-  | otherwise = computFxW64# (preComputFx## bn# tcfx#)
-  where
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFx## (bigNatEncodeDouble# bn# 0#) tcfx#
+  -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
+  | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if (tAFX# !<## threshold#) then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
+ where 
+    !(I64# e64#) = fromIntegral 10^137
+    threshold# = FloatingX# 1.9##  e64#
+  -- where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgtW64# (IN _) !_ = error "nxtDgtW64# :: Invalid negative integer argument"
+
+nxtDgtDoubleFx## :: Double# -> FloatingX# -> Word64#
+nxtDgtDoubleFx## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
+
+nxtDgtDoubleFxHrbie## :: Double# -> FloatingX# -> Word64#
+nxtDgtDoubleFxHrbie## pa# tcfx# = case isTrue# (c# <## threshold#) of
+    True -> inline computDoubleW64# pa# c# (fmaddDouble# c# c# pa#) 
+    False -> case floorDouble (D# (nextUp# (nextUp# pa# /## nextDown# (c# +## nextDown# c#)))) of (W64# w#) -> hndlOvflwW32## w#
+  where 
+    !c# = unsafefx2Double## tcfx#
+    !(D# threshold#) = 1.9 * 10^137
 
 nxtDgtI64# :: Integer -> FloatingX# -> Int64#
 nxtDgtI64# 0 !_ = 0#Int64
