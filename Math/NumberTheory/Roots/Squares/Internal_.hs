@@ -24,97 +24,15 @@ module Math.NumberTheory.Roots.Squares.Internal_
     isqrtB  
   )
 where
-
--- //FIXME Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
-
--- //FIXME Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
-
--- // FIXME Specialized Data Structures: Choose appropriate containers like unboxed vectors instead of lists for large datasets
--- \*********** BEGIN NEW IMPORTS
-import qualified Data.Vector.Unboxed as VU
-import Data.Primitive.ByteArray (byteArrayFromList, foldrByteArray, ByteArray)
-import Data.List  (unfoldr)
-import Data.DoubleWord (Int96, Int256)
-import Data.WideWord (Int128, Word256, zeroInt128) -- he says it's coded to be as fast as possible
-import Data.Bits (finiteBitSize, complement, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import Data.Bits.Floating (nextDown, nextUp)
-import Data.FastDigits (digitsUnsigned, undigits)
-import Data.Maybe (fromMaybe)
-import Data.Word (Word32)
+import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import GHC.Exts
-  ( build, 
-    inline, 
-    word2Double#,
-    Double (..),
-    Double#,
-    Word (..),
-    Int (..),
-    Int#,
-    Int64#,
-    Word64#,
-    Word#, 
-    int2Word#, 
-    word2Int#,
-    minusWord#,
-    plusWord#,
-    uncheckedShiftL#,
-    eqInt64#,
-    eqWord64#,
-    fmaddDouble#,
-    geInt64#,
-    int2Double#,
-    int64ToInt#,
-    int64ToWord64#,
-    intToInt64#,
-    isTrue#,
-    gtInt64#,
-    leInt64#,
-    minusWord#,
-    plusInt64#,
-    plusWord64#,
-    quotInt64#,
-    remInt64#, 
-    sqrtDouble#,
-    subInt64#,
-    subWord64#,
-    timesInt64#,
-    timesWord#,
-    timesWord64#,
-    uncheckedShiftRL#,
-    word2Int#,
-    word32ToWord#,
-    word64ToInt64#,
-    wordToWord64#,
-    neWord#,
-    eqWord#,
-    (*##),
-    (**##),
-    (+#),
-    (+##),
-    (/##),
-    (<#),
-    (<##),
-    (==##),
-    (>=##),
-    (-#),
-    (>=#),
-    (/=#),
-    and#,
-    not#,
-    or#,
-    quotRemWord#
+  ( 
+         Int (..)
+        ,word2Int#
   )
-import GHC.Float (divideDouble, powerDouble, timesDouble, floorDouble, integerToDouble#,int2Double, plusDouble,minusDouble)
-import GHC.Int (Int32, Int64 (I64#))
-import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.BigNat (BigNat(..), BigNat#,BigNat,bigNatLog2, bigNatShiftR, bigNatLeWord#, bigNatIsZero, bigNatLog2#, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
-import GHC.Num.Integer ( Integer (..), integerLog2#)
-import GHC.Word (Word32 (..), Word64 (..))
-import GHC.Integer.Logarithms (wordLog2#)
+import GHC.Num.Integer (integerLog2#)
 import Math.NumberTheory.Roots.Squares.InternalBank_ 
 import Math.NumberTheory.Utils.ArthMtic_ 
-import Math.NumberTheory.Utils.FloatingX_ 
--- *********** END NEW IMPORTS
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
 

@@ -41,7 +41,8 @@ import qualified Data.Vector.Unboxed as VU
 import Data.WideWord (Int128, Word256, zeroInt128)
 import Data.Word (Word32)
 import GHC.Exts
-  ( Double (..),
+  ( 
+    Double (..),
     Double#,
     Int (..),
     Int#,
@@ -361,9 +362,9 @@ theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rm
 nxtDgtW64# :: Integer -> FloatingX# -> Word64#
 -- nxtDgtW64# n tcfx# = computFxW64# (allInclusivePreComputNToFx## n tcfx#) -- works ! but not any faster
 nxtDgtW64# 0 !_ = 0#Word64
-nxtDgtW64# (IS ta#) tcfx# = nxtDgtDoubleFxW64## (int2Double# ta#) tcfx#
+nxtDgtW64# (IS ta#) tcfx# = inline nxtDgtDoubleFxW64## (int2Double# ta#) tcfx#
 nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
   -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if (tAFX# !<## threshold#) then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
  where 
@@ -387,10 +388,10 @@ nxtDgtDoubleFxHrbie## pa# tcfx# = case isTrue# (c# <## threshold#) of
 
 nxtDgtI64# :: Integer -> FloatingX# -> Int64#
 nxtDgtI64# 0 !_ = 0#Int64
-nxtDgtI64# (IS ta#) tcfx# = nxtDgtDoubleFxI64## (int2Double# ta#) tcfx# 
+nxtDgtI64# (IS ta#) tcfx# = inline nxtDgtDoubleFxI64## (int2Double# ta#) tcfx# 
 nxtDgtI64# (IP bn#) tcfx# -- //FIXME = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- handles regular double as well
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI64## (bigNatEncodeDouble# bn# 0#) tcfx# 
-  | otherwise = computFxI64# (preComputFx## bn# tcfx#)
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxI64## (bigNatEncodeDouble# bn# 0#) tcfx# 
+  | otherwise = inline computFxI64# (preComputFx## bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
@@ -404,10 +405,10 @@ nxtDgtDoubleFxI64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r#
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt# :: Integer -> FloatingX# -> Integer
 nxtDgt# 0 _ = 0
-nxtDgt# (IS ta#) tcfx# = nxtDgtDoubleFxI## (int2Double# ta#) tcfx# 
+nxtDgt# (IS ta#) tcfx# = inline nxtDgtDoubleFxI## (int2Double# ta#) tcfx# 
 nxtDgt# (IP bn#) tcfx#
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI## (bigNatEncodeDouble# bn# 0#) tcfx# 
-  | otherwise = computFx# (preComputFx## bn# tcfx#)
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxI## (bigNatEncodeDouble# bn# 0#) tcfx# 
+  | otherwise = inline computFx# (preComputFx## bn# tcfx#)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
