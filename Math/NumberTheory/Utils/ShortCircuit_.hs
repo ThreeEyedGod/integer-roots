@@ -34,7 +34,6 @@ module Math.NumberTheory.Utils.ShortCircuit_
 where
   
 import Control.Monad
-import Control.Monad.Instances ()
 import Data.Maybe
 import Prelude hiding ((||), (&&))
 

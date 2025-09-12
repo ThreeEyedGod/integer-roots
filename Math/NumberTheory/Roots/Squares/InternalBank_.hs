@@ -19,8 +19,7 @@
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
-module Math.NumberTheory.Roots.Squares.InternalBank_
-where
+module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- //FIXME Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
 
@@ -30,19 +29,12 @@ where
 -- \*********** BEGIN NEW IMPORTS
 
 -- he says it's coded to be as fast as possible
-import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Bits.Floating (nextDown, nextUp)
-import Data.DoubleWord (Int256, Int96)
-import Data.FastDigits (digitsUnsigned, undigits)
-import Data.List (unfoldr)
-import Data.Maybe (fromMaybe)
 import Data.Primitive.ByteArray (ByteArray, byteArrayFromList, foldrByteArray)
 import qualified Data.Vector.Unboxed as VU
-import Data.WideWord (Int128, Word256, zeroInt128)
 import Data.Word (Word32)
 import GHC.Exts
-  ( 
-    Double (..),
+  ( Double (..),
     Double#,
     Int (..),
     Int#,
@@ -103,10 +95,10 @@ import GHC.Exts
     (>=##),
   )
 import GHC.Float (divideDouble, floorDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, timesDouble)
-import GHC.Int (Int32, Int64 (I64#))
+import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer (Integer (..))
-import GHC.Word (Word32 (..), Word64 (..))
+import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
 
@@ -116,7 +108,6 @@ import Math.NumberTheory.Utils.FloatingX_
 
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
-
 
 -- | Iteration loop data - these records have vectors / lists in them
 data ItrLst_ = ItrLst_ {lvlst# :: {-# UNPACK #-} !Int#, lstW32 :: {-# UNPACK #-} ![Word64], yCumulative_ :: !Integer, iRem :: {-# UNPACK #-} !Integer, tb___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
@@ -128,7 +119,7 @@ data ItrUV = ItrUV {luv :: Int#, uv :: !(VU.Vector Word64), ycuv :: !Integer, ir
 data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
 theFirstXs :: (Bool, [Word64], [Word32]) -> ItrLst_
-theFirstXs (evenLen, passXs, dxs') 
+theFirstXs (evenLen, passXs, dxs')
   | evenLen =
       let !(# !yc, !y1#, !remInteger #) =
             let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
@@ -165,7 +156,7 @@ theFiBA xs
     i# = word64FromRvsrd2ElemList# dxs'
 
 theFirstUV :: (Bool, VU.Vector Word64, [Word32]) -> ItrUV
-theFirstUV (evenLen, passUV, dxs') 
+theFirstUV (evenLen, passUV, dxs')
   | evenLen =
       let !(# !yc, !y1#, !remInteger #) =
             let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
@@ -324,35 +315,37 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
 {-# NOINLINE theNextIterationsUVIrvrsd #-} -- //FIXME
 
 {-# INLINE theNextIterationsRvrsdSLCode #-}
--- | SL = Straight Line Code 
+
+-- | SL = Straight Line Code
 theNextIterationsRvrsdSLCode :: ItrLst_ -> Integer
 theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
-  -- yCumulative___ $ foldl' tniRvrsd (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
   where
+    -- yCumulative___ $ foldl' tniRvrsd (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
+
     tniRvrsdSL :: Itr__ -> Word64 -> Itr__
-    tniRvrsdSL  (Itr__ !cl# !yCAcc_ !tA !t#) sqW64 =
+    tniRvrsdSL (Itr__ !cl# !yCAcc_ !tA !t#) sqW64 =
       let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
           !tCFx# = inline scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
           !(# ycUpdated, !yTildeFinal#, remFinal #) = case inline nxtDgtW64# tA_ tCFx# of yTilde_# -> inline computeRemW64# yCAcc_ tA_ yTilde_#
           !tcfx# = if isTrue# (cl# <# 3#) then inline nextDownFX# $ tCFx# !+## inline unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
        in (Itr__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
-    go :: [Word64] -> Itr__ -> Integer 
+    go :: [Word64] -> Itr__ -> Integer
     go [] itracc = yCumulative___ itracc
     go [x1] itracc = go [] (inline tniRvrsdSL itracc x1)
     -- ...existing code...
-    go (x1:x2:x3:x4:zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4)
-    go (x1:x2:x3:x4:x5:x6:x7:x8:zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4) x5) x6) x7) x8)
--- ...existing code...
-    go (x1:x2:zs) (Itr__ !cl# !yCAcc_ !tA !t#) = let 
-          !tA_ = tA * secndPlaceW32Radix + toInteger x1
+    go (x1 : x2 : x3 : x4 : zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4)
+    go (x1 : x2 : x3 : x4 : x5 : x6 : x7 : x8 : zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4) x5) x6) x7) x8)
+    -- ...existing code...
+    go (x1 : x2 : zs) (Itr__ !cl# !yCAcc_ !tA !t#) =
+      let !tA_ = tA * secndPlaceW32Radix + toInteger x1
           !tCFx# = inline scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
           !(# ycUpdated, !yTildeFinal#, remFinal #) = case inline nxtDgtW64# tA_ tCFx# of yTilde_# -> inline computeRemW64# yCAcc_ tA_ yTilde_#
-          !tcfx# = if isTrue# (cl# <# 3#) then inline nextDownFX# $ tCFx# !+## inline unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here       
+          !tcfx# = if isTrue# (cl# <# 3#) then inline nextDownFX# $ tCFx# !+## inline unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
           !tA__ = remFinal * secndPlaceW32Radix + toInteger x2
           !tCFx__# = inline scaleByPower2# 32#Int64 tcfx# -- sqrtF previous digits being scaled right here
           !(# ycUpdated__, !yTildeFinal__#, remFinal__ #) = case inline nxtDgtW64# tA__ tCFx__# of yTilde__# -> inline computeRemW64# ycUpdated tA__ yTilde__#
-          !tcfx__# = if isTrue# ((cl# +# 1#) <# 3#) then inline nextDownFX# $ tCFx__# !+## inline unsafeword64ToFloatingX## yTildeFinal__# else tCFx__# -- recall tcfx is already scaled by 32. Do not use normalize here       
-       in go zs (Itr__ (cl# +# 2#) ycUpdated__ remFinal__ tcfx__#)-- rFinalXs
+          !tcfx__# = if isTrue# ((cl# +# 1#) <# 3#) then inline nextDownFX# $ tCFx__# !+## inline unsafeword64ToFloatingX## yTildeFinal__# else tCFx__# -- recall tcfx is already scaled by 32. Do not use normalize here
+       in go zs (Itr__ (cl# +# 2#) ycUpdated__ remFinal__ tcfx__#) -- rFinalXs
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
@@ -365,12 +358,12 @@ nxtDgtW64# 0 !_ = 0#Word64
 nxtDgtW64# (IS ta#) tcfx# = inline nxtDgtDoubleFxW64## (int2Double# ta#) tcfx#
 nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
   | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
-  -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
+  -- \| otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if (tAFX# !<## threshold#) then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
- where 
-    !(I64# e64#) = fromIntegral 10^137
-    threshold# = FloatingX# 1.9##  e64#
-  -- where
+  where
+    !(I64# e64#) = fromIntegral 10 ^ 137
+    threshold# = FloatingX# 1.9## e64#
+    -- where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgtW64# (IN _) !_ = error "nxtDgtW64# :: Invalid negative integer argument"
@@ -380,17 +373,17 @@ nxtDgtDoubleFxW64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r#
 
 nxtDgtDoubleFxHrbie## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxHrbie## pa# tcfx# = case isTrue# (c# <## threshold#) of
-    True -> inline computDoubleW64# pa# c# (fmaddDouble# c# c# pa#) 
-    False -> case floorDouble (D# (nextUp# (nextUp# pa# /## nextDown# (c# +## nextDown# c#)))) of (W64# w#) -> hndlOvflwW32## w#
-  where 
+  True -> inline computDoubleW64# pa# c# (fmaddDouble# c# c# pa#)
+  False -> case floorDouble (D# (nextUp# (nextUp# pa# /## nextDown# (c# +## nextDown# c#)))) of (W64# w#) -> hndlOvflwW32## w#
+  where
     !c# = unsafefx2Double## tcfx#
-    !(D# threshold#) = 1.9 * 10^137
+    !(D# threshold#) = 1.9 * 10 ^ 137
 
 nxtDgtI64# :: Integer -> FloatingX# -> Int64#
 nxtDgtI64# 0 !_ = 0#Int64
-nxtDgtI64# (IS ta#) tcfx# = inline nxtDgtDoubleFxI64## (int2Double# ta#) tcfx# 
+nxtDgtI64# (IS ta#) tcfx# = inline nxtDgtDoubleFxI64## (int2Double# ta#) tcfx#
 nxtDgtI64# (IP bn#) tcfx# -- //FIXME = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- handles regular double as well
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxI64## (bigNatEncodeDouble# bn# 0#) tcfx# 
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxI64## (bigNatEncodeDouble# bn# 0#) tcfx#
   | otherwise = inline computFxI64# (preComputFx## bn# tcfx#)
   where
     thresh# :: Int#
@@ -405,9 +398,9 @@ nxtDgtDoubleFxI64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r#
 -- for larger than what a double can hold, we resort to our custom "Float" - FloatingX
 nxtDgt# :: Integer -> FloatingX# -> Integer
 nxtDgt# 0 _ = 0
-nxtDgt# (IS ta#) tcfx# = inline nxtDgtDoubleFxI## (int2Double# ta#) tcfx# 
+nxtDgt# (IS ta#) tcfx# = inline nxtDgtDoubleFxI## (int2Double# ta#) tcfx#
 nxtDgt# (IP bn#) tcfx#
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxI## (bigNatEncodeDouble# bn# 0#) tcfx# 
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxI## (bigNatEncodeDouble# bn# 0#) tcfx#
   | otherwise = inline computFx# (preComputFx## bn# tcfx#)
   where
     thresh# :: Int#
@@ -419,9 +412,9 @@ nxtDgtDoubleFxI## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #
 
 nxtDgt :: Integer -> FloatingX -> Integer
 nxtDgt 0 _ = 0
-nxtDgt (IS ta#) tcfx = nxtDgtDoubleFxI (int2Double (I# ta#)) tcfx 
+nxtDgt (IS ta#) tcfx = nxtDgtDoubleFxI (int2Double (I# ta#)) tcfx
 nxtDgt n@(IP bn#) tcfx@(FloatingX s@(D# s#) e@(I64# e#))
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI (D# (bigNatEncodeDouble# bn# 0#)) tcfx 
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI (D# (bigNatEncodeDouble# bn# 0#)) tcfx
   | otherwise = computFx (preComputFx (BN# bn#) (FloatingX s e)) -- computFx (preComputFx bn# tcfx#)
   where
     thresh# :: Int#

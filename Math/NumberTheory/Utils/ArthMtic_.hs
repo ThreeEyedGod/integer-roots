@@ -2,14 +2,14 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OrPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE UnboxedTuples #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
 {-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 -- |
 -- Module:      Math.NumberTheory.Roots.Squares.Internal
@@ -19,42 +19,42 @@
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
-module Math.NumberTheory.Utils.ArthMtic_ (
-  maxIntSizeAcross 
-, _evenInt64#
-, _oddInt64#
-, _even
-, _odd
-, nextDown#
-, nextUp#
-, updateDouble#
-, split
-, split#
-, fromInt64
-, sqrtOf2
-, MaxBounds (..)
-, double
-, radixW32
-, safePosAdd256
-, safePosMul256
-, safePosMul64
-, safePosAdd64
-, hndlOvflwW32
-, hndlOvflwW32##
-, hndlOvflwI32##
-, secndPlaceW32Radix
-, mkIW32EvenRestLst
-, splitLastOne
-, splitLastTwo
-, word64FromRvsrd2ElemList#
-, largestNSqLTEEven##
-, largestNSqLTEOdd##
-, dgtsLstBase32
-, maxDouble
-, maxSafeInteger
-, maxUnsafeInteger
-, foldr'
-)
+module Math.NumberTheory.Utils.ArthMtic_
+  ( maxIntSizeAcross,
+    _evenInt64#,
+    _oddInt64#,
+    _even,
+    _odd,
+    nextDown#,
+    nextUp#,
+    updateDouble#,
+    split,
+    split#,
+    fromInt64,
+    sqrtOf2,
+    MaxBounds (..),
+    double,
+    radixW32,
+    safePosAdd256,
+    safePosMul256,
+    safePosMul64,
+    safePosAdd64,
+    hndlOvflwW32,
+    hndlOvflwW32##,
+    hndlOvflwI32##,
+    secndPlaceW32Radix,
+    mkIW32EvenRestLst,
+    splitLastOne,
+    splitLastTwo,
+    word64FromRvsrd2ElemList#,
+    largestNSqLTEEven##,
+    largestNSqLTEOdd##,
+    dgtsLstBase32,
+    maxDouble,
+    maxSafeInteger,
+    maxUnsafeInteger,
+    foldr',
+  )
 where
 
 -- //FIXME Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
@@ -62,109 +62,107 @@ where
 -- //FIXME Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
 
 -- \*********** BEGIN NEW IMPORTS
-import Data.List  (unfoldr)
+
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
-import Data.DoubleWord (Int96, Int256)
-import Data.WideWord (Int128, Word256, zeroInt128) -- he says it's coded to be as fast as possible
-import Data.Bits (finiteBitSize, complement, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
+-- he says it's coded to be as fast as possible
+import Data.Bits (unsafeShiftL)
 import Data.Bits.Floating (nextDown, nextUp)
+import Data.DoubleWord (Int256, Int96)
 import Data.FastDigits (digitsUnsigned, undigits)
+import Data.List (unfoldr)
 import Data.Maybe (fromMaybe)
+import Data.WideWord (Int128, Word256, zeroInt128)
 import Data.Word (Word32)
 import GHC.Exts
-  ( build, 
-    word2Double#,
-    Double (..),
+  ( Double (..),
     Double#,
-    Word (..),
     Int (..),
     Int#,
     Int64#,
+    Word (..),
+    Word#,
     Word64#,
-    Word#, 
-    int2Word#, 
-    word2Int#,
-    minusWord#,
-    plusWord#,
-    uncheckedShiftL#,
+    and#,
+    build,
     eqInt64#,
+    eqWord#,
     eqWord64#,
     fmaddDouble#,
     geInt64#,
+    gtInt64#,
     int2Double#,
+    int2Word#,
     int64ToInt#,
     int64ToWord64#,
     intToInt64#,
     isTrue#,
-    gtInt64#,
     leInt64#,
     minusWord#,
+    neWord#,
+    not#,
+    or#,
     plusInt64#,
+    plusWord#,
     plusWord64#,
     quotInt64#,
-    remInt64#, 
+    quotRemWord#,
+    remInt64#,
     sqrtDouble#,
     subInt64#,
     subWord64#,
     timesInt64#,
     timesWord#,
     timesWord64#,
+    uncheckedShiftL#,
     uncheckedShiftRL#,
+    word2Double#,
     word2Int#,
     word32ToWord#,
     word64ToInt64#,
     wordToWord64#,
-    neWord#,
-    eqWord#,
     (*##),
     (**##),
     (+#),
     (+##),
+    (-#),
     (/##),
+    (/=#),
     (<#),
     (<##),
     (==##),
-    (>=##),
-    (-#),
     (>=#),
-    (/=#),
-    and#,
-    not#,
-    or#,
-    quotRemWord#
+    (>=##),
   )
-import GHC.Float (divideDouble, powerDouble, timesDouble, floorDouble, integerToDouble#,int2Double, plusDouble,minusDouble)
+import GHC.Float (floorDouble)
 import GHC.Int (Int32, Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.BigNat (BigNat(..), BigNat#,BigNat,bigNatLog2, bigNatShiftR, bigNatLeWord#, bigNatIsZero, bigNatLog2#, bigNatIndex#, bigNatEncodeDouble#, bigNatIsZero, bigNatShiftR#, bigNatSize#)
-import GHC.Num.Integer ( Integer (..), integerLog2#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Word (Word32 (..), Word64 (..))
-import GHC.Integer.Logarithms (wordLog2#)
 import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
+
 -- *********** END NEW IMPORTS
 
-
-fitsInMaxInt32 :: Integer -> Bool 
+fitsInMaxInt32 :: Integer -> Bool
 fitsInMaxInt32 x = x <= toInteger (maxBound :: Int32)
 {-# INLINE fitsInMaxInt32 #-}
 
-fitsInMaxInt64 :: Integer -> Bool 
+fitsInMaxInt64 :: Integer -> Bool
 fitsInMaxInt64 x = x <= toInteger (maxBound :: Int64)
 {-# INLINE fitsInMaxInt64 #-}
 
-fitsInMaxInt96 :: Integer -> Bool 
+fitsInMaxInt96 :: Integer -> Bool
 fitsInMaxInt96 x = x <= toInteger (maxBound :: Int96)
 {-# INLINE fitsInMaxInt96 #-}
 
-fitsInMaxInt128 :: Integer -> Bool 
+fitsInMaxInt128 :: Integer -> Bool
 fitsInMaxInt128 x = x <= toInteger (maxBound :: Int128)
 {-# INLINE fitsInMaxInt128 #-}
 
-fitsInMaxInt256 :: Integer -> Bool 
+fitsInMaxInt256 :: Integer -> Bool
 fitsInMaxInt256 x = x <= toInteger (maxBound :: Int256)
 {-# INLINE fitsInMaxInt256 #-}
 
-fitsInMaxWord256 :: Integer -> Bool 
+fitsInMaxWord256 :: Integer -> Bool
 fitsInMaxWord256 x = x <= toInteger (maxBound :: Word256)
 {-# INLINE fitsInMaxWord256 #-}
 
@@ -175,10 +173,10 @@ data MaxBounds
   | Is128
   | Is256
   | IsIN
-  deriving (Eq, Show, Ord) -- Ord for using maximum later on 
+  deriving (Eq, Show, Ord) -- Ord for using maximum later on
 
-maxIntSizeAcross :: Integer -> Integer -> Integer -> MaxBounds 
-maxIntSizeAcross n1 n2 n3 = maximum (fromMaybe IsIN <$> firstTrueOf <$> lazyXsFits <$> [n1,n2,n3])
+maxIntSizeAcross :: Integer -> Integer -> Integer -> MaxBounds
+maxIntSizeAcross n1 n2 n3 = maximum (fromMaybe IsIN <$> firstTrueOf <$> lazyXsFits <$> [n1, n2, n3])
 {-# INLINE maxIntSizeAcross #-}
 
 lazyXsFits :: Integer -> [Maybe MaxBounds]
@@ -188,142 +186,140 @@ lazyXsFits n = [if fitsInMaxInt32 n then Just Is32 else Nothing, if fitsInMaxInt
 safeAdd64 :: Int64 -> Int64 -> Either Integer Int64
 safeAdd64 x y =
   let !result = x + y
-  in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
-     then Left (toInteger x + toInteger y)
-     else Right result
+   in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
+        then Left (toInteger x + toInteger y)
+        else Right result
 {-# INLINE safeAdd64 #-}
 
 safePosAdd64 :: Int64 -> Int64 -> Either Integer Int64
 safePosAdd64 x y =
   let !result = x + y
-  in if result < 0 
-     then Left (toInteger x + toInteger y)
-     else Right result
+   in if result < 0
+        then Left (toInteger x + toInteger y)
+        else Right result
 {-# INLINE safePosAdd64 #-}
 
 safeMul64 :: Int64 -> Int64 -> Either Integer Int64
 safeMul64 x y =
   let !result = x * y
-      -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
-  in if y /= 0 && result `div` y /= x
-     then Left (toInteger x * toInteger y)
-     else Right result
+   in -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
+      if y /= 0 && result `div` y /= x
+        then Left (toInteger x * toInteger y)
+        else Right result
 {-# INLINE safeMul64 #-}
 
 safePosMul64 :: Int64 -> Int64 -> Either Integer Int64
 safePosMul64 x y =
   let !result = x * y
-      -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
-  in if result `div` y /= x
-     then Left (toInteger x * toInteger y)
-     else Right result
+   in -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
+      if result `div` y /= x
+        then Left (toInteger x * toInteger y)
+        else Right result
 {-# INLINE safePosMul64 #-}
 
 safeAdd128 :: Int128 -> Int128 -> Either Integer Int128
 safeAdd128 x y =
   let !result = x + y
-  in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
-     then Left (toInteger x + toInteger y)
-     else Right result
+   in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
+        then Left (toInteger x + toInteger y)
+        else Right result
 {-# INLINE safeAdd128 #-}
 
 safePosAdd128 :: Int128 -> Int128 -> Either Integer Int128
 safePosAdd128 x y =
   let !result = x + y
-  in if result < zeroInt128  
-     then Left (toInteger x + toInteger y)
-     else Right result
+   in if result < zeroInt128
+        then Left (toInteger x + toInteger y)
+        else Right result
 {-# INLINE safePosAdd128 #-}
 
 safeMul128 :: Int128 -> Int128 -> Either Integer Int128
 safeMul128 x y =
   let !result = x * y
-      -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
-  in if y /= zeroInt128 && result `div` y /= x
-     then Left (toInteger x * toInteger y)
-     else Right result
+   in -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
+      if y /= zeroInt128 && result `div` y /= x
+        then Left (toInteger x * toInteger y)
+        else Right result
 {-# INLINE safeMul128 #-}
 
 safeAdd96 :: Int96 -> Int96 -> Either Integer Int96
 safeAdd96 x y =
   let !result = x + y
-  in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
-     then Left (toInteger x + toInteger y)
-     else Right result
+   in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
+        then Left (toInteger x + toInteger y)
+        else Right result
 {-# INLINE safeAdd96 #-}
 
 safeMul96 :: Int96 -> Int96 -> Either Integer Int96
 safeMul96 x y =
   let !result = x * y
-      -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
-  in if y /= 0 && result `div` y /= x
-     then Left (toInteger x * toInteger y)
-     else Right result
+   in -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
+      if y /= 0 && result `div` y /= x
+        then Left (toInteger x * toInteger y)
+        else Right result
 {-# INLINE safeMul96 #-}
 
 safeAdd256 :: Int256 -> Int256 -> Either Integer Int256
 safeAdd256 x y =
   let !result = x + y
-  in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
-     then Left (toInteger x + toInteger y)
-     else Right result
+   in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
+        then Left (toInteger x + toInteger y)
+        else Right result
 {-# INLINE safeAdd256 #-}
 
 -- //todo not working ?
 safeAddW256 :: Word256 -> Word256 -> Either Integer Word256
 safeAddW256 x y =
   let !result = x + y
-  in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
-     then Left (toInteger x + toInteger y)
-     else Right result
+   in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
+        then Left (toInteger x + toInteger y)
+        else Right result
 {-# INLINE safeAddW256 #-}
 
 -- //todo not working ?
 safeSubW256 :: Word256 -> Word256 -> Either Integer Word256
 safeSubW256 x y =
   let !result = x + (negate y)
-  in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
-     then Left (toInteger x + toInteger y)
-     else Right result
+   in if (x > 0 && y > 0 && result < 0) || (x < 0 && y < 0 && result > 0)
+        then Left (toInteger x + toInteger y)
+        else Right result
 {-# INLINE safeSubW256 #-}
 
 safePosAdd256 :: Int256 -> Int256 -> Either Integer Int256
 safePosAdd256 x y =
   let !result = x + y
-  in if result < 0 
-     then Left (toInteger x + toInteger y)
-     else Right result
+   in if result < 0
+        then Left (toInteger x + toInteger y)
+        else Right result
 {-# INLINE safePosAdd256 #-}
-
 
 safeMul256 :: Int256 -> Int256 -> Either Integer Int256
 safeMul256 x y =
   let !result = x * y
-      -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
-  in if y /= 0 && result `div` y /= x
-     then Left (toInteger x * toInteger y)
-     else Right result
+   in -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
+      if y /= 0 && result `div` y /= x
+        then Left (toInteger x * toInteger y)
+        else Right result
 {-# INLINE safeMul256 #-}
 
 safePosMul256 :: Int256 -> Int256 -> Either Integer Int256
 safePosMul256 x y =
   let !result = x * y
-      -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
-  in if result `div` y /= x
-     then Left (toInteger x * toInteger y)
-     else Right result
+   in -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
+      if result `div` y /= x
+        then Left (toInteger x * toInteger y)
+        else Right result
 {-# INLINE safePosMul256 #-}
 
 -- //todo not working ?
 safeMulW256 :: Word256 -> Word256 -> Either Integer Word256
 safeMulW256 x y =
   let !result = x * y
-      -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
-  in if y /= 0 && result `div` y /= x
-     then Left (toInteger x * toInteger y)
-     else Right result
+   in -- Overflow detection: if y ≠ 0 and result ÷ y ≠ x, overflow occurred
+      if y /= 0 && result `div` y /= x
+        then Left (toInteger x * toInteger y)
+        else Right result
 {-# INLINE safeMulW256 #-}
-
 
 -- | HELPER functions
 {-# INLINE [0] dgtsLstBase32 #-}
@@ -339,6 +335,7 @@ word64FromRvsrd2ElemList# (_ : _ : _) = error "word64FromRvsrd2ElemList# : more 
 {-# INLINE word64FromRvsrd2ElemList# #-}
 
 {-# INLINE mkIW32Lst #-}
+
 -- | Spit out the Word32 List from digitsUnsigned which comes in reversed format.
 mkIW32Lst :: Integer -> Word -> [Word32]
 mkIW32Lst 0 _ = [0] -- safety
@@ -363,25 +360,25 @@ pairUp False _ = error "pairUp: Invalid odd length of list"
 pairUpAcc :: [a] -> [(a, a)]
 pairUpAcc xs = go xs []
   where
-    go (x : y : zs) !acc = go zs ((x,y) : acc)
-    go []           acc  = reverse acc
-    go [_]          _    = error "pairUp: odd length"
+    go (x : y : zs) !acc = go zs ((x, y) : acc)
+    go [] acc = reverse acc
+    go [_] _ = error "pairUp: odd length"
 
 {-# INLINE pairUpUnfold #-}
 pairUpUnfold :: [a] -> [(a, a)]
 pairUpUnfold = unfoldr step
   where
-    step (x : y : zs) = Just ((x,y), zs)
-    step []           = Nothing
-    step [_]          = error "pairUp: odd length"
+    step (x : y : zs) = Just ((x, y), zs)
+    step [] = Nothing
+    step [_] = error "pairUp: odd length"
 
 {-# INLINE pairUpBuild #-}
-pairUpBuild :: [a] -> [(a,a)]
+pairUpBuild :: [a] -> [(a, a)]
 pairUpBuild xs = build (\c n -> go c n xs)
   where
-    go c n (x : y : zs) = c (x,y) (go c n zs)
-    go _ n []           = n
-    go _ _ [_]          = error "pairUp: odd length"
+    go c n (x : y : zs) = c (x, y) (go c n zs)
+    go _ n [] = n
+    go _ _ [_] = error "pairUp: odd length"
 
 -- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s list
 {-# INLINE [0] integerOfNxtPairsLst #-}
@@ -398,31 +395,32 @@ data Strats
   deriving (Eq)
 
 -- | parallel map with 3 optional strategies
-parallelMap :: (NFData a, NFData b) => Strats -> Int -> (a->b) -> [a] -> [b]
+parallelMap :: (NFData a, NFData b) => Strats -> Int -> (a -> b) -> [a] -> [b]
 parallelMap strat stratParm f = case strat of
   Chunk -> withStrategy (parListChunk stratParm rdeepseq) . map f
   Buffer -> withStrategy (parBuffer stratParm rpar) . map f
   Split -> withStrategy (parListSplitAt stratParm rdeepseq rdeepseq) . map f
 
 {-# INLINE [1] iFrmTupleBaseW32 #-}
+
 {-# RULES
-"iFrmTupleBaseW32/Integer"     iFrmTupleBaseW32 = intgrFromRvsrdTuple
-"iFrmTupleBaseW32/Word64"    iFrmTupleBaseW32 = word64FromRvsrdTuple
+"iFrmTupleBaseW32/Integer" iFrmTupleBaseW32 = intgrFromRvsrdTuple
+"iFrmTupleBaseW32/Word64" iFrmTupleBaseW32 = word64FromRvsrdTuple
   #-}
-iFrmTupleBaseW32 :: Integral a => (Word32, Word32) -> a
+
+iFrmTupleBaseW32 :: (Integral a) => (Word32, Word32) -> a
 iFrmTupleBaseW32 tu = integralFromRvsrdTuple tu radixW32
 
 {-# INLINE [0] mkIW32EvenRestLst #-}
-{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Integer]#-}
-{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64]#-}
-{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word]#-}
+{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Integer] #-}
+{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64] #-}
+{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word] #-}
 mkIW32EvenRestLst :: (NFData a, Integral a) => Int -> Bool -> [Word32] -> [a]
-mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) --(pairUpUnfold xs) --(pairUpAcc xs) --(pairUp evenLen xs)
+mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) -- (pairUpUnfold xs) --(pairUpAcc xs) --(pairUp evenLen xs)
 
 --- END helpers
 --- BEGIN Core numeric helper functions
 --- ***********************************
-
 
 {-# INLINE [0] integralFromRvsrdTuple #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer #-}
@@ -431,7 +429,7 @@ mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) --(
 
 -- | Integer from a "reversed" tuple of Word32 digits
 -- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259
-integralFromRvsrdTuple :: Integral a => (Word32, Word32) -> a -> a
+integralFromRvsrdTuple :: (Integral a) => (Word32, Word32) -> a -> a
 integralFromRvsrdTuple (0, 0) 0 = 0
 integralFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
 integralFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
@@ -531,17 +529,17 @@ convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs)
 intgrFrom3DigitsBase32 :: Integer -> (Word32, Word32) -> Integer
 intgrFrom3DigitsBase32 i (l1, l2) = (i * secndPlaceW32Radix) + intgrFromRvsrdTuple (l1, l2) radixW32
 
--- | custom even and odd to handle what we need 
-_even, _odd       :: (Integral a) => a -> (Bool, a)
-_even n          =  let !(q,r) = n `quotRem` 2 in (r == 0, q) 
-_odd             =  _even
-{-# INLINE _even  #-}
-{-# INLINE _odd  #-}
+-- | custom even and odd to handle what we need
+_even, _odd :: (Integral a) => a -> (Bool, a)
+_even n = let !(q, r) = n `quotRem` 2 in (r == 0, q)
+_odd = _even
+{-# INLINE _even #-}
+{-# INLINE _odd #-}
 
-_evenInt64#, _oddInt64#       :: Int64# -> (# Bool, Int64# #)
-_evenInt64# n#         =   (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #) 
-_oddInt64#             =  _evenInt64#
-{-# INLINE _evenInt64#  #-}
+_evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
+_evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
+_oddInt64# = _evenInt64#
+{-# INLINE _evenInt64# #-}
 {-# INLINE _oddInt64# #-}
 
 sqrtDX :: Double -> Double
@@ -661,6 +659,6 @@ undigits_ = undigits
 foldr' :: (a -> b -> b) -> b -> [a] -> b
 foldr' f z xs = go xs
   where
-    go []     = z
-    go (x:xs) = f x $! go xs
+    go [] = z
+    go (x : xs) = f x $! go xs
 {-# INLINEABLE foldr' #-}

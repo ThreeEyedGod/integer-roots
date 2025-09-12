@@ -2,14 +2,14 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OrPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE UnboxedTuples #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm -ddump-to-file dumps else not
 {-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 -- |
 -- Module:      Math.NumberTheory.Roots.Squares.Internal
@@ -21,18 +21,18 @@
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
 module Math.NumberTheory.Roots.Squares.Internal_
   ( karatsubaSqrt,
-    isqrtB  
+    isqrtB,
   )
 where
+
 import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import GHC.Exts
-  ( 
-         Int (..)
-        ,word2Int#
+  ( Int (..),
+    word2Int#,
   )
 import GHC.Num.Integer (integerLog2#)
-import Math.NumberTheory.Roots.Squares.InternalBank_ 
-import Math.NumberTheory.Utils.ArthMtic_ 
+import Math.NumberTheory.Roots.Squares.InternalBank_
+import Math.NumberTheory.Utils.ArthMtic_
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
