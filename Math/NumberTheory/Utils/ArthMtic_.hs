@@ -136,6 +136,7 @@ import GHC.Exts
 import GHC.Float (floorDouble)
 import GHC.Int (Int32, Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
+import GHC.Num.Integer (integerLogBaseWord)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
@@ -508,6 +509,12 @@ hndlOvflwI32## i64# = if isTrue# (i64# `eqInt64#` maxW32#) then predmaxW32# else
   where
     !(I64# maxW32#) = radixW32
     !(I64# predmaxW32#) = predRadixW32
+
+{-# INLINE radixW32Length #-} -- this works 
+radixW32Length :: Integer -> Word
+radixW32Length n
+  | n == 0    = 1
+  | otherwise = integerLogBaseWord radixW32 n + 1
 
 {-# INLINE wrd2wrd32 #-}
 wrd2wrd32 :: [Word] -> [Word32]

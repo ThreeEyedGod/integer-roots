@@ -174,7 +174,7 @@ theFirstUV (evenLen, passUV, dxs')
     i# = word64FromRvsrd2ElemList# dxs'
 
 {-# INLINE stageList #-}
-stageList :: [Word32] -> (Bool, [Word64], [Word32])
+stageList :: [Word32] -> (Bool, [Word64], [Word32]) -- //FIXME WHY WORD64 LIST?
 stageList xs =
   if even l
     then
@@ -184,7 +184,7 @@ stageList xs =
       let !(rstEvenLen, lastOne) = splitLastOne xs l
        in (False, mkIW32EvenRestLst l True rstEvenLen, lastOne)
   where
-    !l = length xs
+    !l = length xs -- // FIXME can we remove this traversal?
 
 stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])
 stageListRvrsd xs =
@@ -312,7 +312,7 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
        in (Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#)) -- rFinalXs
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
-{-# NOINLINE theNextIterationsUVIrvrsd #-} -- //FIXME
+{-# NOINLINE theNextIterationsUVIrvrsd #-} 
 
 {-# INLINE theNextIterationsRvrsdSLCode #-}
 
