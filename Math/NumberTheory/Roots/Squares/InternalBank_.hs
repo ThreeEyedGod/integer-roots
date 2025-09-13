@@ -121,20 +121,29 @@ data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, i
 theFirstXs :: (Bool, [Word64], [Word32]) -> ItrLst_
 theFirstXs (evenLen, passXs, dxs')
   | evenLen =
-      let !(# !yc, !y1#, !remInteger #) =
-            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                ysq# = yT64# `timesWord64#` yT64#
-                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+      let !(# !yc, !y1#, !remInteger #) = evenFirstRmdr i#
        in ItrLst_ 1# passXs yc remInteger (unsafeword64ToFloatingX## y1#)
-  | otherwise =
-      let yT64# = largestNSqLTEOdd## i#
-          y = W64# yT64#
-          ysq# = yT64# `timesWord64#` yT64#
-          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
+  | otherwise = let !(# !y, !yT64#, !remInteger #) = oddFirstRmdr i#
        in ItrLst_ 1# passXs (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
   where
     i# = word64FromRvsrd2ElemList# dxs'
+
+evenFirstRmdr :: Word64# -> (# Integer, Word64#, Integer #)
+evenFirstRmdr i# = let 
+                yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
+                ysq# = yT64# `timesWord64#` yT64#
+                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
+             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+{-# INLINE evenFirstRmdr #-}
+
+oddFirstRmdr :: Word64# -> (# Integer, Word64#, Integer #)
+oddFirstRmdr i# = let 
+                yT64# = largestNSqLTEOdd## i#
+                y = W64# yT64#
+                ysq# = yT64# `timesWord64#` yT64#
+                remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
+             in (# toInteger y, yT64#, remInteger #)
+{-# INLINE oddFirstRmdr #-}
 
 theFiBA :: [Word32] -> ItrBA
 theFiBA xs
@@ -158,18 +167,10 @@ theFiBA xs
 theFirstUV :: (Bool, VU.Vector Word64, [Word32]) -> ItrUV
 theFirstUV (evenLen, passUV, dxs')
   | evenLen =
-      let !(# !yc, !y1#, !remInteger #) =
-            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                ysq# = yT64# `timesWord64#` yT64#
-                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+      let !(# !yc, !y1#, !remInteger #) = evenFirstRmdr i#
        in ItrUV 1# passUV yc remInteger (unsafeword64ToFloatingX## y1#)
-  | otherwise =
-      let yT64# = largestNSqLTEOdd## i#
-          y = W64# yT64#
-          ysq# = yT64# `timesWord64#` yT64#
-          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
-       in ItrUV 1# passUV (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
+  | otherwise = let !(# !y, !yT64#, !remInteger #) = oddFirstRmdr i#
+       in ItrUV 1# passUV y remInteger (unsafeword64ToFloatingX## yT64#)
   where
     i# = word64FromRvsrd2ElemList# dxs'
 
@@ -357,7 +358,7 @@ nxtDgtW64# 0 !_ = 0#Word64
 nxtDgtW64# (IS ta#) tcfx# = inline nxtDgtDoubleFxW64## (int2Double# ta#) tcfx#
 nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
   | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
-  -- \| otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
+  -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if (tAFX# !<## threshold#) then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
   where
     !(I64# e64#) = fromIntegral 10 ^ 137
@@ -486,6 +487,10 @@ preComputFx :: BigNat -> FloatingX -> (FloatingX, FloatingX, FloatingX)
 preComputFx tA__bn tCFX = case unsafeGtWordbn2Fx tA__bn of tAFX -> (tAFX, tCFX, tCFX !**+ tAFX) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComputFx #-}
 
+preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
+preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+{-# INLINE preComputFx## #-}
+
 -- | handles small/regular double as well. So just not bigNat only
 allInclusivePreComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 allInclusivePreComputFx## tA__bn# tCFX# = case bigNat2FloatingX## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
@@ -495,10 +500,6 @@ allInclusivePreComputFx## tA__bn# tCFX# = case bigNat2FloatingX## tA__bn# of tAF
 allInclusivePreComputNToFx## :: Integer -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 allInclusivePreComputNToFx## tA tCFX# = case unsafeN2Fx# tA of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE allInclusivePreComputNToFx## #-}
-
-preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
-{-# INLINE preComputFx## #-}
 
 computeRem :: Integer -> Integer -> Integer -> (Integer, Integer, Integer)
 computeRem yc ta 0 = (yc * radixW32, 0, ta)
@@ -513,27 +514,7 @@ computeRemW64# yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
 computeRemW64# yc ta yTilde_# =
   let !i = toInteger (W64# yTilde_#)
       -- !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-      !intToUse = maxIntSizeAcross yc ta i
-      !(ycScaled, rdr) = case intToUse of
-        Is32 -> case radixW32 `safePosMul64` fromIntegral yc of
-          Right ycScaled64 -> case fromIntegral (W64# yTilde_#) `safePosAdd64` ycScaled64 of
-            Right iPlusycScaled -> case ycScaled64 `safePosAdd64` iPlusycScaled of
-              Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#) `safePosMul64` iPlusDoubleYcScaled of
-                Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr64 -> (fromIntegral ycScaled64, fromIntegral rdr64)
-                Left iTimesiPlusDoubleYcScaledIN -> (fromIntegral ycScaled64, ta - iTimesiPlusDoubleYcScaledIN)
-              Left iPlusDoubleYcScaledIN -> (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
-            Left iPlusycScaledIN -> (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
-          Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-        (Is32; Is64; Is96) -> case radixW32 `safePosMul256` fromIntegral yc of
-          Right ycScaled256 -> case fromIntegral (W64# yTilde_#) `safePosAdd256` ycScaled256 of
-            Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of
-              Right iPlusDoubleYcScaled -> case fromIntegral (W64# yTilde_#) `safePosMul256` iPlusDoubleYcScaled of
-                Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr256 -> (fromIntegral ycScaled256, fromIntegral rdr256)
-                Left iTimesiPlusDoubleYcScaledIN -> (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
-              Left iPlusDoubleYcScaledIN -> (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
-            Left iPlusycScaledIN -> (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
-          Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-        (Is128; Is256; IsIN; _) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
+      !(ycScaled, rdr) = rmdr yc ta i (fromIntegral (W64# yTilde_#))
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled + i)) + 1 #) else (# yTilde_#, rdr #)
    in (# toInteger (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #)
 {-# INLINE computeRemW64# #-}
@@ -543,30 +524,35 @@ computeRemI64# yc ta 0#Int64 = (# yc * radixW32, 0#Int64, ta #)
 computeRemI64# yc ta yTilde_# =
   let !i = toInteger (I64# yTilde_#)
       -- !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
+      !(ycScaled, rdr) = rmdr yc ta i (I64# yTilde_#)
+      !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subInt64#` 1#Int64, rdr + double (pred (ycScaled + i)) + 1 #) else (# yTilde_#, rdr #)
+   in (# toInteger (I64# yAdj#) + ycScaled, yAdj#, rdrAdj #)
+{-# INLINE computeRemI64# #-}
+
+rmdr :: Integer -> Integer -> Integer -> Int64 -> (Integer, Integer)
+rmdr yc ta i yTilde_ = let 
       !intToUse = maxIntSizeAcross yc ta i
       !(ycScaled, rdr) = case intToUse of
         Is32 -> case radixW32 `safePosMul64` fromIntegral yc of
-          Right ycScaled64 -> case (I64# yTilde_#) `safePosAdd64` ycScaled64 of
+          Right ycScaled64 -> case yTilde_ `safePosAdd64` ycScaled64 of
             Right iPlusycScaled -> case ycScaled64 `safePosAdd64` iPlusycScaled of
-              Right iPlusDoubleYcScaled -> case (I64# yTilde_#) `safePosMul64` iPlusDoubleYcScaled of
+              Right iPlusDoubleYcScaled -> case yTilde_ `safePosMul64` iPlusDoubleYcScaled of
                 Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr64 -> (fromIntegral ycScaled64, fromIntegral rdr64)
                 Left iTimesiPlusDoubleYcScaledIN -> (fromIntegral ycScaled64, ta - iTimesiPlusDoubleYcScaledIN)
               Left iPlusDoubleYcScaledIN -> (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
             Left iPlusycScaledIN -> (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
           Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
         (Is32; Is64; Is96) -> case radixW32 `safePosMul256` fromIntegral yc of
-          Right ycScaled256 -> case fromIntegral (I64# yTilde_#) `safePosAdd256` ycScaled256 of
+          Right ycScaled256 -> case fromIntegral yTilde_ `safePosAdd256` ycScaled256 of
             Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of
-              Right iPlusDoubleYcScaled -> case fromIntegral (I64# yTilde_#) `safePosMul256` iPlusDoubleYcScaled of
+              Right iPlusDoubleYcScaled -> case fromIntegral yTilde_ `safePosMul256` iPlusDoubleYcScaled of
                 Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr256 -> (fromIntegral ycScaled256, fromIntegral rdr256)
                 Left iTimesiPlusDoubleYcScaledIN -> (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
               Left iPlusDoubleYcScaledIN -> (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
             Left iPlusycScaledIN -> (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
           Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
         (Is128; Is256; IsIN; _) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-      !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subInt64#` 1#Int64, rdr + double (pred (ycScaled + i)) + 1 #) else (# yTilde_#, rdr #)
-   in (# toInteger (I64# yAdj#) + ycScaled, yAdj#, rdrAdj #)
-{-# INLINE computeRemI64# #-}
+    in (ycScaled, rdr)
 
 handleFirstRem :: (# Word64#, Integer #) -> (# Integer, Word64#, Integer #)
 handleFirstRem (# yi64#, ri_ #)
