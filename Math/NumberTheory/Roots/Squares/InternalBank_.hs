@@ -21,11 +21,6 @@
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
 module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
--- //FIXME Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
-
--- //FIXME Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
-
--- // FIXME Specialized Data Structures: Choose appropriate containers like unboxed vectors instead of lists for large datasets
 -- \*********** BEGIN NEW IMPORTS
 
 -- he says it's coded to be as fast as possible
@@ -188,55 +183,24 @@ stageList xs =
     !l = length xs -- // FIXME can we remove this traversal?
 
 stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])
-stageListRvrsd xs =
-  if even l
-    then
-      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
-       in (True, reverse $ mkIW32EvenRestLst l True rstEvenLen, lastTwo)
-    else
-      let !(rstEvenLen, lastOne) = splitLastOne xs l
-       in (False, reverse $ mkIW32EvenRestLst l True rstEvenLen, lastOne)
-  where
-    !l = length xs
+stageListRvrsd xs = case stageList xs of
+  (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
+{-# INLINE stageListRvrsd #-}
 
 {-# INLINE stageBA #-}
 stageBA :: [Word32] -> (Bool, ByteArray, [Word32])
-stageBA xs =
-  if even l
-    then
-      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
-       in (True, byteArrayFromList (mkIW32EvenRestLst l True rstEvenLen :: [Word]), lastTwo)
-    else
-      let !(rstEvenLen, lastOne) = splitLastOne xs l
-       in (False, byteArrayFromList (mkIW32EvenRestLst l True rstEvenLen :: [Word]), lastOne)
-  where
-    !l = length xs
+stageBA xs = case stageList xs of
+  (evenLen, ws, lastElems) -> (evenLen, byteArrayFromList ws, lastElems)
 
 {-# INLINE stageUV #-}
 stageUV :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUV xs =
-  if even l
-    then
-      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
-       in (True, VU.fromList (mkIW32EvenRestLst l True rstEvenLen), lastTwo)
-    else
-      let !(rstEvenLen, lastOne) = splitLastOne xs l
-       in (False, VU.fromList (mkIW32EvenRestLst l True rstEvenLen), lastOne)
-  where
-    !l = length xs
+stageUV xs = case stageList xs of 
+    (evenLen, ws, lastElems) -> (evenLen, VU.fromList  ws, lastElems)
 
 {-# INLINE stageUVrvrsd #-}
 stageUVrvrsd :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUVrvrsd xs =
-  if even l
-    then
-      let !(rstEvenLen, lastTwo) = splitLastTwo xs l
-       in (True, VU.fromList $ reverse (mkIW32EvenRestLst l True rstEvenLen), lastTwo)
-    else
-      let !(rstEvenLen, lastOne) = splitLastOne xs l
-       in (False, VU.fromList $ reverse (mkIW32EvenRestLst l True rstEvenLen), lastOne)
-  where
-    !l = length xs
+stageUVrvrsd xs = case stageListRvrsd xs of 
+    (evenLen, ws, lastElems) -> (evenLen, VU.fromList  ws, lastElems)
 
 theNextIterations :: ItrLst_ -> Integer
 theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
