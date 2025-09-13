@@ -42,9 +42,9 @@ import Math.NumberTheory.Utils.ArthMtic_
 {-# SPECIALIZE isqrtB :: Integer -> Integer #-}
 isqrtB :: (Integral a) => a -> a
 isqrtB 0 = 0
-isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV .dgtsLstBase32 . fromIntegral $ n
--- isqrtB n = fromInteger . theNextIterations . theFirstXs . stageList . dgtsLstBase32 . fromIntegral $ n
+isqrtB n = fromInteger . theNextIterations . theFirstXs . stageList . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 

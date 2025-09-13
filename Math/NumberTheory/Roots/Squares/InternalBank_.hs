@@ -419,8 +419,14 @@ computFx :: (FloatingX, FloatingX, FloatingX) -> Integer
 computFx (!tAFX, !tCFX, !radFX) = hndlOvflwW32 (floorFX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFx (nextDownFX radFX) !+ nextDownFX tCFX))))
 {-# INLINE computFx #-}
 
+coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
+coreFx# (# tAFX#, tCFX#, radFX# #) = 
+  nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))
+{-# INLINE coreFx# #-}
+
 computFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Integer
-computFx# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+computFx# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32 (floorX# (coreFx# (# tAFX#, tCFX#, radFX# #)))
+  -- hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE computFx# #-}
 
 {-# INLINE computDoubleW64# #-}
@@ -428,7 +434,8 @@ computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
 computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) of (W64# w#) -> hndlOvflwW32## w#
 
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
-computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
+  -- hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE computFxW64# #-}
 
 {-# INLINE computDoubleI64# #-}
@@ -436,7 +443,8 @@ computDoubleI64# :: Double# -> Double# -> Double# -> Int64#
 computDoubleI64# !tAFX# !tCFX# !radFX# = case floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) of (I64# i#) -> hndlOvflwI32## i#
 
 computFxI64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Int64#
-computFxI64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwI32## (floorXI64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+computFxI64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwI32## (floorXI64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
+  -- hndlOvflwI32## (floorXI64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE computFxI64# #-}
 
 preComputDouble :: Double -> FloatingX -> (Double, Double, Double)
