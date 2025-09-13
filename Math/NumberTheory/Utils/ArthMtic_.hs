@@ -140,6 +140,7 @@ import GHC.Num.Integer (integerLogBaseWord)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
+import Control.Parallel (par, pseq)
 
 -- *********** END NEW IMPORTS
 
@@ -669,3 +670,11 @@ foldr' f z xs = go xs
     go [] = z
     go (x : xs) = f x $! go xs
 {-# INLINEABLE foldr' #-}
+
+-- | Compute two functions in parallel and return their results as a tuple.
+{-# INLINE computePar #-}
+computePar :: (a -> d) -> (b -> c -> e) -> a -> b -> c -> (d, e)
+computePar f1 f2 x y z =
+  let r1 = f1 x
+      r2 = f2 y z 
+  in r1 `par` (r2 `pseq` (r1, r2))

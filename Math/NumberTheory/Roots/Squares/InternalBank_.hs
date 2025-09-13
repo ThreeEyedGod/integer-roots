@@ -321,7 +321,6 @@ theNextIterationsRvrsdSLCode :: ItrLst_ -> Integer
 theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
   where
     -- yCumulative___ $ foldl' tniRvrsd (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
-
     tniRvrsdSL :: Itr__ -> Word64 -> Itr__
     tniRvrsdSL (Itr__ !cl# !yCAcc_ !tA !t#) sqW64 =
       let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
@@ -331,11 +330,10 @@ theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rm
        in (Itr__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
     go :: [Word64] -> Itr__ -> Integer
     go [] itracc = yCumulative___ itracc
-    go [x1] itracc = go [] (inline tniRvrsdSL itracc x1)
-    -- ...existing code...
-    go (x1 : x2 : x3 : x4 : zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4)
     go (x1 : x2 : x3 : x4 : x5 : x6 : x7 : x8 : zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4) x5) x6) x7) x8)
-    -- ...existing code...
+    go (x1 : x2 : x3 : x4 : x5 : x6 : x7 : zs) acc = go zs ((tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4) x5) x6) x7))
+    go (x1 : x2 : x3 : x4 : x5 : x6 : zs) acc = go zs ((tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4) x5) x6))
+    go (x1 : x2 : x3 : x4 : zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4)
     go (x1 : x2 : zs) (Itr__ !cl# !yCAcc_ !tA !t#) =
       let !tA_ = tA * secndPlaceW32Radix + toInteger x1
           !tCFx# = inline scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
@@ -346,6 +344,7 @@ theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rm
           !(# ycUpdated__, !yTildeFinal__#, remFinal__ #) = case inline nxtDgtW64# tA__ tCFx__# of yTilde__# -> inline computeRemW64# ycUpdated tA__ yTilde__#
           !tcfx__# = if isTrue# ((cl# +# 1#) <# 3#) then inline nextDownFX# $ tCFx__# !+## inline unsafeword64ToFloatingX## yTildeFinal__# else tCFx__# -- recall tcfx is already scaled by 32. Do not use normalize here
        in go zs (Itr__ (cl# +# 2#) ycUpdated__ remFinal__ tcfx__#) -- rFinalXs
+    go [x1] itracc = go [] (inline tniRvrsdSL itracc x1)
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
@@ -476,17 +475,11 @@ computFxI64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwI32## (floorXI64## (nextUp
 {-# INLINE computFxI64# #-}
 
 preComputDouble :: Double -> FloatingX -> (Double, Double, Double)
-preComputDouble a@(D# a#) tcfx =
-  let !c@(D# c#) = unsafefx2Double tcfx
-      r# = fmaddDouble# c# c# a#
-   in (a, c, (D# r#))
+preComputDouble a@(D# a#) (FloatingX (D# s#) (I64# e#)) = case preComput a# (FloatingX# s# e#) of (# a#, c#, r# #) -> (a, D# c#, D# r#)
 {-# INLINE preComputDouble #-}
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
-preComput a# tcfx# =
-  let !c# = unsafefx2Double## tcfx#
-      !r# = fmaddDouble# c# c# a#
-   in (# a#, c#, r# #)
+preComput a# tcfx# = case unsafefx2Double## tcfx# of c# -> (# a#, c#, fmaddDouble# c# c# a# #)
 {-# INLINE preComput #-}
 
 preComputFx :: BigNat -> FloatingX -> (FloatingX, FloatingX, FloatingX)

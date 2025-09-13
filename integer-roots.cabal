@@ -106,3 +106,4 @@ benchmark integer-roots-benchmark
                        -rtsopts
                        -threaded
                        -with-rtsopts=-N6 -w
+                       -eventlog
