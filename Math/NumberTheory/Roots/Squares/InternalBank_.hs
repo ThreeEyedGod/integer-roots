@@ -419,11 +419,15 @@ computDouble !tADX !tCDX !radDX = hndlOvflwW32 $ floorDouble (nextUp (nextUp tAD
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Integer
-computDouble# !tAFX# !tCFX# !radFX# = hndlOvflwW32 $ floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#))))
+computDouble# !tAFX# !tCFX# !radFX# = hndlOvflwW32 $ floorDouble (D# (coreD# tAFX# tCFX# radFX#))
 
+{-# INLINE computFx #-}
 computFx :: (FloatingX, FloatingX, FloatingX) -> Integer
 computFx (!tAFX, !tCFX, !radFX) = hndlOvflwW32 (floorFX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFx (nextDownFX radFX) !+ nextDownFX tCFX))))
-{-# INLINE computFx #-}
+
+coreD# :: Double# -> Double# -> Double# -> Double#
+coreD# da# dc# dr# = nextUp# (nextUp# da# /## nextDown# (sqrtDouble# (nextDown# dr#) +## nextDown# dc#))
+{-# INLINE coreD# #-}
 
 coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
 coreFx# (# tAFX#, tCFX#, radFX# #) =
@@ -437,7 +441,7 @@ computFx# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32 (floorX# (coreFx# (# tAFX
 
 {-# INLINE computDoubleW64# #-}
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
-computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) of (W64# w#) -> hndlOvflwW32## w#
+computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDouble (D# (coreD# tAFX# tCFX# radFX#)) of (W64# w#) -> hndlOvflwW32## w#
 
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
 computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
@@ -446,7 +450,7 @@ computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx
 
 {-# INLINE computDoubleI64# #-}
 computDoubleI64# :: Double# -> Double# -> Double# -> Int64#
-computDoubleI64# !tAFX# !tCFX# !radFX# = case floorDouble (D# (nextUp# (nextUp# tAFX# /## nextDown# (sqrtDouble# (nextDown# radFX#) +## nextDown# tCFX#)))) of (I64# i#) -> hndlOvflwI32## i#
+computDoubleI64# !tAFX# !tCFX# !radFX# = case floorDouble (D# (coreD# tAFX# tCFX# radFX#)) of (I64# i#) -> hndlOvflwI32## i#
 
 computFxI64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Int64#
 computFxI64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwI32## (floorXI64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
