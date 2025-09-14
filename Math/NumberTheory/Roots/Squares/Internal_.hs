@@ -50,9 +50,9 @@ isqrtB n = fromInteger . theNextIterations . theFirstXs . stageList . dgtsLstBas
 {-# SPECIALIZE isqrtB_ :: Int -> Integer -> Integer #-}
 isqrtB_ :: (Integral a) => Int -> a -> a
 isqrtB_ _ 0 = 0
--- isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd . dgtsLstBase32 . fromIntegral $ n
--- isqrtB n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV .dgtsLstBase32 . fromIntegral $ n
-isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . stageList_ l . dgtsLstBase32 . fromIntegral $ n
+isqrtB_ l n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd_ l . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB l n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV_ l .dgtsLstBase32 . fromIntegral $ n
+-- isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . stageList_ l . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd_ l . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
