@@ -22,6 +22,8 @@
 module Math.NumberTheory.Roots.Squares.Internal_
   ( karatsubaSqrt,
     isqrtB,
+    isqrtB_,
+    lenRadixW32
   )
 where
 
@@ -30,7 +32,7 @@ import GHC.Exts
   ( Int (..),
     word2Int#,
   )
-import GHC.Num.Integer (integerLog2#)
+import GHC.Num.Integer (integerLog2#, integerLogBase#)
 import Math.NumberTheory.Roots.Squares.InternalBank_
 import Math.NumberTheory.Utils.ArthMtic_
 
@@ -48,11 +50,22 @@ isqrtB n = fromInteger . theNextIterations . theFirstXs . stageList . dgtsLstBas
 -- isqrtB n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB #-}
 
+{-# SPECIALIZE isqrtB_ :: Int -> Integer -> Integer #-}
+isqrtB_ :: (Integral a) => Int -> a -> a
+isqrtB_ _ 0 = 0
+-- isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV .dgtsLstBase32 . fromIntegral $ n
+isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . (stageList_ l). dgtsLstBase32 . fromIntegral $ n
+-- isqrtB n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd . dgtsLstBase32 . fromIntegral $ n
+{-# INLINEABLE isqrtB_ #-}
+
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
-  | lgN < 2300 =
-      let s = isqrtB n in (s, n - s * s)
+  -- | lgN < 2300 =
+  --     let s = isqrtB n in (s, n - s * s)
+  | lgNradixW32 < 72 = -- 72 in radixw32 is ~ 2300 in base 2 
+      let s = isqrtB_ lgNradixW32 n in (s, n - s * s)
   | otherwise =
       if lgN .&. 2 /= 0
         then
@@ -70,6 +83,10 @@ karatsubaSqrt n
   where
     k = lgN `unsafeShiftR` 2 + 1
     lgN = I# (word2Int# (integerLog2# n))
+    !lgNradixW32 = lenRadixW32 n 
+
+lenRadixW32 :: Integral a => a -> Int
+lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1 
 
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)

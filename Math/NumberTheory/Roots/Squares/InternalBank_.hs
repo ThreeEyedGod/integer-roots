@@ -177,6 +177,16 @@ stageList xs =
     !evenYes = even l
     !splitFn = if evenYes then splitLastTwo else splitLastOne
 
+{-# INLINE stageList_ #-}
+stageList_ :: Int -> [Word32] -> (Bool, [Word64], [Word32]) -- //FIXME WHY WORD64 LIST?
+stageList_ l xs =
+  case splitFn xs l of
+    (rstEvenLen, lastElems) -> (evenYes, mkIW32EvenRestLst l True rstEvenLen, lastElems)
+  where
+    -- !l = length xs -- // FIXME can we remove this traversal?
+    !evenYes = even l
+    !splitFn = if evenYes then splitLastTwo else splitLastOne
+
 stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])
 stageListRvrsd xs = case stageList xs of
   (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
