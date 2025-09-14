@@ -183,6 +183,11 @@ stageList_ l xs =
 stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])
 stageListRvrsd xs = case stageList xs of
   (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
+
+{-# INLINE stageListRvrsd_ #-}
+stageListRvrsd_ :: Int -> [Word32] -> (Bool, [Word64], [Word32])
+stageListRvrsd_ l xs = case stageList_ l xs of
+  (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
 {-# INLINE stageListRvrsd #-}
 
 {-# INLINE stageBA #-}
@@ -281,9 +286,8 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
 
 -- | SL = Straight Line Code
 theNextIterationsRvrsdSLCode :: ItrLst_ -> Integer
-theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
+theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldl' tniRvrsdSL (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs--inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
   where
-    -- yCumulative___ $ foldl' tniRvrsd (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
     tniRvrsdSL :: Itr__ -> Word64 -> Itr__
     tniRvrsdSL (Itr__ !cl# !yCAcc_ !tA !t#) sqW64 =
       let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
