@@ -27,16 +27,8 @@ module Math.NumberTheory.Utils.FloatingX_ where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
--- he says it's coded to be as fast as possible
 import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Bits.Floating (nextDown, nextUp)
-import Data.DoubleWord (Int256, Int96)
-import Data.FastDigits (digitsUnsigned, undigits)
-import Data.List (unfoldr)
-import Data.Maybe (fromMaybe)
-import Data.WideWord (Int128, Word256, zeroInt128)
-import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
     Double#,
@@ -99,13 +91,13 @@ import GHC.Exts
     (>=##),
   )
 import GHC.Float (divideDouble, floorDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, timesDouble)
-import GHC.Int (Int32, Int64 (I64#))
+import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
-import GHC.Num.Integer (Integer (..), integerLog2#)
-import GHC.Word (Word32 (..), Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (fromInt64, maxDouble, maxSafeInteger, maxUnsafeInteger, nextDown#, nextUp#, split, split#, sqrtOf2, updateDouble#, _even, _evenInt64#, _odd, _oddInt64#)
+import GHC.Num.Integer (integerLog2#)
+import GHC.Word (Word64 (..))
+import Math.NumberTheory.Utils.ArthMtic_ (fromInt64, maxDouble, maxUnsafeInteger, nextDown#, nextUp#, split, split#, sqrtOf2, updateDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 

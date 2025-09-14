@@ -62,7 +62,7 @@ integerSquareRoot n
   #-}
 {-# INLINE [1] integerSquareRoot' #-}
 integerSquareRoot' :: Integral a => a -> a
-integerSquareRoot' n = isqrtB_ (lenRadixW32 n) n
+integerSquareRoot' n = isqrtB_ (lenRadixW32 n) n --isqrtB n
 
 -- | For a non-negative input \( n \)
 --   calculate its integer square root \( r = \lfloor \sqrt{n} \rfloor \)
