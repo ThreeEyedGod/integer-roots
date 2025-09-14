@@ -266,9 +266,8 @@ theNextIterationsUVI (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
           !(W64# yTildeFinal#) = fromIntegral yTildeFinal
           !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then inline nextDownFX# $ (FloatingX# s'# e'#) !+## inline unsafeword64ToFloatingX## yTildeFinal# else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
        in (Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#)) -- rFinalXs
-
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
-{-# NOINLINE theNextIterationsUVI #-} -- //FIXME
+{-# NOINLINE theNextIterationsUVI #-} 
 
 theNextIterationsUVIrvrsd :: ItrUV -> Integer
 theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =

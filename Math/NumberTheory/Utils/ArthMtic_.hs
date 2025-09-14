@@ -57,10 +57,6 @@ module Math.NumberTheory.Utils.ArthMtic_
   )
 where
 
--- //FIXME Type conversion avoidance: Avoid boxing/unboxing and unnecessary type conversions within performance-critical code—especially inner numeric loops.
-
--- //FIXME Tighten representation: Operate on Int when possible, only converting to Double at the last possible moment, as converting on every loop iteration can cost performance.
-
 -- \*********** BEGIN NEW IMPORTS
 
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
