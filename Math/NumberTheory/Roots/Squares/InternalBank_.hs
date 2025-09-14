@@ -139,24 +139,14 @@ oddFirstRmdr i# =
    in (# toInteger y, yT64#, remInteger #)
 {-# INLINE oddFirstRmdr #-}
 
-theFiBA :: [Word32] -> ItrBA
-theFiBA xs
-  | evenLen =
-      let !(# !yc, !y1#, !remInteger #) =
-            let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-                ysq# = yT64# `timesWord64#` yT64#
-                diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-             in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-       in ItrBA 1# passBA yc remInteger (unsafeword64ToFloatingX## y1#)
-  | otherwise =
-      let yT64# = largestNSqLTEOdd## i#
-          y = W64# yT64#
-          ysq# = yT64# `timesWord64#` yT64#
-          !remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
-       in ItrBA 1# passBA (toInteger y) remInteger (unsafeword64ToFloatingX## yT64#)
+theFirstBA :: (Bool, ByteArray, [Word32])  -> ItrBA
+theFirstBA (evenLen, passBA, dxs') =
+  case rmdrFn i# of
+    (# !yVal, !yWord#, !remInteger #) ->
+      ItrBA 1# passBA yVal remInteger (unsafeword64ToFloatingX## yWord#)
   where
-    !(evenLen, passBA, dxs') = stageBA xs
-    i# = word64FromRvsrd2ElemList# dxs'
+    !i# = word64FromRvsrd2ElemList# dxs'
+    !rmdrFn = if evenLen then evenFirstRmdr else oddFirstRmdr
 
 theFirstUV :: (Bool, VU.Vector Word64, [Word32]) -> ItrUV
 theFirstUV (evenLen, passUV, dxs') =
@@ -195,14 +185,29 @@ stageBA :: [Word32] -> (Bool, ByteArray, [Word32])
 stageBA xs = case stageList xs of
   (evenLen, ws, lastElems) -> (evenLen, byteArrayFromList ws, lastElems)
 
+{-# INLINE stageBA_ #-}
+stageBA_ :: Int -> [Word32] -> (Bool, ByteArray, [Word32])
+stageBA_ l xs = case stageList_ l xs of
+  (evenLen, ws, lastElems) -> (evenLen, byteArrayFromList ws, lastElems)
+
 {-# INLINE stageUV #-}
 stageUV :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
 stageUV xs = case stageList xs of
   (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
 
+{-# INLINE stageUV_ #-}
+stageUV_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
+stageUV_ l xs = case stageList_ l xs of
+  (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
+
 {-# INLINE stageUVrvrsd #-}
 stageUVrvrsd :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
 stageUVrvrsd xs = case stageListRvrsd xs of
+  (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
+
+{-# INLINE stageUVrvrsd_ #-}
+stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
+stageUVrvrsd_ l xs = case stageListRvrsd_ l xs of
   (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
 
 theNextIterations :: ItrLst_ -> Integer
