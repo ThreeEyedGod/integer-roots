@@ -275,12 +275,10 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
   where
     {-# INLINE tniRvr #-}
     tniRvr :: Itr__ -> Word64 -> Itr__
-    tniRvr (Itr__ !cl# !yCAcc_ !tA t@(FloatingX# s# e#)) sqW64 =
+    tniRvr (Itr__ !cl# !yCAcc_ !tA !t@(FloatingX# s# e#)) sqW64 =
       let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
           !tCFx@(FloatingX (D# s'#) (I64# e'#)) = scaleByPower2 32 (FloatingX (D# s#) (I64# e#)) -- sqrtF previous digits being scaled right here
           !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgt tA_ tCFx of yTilde -> computeRem yCAcc_ tA_ yTilde
-          -- !(W64# yTildeFinal#) = fromIntegral yTildeFinal
-          -- !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFloatingX## yTildeFinal# else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
           !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFx# yTildeFinal else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
        in (Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#)) -- rFinalXs
 
@@ -384,9 +382,9 @@ nxtDgtDoubleFxI## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #
 nxtDgt :: Integer -> FloatingX -> Integer
 nxtDgt 0 _ = 0
 nxtDgt (IS ta#) tcfx = nxtDgtDoubleFxI (int2Double (I# ta#)) tcfx
-nxtDgt n@(IP bn#) tcfx@(FloatingX s@(D# s#) e@(I64# e#))
+nxtDgt (IP bn#) tcfx
   | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI (D# (bigNatEncodeDouble# bn# 0#)) tcfx
-  | otherwise = computFx (preComputFx (BN# bn#) (FloatingX s e)) -- computFx (preComputFx bn# tcfx#)
+  | otherwise = computFx (preComputFx (BN# bn#) tcfx) 
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
