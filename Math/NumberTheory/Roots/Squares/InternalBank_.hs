@@ -279,8 +279,9 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
       let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
           !tCFx@(FloatingX (D# s'#) (I64# e'#)) = scaleByPower2 32 (FloatingX (D# s#) (I64# e#)) -- sqrtF previous digits being scaled right here
           !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgt tA_ tCFx of yTilde -> computeRem yCAcc_ tA_ yTilde
-          !(W64# yTildeFinal#) = fromIntegral yTildeFinal
-          !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFloatingX## yTildeFinal# else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
+          -- !(W64# yTildeFinal#) = fromIntegral yTildeFinal
+          -- !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFloatingX## yTildeFinal# else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
+          !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFx# yTildeFinal else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
        in (Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#)) -- rFinalXs
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
