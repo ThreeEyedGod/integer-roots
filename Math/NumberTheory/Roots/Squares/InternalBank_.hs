@@ -112,6 +112,7 @@ data ItrBA = ItrBA {lBA :: Int#, ba :: !ByteArray, ycBA :: Integer, irBA :: !Int
 data ItrUV = ItrUV {luv :: Int#, uv :: !(VU.Vector Word64), ycuv :: !Integer, iruv :: !Integer, tbuvFx :: !FloatingX#} deriving (Eq)
 
 data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
+data Itr' = Itr' {lv'# :: {-# UNPACK #-} !Int#, yCumulative' :: !Integer, iRem':: {-# UNPACK #-} !Integer, tb' :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
 theFirstXs :: (Bool, [Word64], [Word32]) -> ItrLst_
 theFirstXs (evenLen, passXs, dxs') =
@@ -170,45 +171,50 @@ stageList_ l xs =
     !evenYes = even l
     !splitFn = if evenYes then splitLastTwo else splitLastOne
 
+sndModifyWith :: ([c] -> [c]) -> (a, [c], b) -> (a, [c], b)
+sndModifyWith f (a, xs, b) = (a, f xs, b)
+{-# INLINE sndModifyWith #-}
+
+sndChangeToBA :: ([c] -> ByteArray) -> (a, [c], b) -> (a, ByteArray, b)
+sndChangeToBA f (a, xs, b) = (a, f xs, b)
+{-# INLINE sndChangeToBA #-}
+
+sndChangeToVU :: ([c] -> VU.Vector c) -> (a, [c], b) -> (a, VU.Vector c, b)
+sndChangeToVU f (a, xs, b) = (a, f xs, b)
+{-# INLINE sndChangeToVU #-}
+
+{-# INLINE stageListRvrsd #-}
 stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])
-stageListRvrsd xs = case stageList xs of
-  (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
+stageListRvrsd xs = sndModifyWith reverse (stageList xs)
 
 {-# INLINE stageListRvrsd_ #-}
 stageListRvrsd_ :: Int -> [Word32] -> (Bool, [Word64], [Word32])
-stageListRvrsd_ l xs = case stageList_ l xs of
-  (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
-{-# INLINE stageListRvrsd #-}
+stageListRvrsd_ l xs  = sndModifyWith reverse (stageList_ l xs)
+-- stageListRvrsd_ l xs = case stageList_ l xs of (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
 
 {-# INLINE stageBA #-}
 stageBA :: [Word32] -> (Bool, ByteArray, [Word32])
-stageBA xs = case stageList xs of
-  (evenLen, ws, lastElems) -> (evenLen, byteArrayFromList ws, lastElems)
+stageBA xs = sndChangeToBA byteArrayFromList (stageList xs)
 
 {-# INLINE stageBA_ #-}
 stageBA_ :: Int -> [Word32] -> (Bool, ByteArray, [Word32])
-stageBA_ l xs = case stageList_ l xs of
-  (evenLen, ws, lastElems) -> (evenLen, byteArrayFromList ws, lastElems)
+stageBA_ l xs = sndChangeToBA byteArrayFromList (stageList_ l xs)
 
 {-# INLINE stageUV #-}
 stageUV :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUV xs = case stageList xs of
-  (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
+stageUV xs = sndChangeToVU VU.fromList (stageList xs)
 
 {-# INLINE stageUV_ #-}
 stageUV_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUV_ l xs = case stageList_ l xs of
-  (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
+stageUV_ l xs = sndChangeToVU VU.fromList (stageList_ l xs)
 
 {-# INLINE stageUVrvrsd #-}
 stageUVrvrsd :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUVrvrsd xs = case stageListRvrsd xs of
-  (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
+stageUVrvrsd xs = sndChangeToVU VU.fromList (stageListRvrsd xs)
 
 {-# INLINE stageUVrvrsd_ #-}
 stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUVrvrsd_ l xs = case stageListRvrsd_ l xs of
-  (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
+stageUVrvrsd_ l xs = sndChangeToVU VU.fromList (stageListRvrsd_ l xs)
 
 theNextIterations :: ItrLst_ -> Integer
 theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
