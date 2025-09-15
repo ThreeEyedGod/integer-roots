@@ -255,17 +255,16 @@ theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rm
 nxtDgtW64# :: Integer -> FloatingX# -> Word64#
 -- nxtDgtW64# n tcfx# = computFxW64# (allInclusivePreComputNToFx## n tcfx#) -- works ! but not any faster
 nxtDgtW64# 0 !_ = 0#Word64
-nxtDgtW64# (IS ta#) tcfx# = inline nxtDgtDoubleFxW64## (int2Double# ta#) tcfx#
 nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
   | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
-  -- \| otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
+  -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if (tAFX# !<## threshold#) then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
-  where
-    !(I64# e64#) = fromIntegral 10 ^ 137
-    threshold# = FloatingX# 1.9## e64#
+  where    
+    threshold# = let !(I64# e64#) = fromIntegral 10 ^ 137 in FloatingX# 1.9## e64#
     -- where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
+nxtDgtW64# (IS ta#) tcfx# = inline nxtDgtDoubleFxW64## (int2Double# ta#) tcfx# -- chances are this branch is never taken (see how squares_. hs is structured)
 nxtDgtW64# (IN _) !_ = error "nxtDgtW64# :: Invalid negative integer argument"
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
