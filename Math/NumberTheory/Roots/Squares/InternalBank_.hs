@@ -143,12 +143,12 @@ theFirstUV (evenLen, passUV, dxs') =
 
 theNextIterations :: ItrLst_ -> Integer
 theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
-  yCumulative___ $ foldr' tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs
+  yCumulative___ $ foldr' tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) (fromIntegral <$> wrd64Xs)
   where
     {-# INLINE tni #-}
-    tni :: Word64 -> Itr__ -> Itr__
-    tni sqW64 (Itr__ !cl# !yCAcc_ !tA !t#) =
-      let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
+    tni :: Integer -> Itr__ -> Itr__
+    tni i (Itr__ !cl# !yCAcc_ !tA !t#) =
+      let !tA_ = tA * secndPlaceW32Radix + i
           !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
           !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgtW64# tA_ tCFx# of yTilde_# -> computeRemW64# yCAcc_ tA_ yTilde_#
           !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
