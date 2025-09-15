@@ -123,23 +123,6 @@ theFirstXs (evenLen, passXs, dxs') =
     !i# = word64FromRvsrd2ElemList# dxs'
     !rmdrFn = if evenLen then evenFirstRmdr else oddFirstRmdr
 
-evenFirstRmdr :: Word64# -> (# Integer, Word64#, Integer #)
-evenFirstRmdr i# =
-  let yT64# = hndlOvflwW32## (largestNSqLTEEven## i#)
-      ysq# = yT64# `timesWord64#` yT64#
-      diff# = word64ToInt64# i# `subInt64#` word64ToInt64# ysq#
-   in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
-{-# INLINE evenFirstRmdr #-}
-
-oddFirstRmdr :: Word64# -> (# Integer, Word64#, Integer #)
-oddFirstRmdr i# =
-  let yT64# = largestNSqLTEOdd## i#
-      y = W64# yT64#
-      ysq# = yT64# `timesWord64#` yT64#
-      remInteger = toInteger $ W64# (i# `subWord64#` ysq#) -- no chance this will be negative
-   in (# toInteger y, yT64#, remInteger #)
-{-# INLINE oddFirstRmdr #-}
-
 theFirstBA :: (Bool, ByteArray, [Word32])  -> ItrBA
 theFirstBA (evenLen, passBA, dxs') =
   case rmdrFn i# of
@@ -157,64 +140,6 @@ theFirstUV (evenLen, passUV, dxs') =
   where
     !i# = word64FromRvsrd2ElemList# dxs'
     !rmdrFn = if evenLen then evenFirstRmdr else oddFirstRmdr
-
-{-# INLINE stageList #-}
-stageList :: [Word32] -> (Bool, [Word64], [Word32]) -- //FIXME WHY WORD64 LIST?
-stageList xs = stageList_ (length xs) xs
-
-{-# INLINE stageList_ #-}
-stageList_ :: Int -> [Word32] -> (Bool, [Word64], [Word32]) -- //FIXME WHY WORD64 LIST?
-stageList_ l xs =
-  case splitFn xs l of
-    (rstEvenLen, lastElems) -> (evenYes, mkIW32EvenRestLst l True rstEvenLen, lastElems)
-  where
-    !evenYes = even l
-    !splitFn = if evenYes then splitLastTwo else splitLastOne
-
-sndModifyWith :: ([c] -> [c]) -> (a, [c], b) -> (a, [c], b)
-sndModifyWith f (a, xs, b) = (a, f xs, b)
-{-# INLINE sndModifyWith #-}
-
-sndChangeToBA :: ([c] -> ByteArray) -> (a, [c], b) -> (a, ByteArray, b)
-sndChangeToBA f (a, xs, b) = (a, f xs, b)
-{-# INLINE sndChangeToBA #-}
-
-sndChangeToVU :: ([c] -> VU.Vector c) -> (a, [c], b) -> (a, VU.Vector c, b)
-sndChangeToVU f (a, xs, b) = (a, f xs, b)
-{-# INLINE sndChangeToVU #-}
-
-{-# INLINE stageListRvrsd #-}
-stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])
-stageListRvrsd xs = sndModifyWith reverse (stageList xs)
-
-{-# INLINE stageListRvrsd_ #-}
-stageListRvrsd_ :: Int -> [Word32] -> (Bool, [Word64], [Word32])
-stageListRvrsd_ l xs  = sndModifyWith reverse (stageList_ l xs)
--- stageListRvrsd_ l xs = case stageList_ l xs of (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
-
-{-# INLINE stageBA #-}
-stageBA :: [Word32] -> (Bool, ByteArray, [Word32])
-stageBA xs = sndChangeToBA byteArrayFromList (stageList xs)
-
-{-# INLINE stageBA_ #-}
-stageBA_ :: Int -> [Word32] -> (Bool, ByteArray, [Word32])
-stageBA_ l xs = sndChangeToBA byteArrayFromList (stageList_ l xs)
-
-{-# INLINE stageUV #-}
-stageUV :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUV xs = sndChangeToVU VU.fromList (stageList xs)
-
-{-# INLINE stageUV_ #-}
-stageUV_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUV_ l xs = sndChangeToVU VU.fromList (stageList_ l xs)
-
-{-# INLINE stageUVrvrsd #-}
-stageUVrvrsd :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUVrvrsd xs = sndChangeToVU VU.fromList (stageListRvrsd xs)
-
-{-# INLINE stageUVrvrsd_ #-}
-stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUVrvrsd_ l xs = sndChangeToVU VU.fromList (stageListRvrsd_ l xs)
 
 theNextIterations :: ItrLst_ -> Integer
 theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
@@ -560,3 +485,80 @@ handleFirstRem (# yi64#, ri_ #)
 fixRemainder :: Integer -> Integer -> Integer
 fixRemainder !newYc !rdr = rdr + double newYc + 1
 {-# INLINE fixRemainder #-}
+
+-- | Find the largest n such that n^2 <= w, where n is even different for even length lists and odd length lists
+evenFirstRmdr :: Word64# -> (# Integer, Word64#, Integer #)
+evenFirstRmdr w# =
+  let yT64# = hndlOvflwW32## (largestNSqLTEEven## w#)
+      ysq# = yT64# `timesWord64#` yT64#
+      diff# = word64ToInt64# w# `subInt64#` word64ToInt64# ysq#
+   in handleFirstRem (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+{-# INLINE evenFirstRmdr #-}
+
+oddFirstRmdr :: Word64# -> (# Integer, Word64#, Integer #)
+oddFirstRmdr w# =
+  let yT64# = largestNSqLTEOdd## w#
+      y = W64# yT64#
+      ysq# = yT64# `timesWord64#` yT64#
+      remInteger = toInteger $ W64# (w# `subWord64#` ysq#) -- no chance this will be negative
+   in (# toInteger y, yT64#, remInteger #)
+{-# INLINE oddFirstRmdr #-}
+
+-- | Staging the input list of Word32 into a list of Word64 by combining pairs of Word32
+{-# INLINE stageList #-}
+stageList :: [Word32] -> (Bool, [Word64], [Word32]) -- //FIXME WHY WORD64 LIST?
+stageList xs = stageList_ (length xs) xs
+
+{-# INLINE stageList_ #-}
+stageList_ :: Int -> [Word32] -> (Bool, [Word64], [Word32]) -- //FIXME WHY WORD64 LIST?
+stageList_ l xs =
+  case splitFn xs l of
+    (rstEvenLen, lastElems) -> (evenYes, mkIW32EvenRestLst l True rstEvenLen, lastElems)
+  where
+    !evenYes = even l
+    !splitFn = if evenYes then splitLastTwo else splitLastOne
+
+sndModifyWith :: ([c] -> [c]) -> (a, [c], b) -> (a, [c], b)
+sndModifyWith f (a, xs, b) = (a, f xs, b)
+{-# INLINE sndModifyWith #-}
+
+sndChangeToBA :: ([c] -> ByteArray) -> (a, [c], b) -> (a, ByteArray, b)
+sndChangeToBA f (a, xs, b) = (a, f xs, b)
+{-# INLINE sndChangeToBA #-}
+
+sndChangeToVU :: ([c] -> VU.Vector c) -> (a, [c], b) -> (a, VU.Vector c, b)
+sndChangeToVU f (a, xs, b) = (a, f xs, b)
+{-# INLINE sndChangeToVU #-}
+
+{-# INLINE stageListRvrsd #-}
+stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])
+stageListRvrsd xs = sndModifyWith reverse (stageList xs)
+
+{-# INLINE stageListRvrsd_ #-}
+stageListRvrsd_ :: Int -> [Word32] -> (Bool, [Word64], [Word32])
+stageListRvrsd_ l xs  = sndModifyWith reverse (stageList_ l xs)
+-- stageListRvrsd_ l xs = case stageList_ l xs of (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
+
+{-# INLINE stageBA #-}
+stageBA :: [Word32] -> (Bool, ByteArray, [Word32])
+stageBA xs = sndChangeToBA byteArrayFromList (stageList xs)
+
+{-# INLINE stageBA_ #-}
+stageBA_ :: Int -> [Word32] -> (Bool, ByteArray, [Word32])
+stageBA_ l xs = sndChangeToBA byteArrayFromList (stageList_ l xs)
+
+{-# INLINE stageUV #-}
+stageUV :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
+stageUV xs = sndChangeToVU VU.fromList (stageList xs)
+
+{-# INLINE stageUV_ #-}
+stageUV_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
+stageUV_ l xs = sndChangeToVU VU.fromList (stageList_ l xs)
+
+{-# INLINE stageUVrvrsd #-}
+stageUVrvrsd :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
+stageUVrvrsd xs = sndChangeToVU VU.fromList (stageListRvrsd xs)
+
+{-# INLINE stageUVrvrsd_ #-}
+stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
+stageUVrvrsd_ l xs = sndChangeToVU VU.fromList (stageListRvrsd_ l xs)
