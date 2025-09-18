@@ -584,10 +584,17 @@ split# d# =
    in (# s#, ex# #)
 
 -- | Some Constants
+{-# INLINE radixW32 #-}
+{-# SPECIALIZE radixW32 :: Integer #-}
+{-# SPECIALIZE radixW32 :: Word64 #-}
+{-# SPECIALIZE radixW32 :: Int64 #-}
 radixW32 :: (Integral a) => a
 radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
-{-# INLINE radixW32 #-}
 
+{-# INLINE predRadixW32 #-}
+{-# SPECIALIZE predRadixW32 :: Integer #-}
+{-# SPECIALIZE predRadixW32 :: Word64 #-}
+{-# SPECIALIZE predRadixW32 :: Int64 #-}
 predRadixW32 :: (Integral a) => a
 predRadixW32 = 4294967295 -- 2 ^ finiteBitSize (0 :: Word32) -1
 

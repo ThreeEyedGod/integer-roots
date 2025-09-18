@@ -150,7 +150,7 @@ theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
     tni i (Itr__ !cl# !yCAcc_ !tA !t#) =
       let !tA_ = tA * secndPlaceW32Radix + i
           !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-          !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgtW64# tA_ tCFx# of yTilde_# -> computeRemW64# yCAcc_ tA_ yTilde_#
+          !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#) 
           !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
        in (Itr__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
 
@@ -415,7 +415,7 @@ allInclusivePreComputNToFx## tA tCFX# = case unsafeN2Fx# tA of tAFX# -> (# tAFX#
 computeRem :: Integer -> Integer -> Integer -> (Integer, Integer, Integer)
 computeRem yc ta 0 = (yc * radixW32, 0, ta)
 computeRem yc ta i =
-  let !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
+  let !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta + (- i * (double ycS' + i)))
       !(yAdj, rdrAdj) = if rdr < 0 then (pred i, rdr + double (pred (ycScaled + i)) + 1) else (i, rdr)
    in -- !(yAdj, rdrAdj) = if rdr < 0 then (pred i, fixRemainder (pred (ycScaled + i)) rdr + 1) else (i, rdr)
       (yAdj + ycScaled, yAdj, rdrAdj)
