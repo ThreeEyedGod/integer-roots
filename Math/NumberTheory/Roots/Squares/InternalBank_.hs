@@ -311,15 +311,23 @@ nxtDgtDoubleFxI## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #
 
 nxtDgt :: Integer -> FloatingX -> Integer
 nxtDgt 0 _ = 0
-nxtDgt (IS ta#) tcfx = nxtDgtDoubleFxI (int2Double (I# ta#)) tcfx
-nxtDgt (IP bn#) tcfx
+nxtDgt n tcfx
+  | n < 2^512 = nxtDgtDoubleFxI (fromIntegral n) tcfx
+  | otherwise = computFx (preComputIFx n tcfx) 
+{-# INLINE nxtDgt #-}
+
+-- | same as nxtDgt but without the small value shortcut, lots of branches cause impedance
+nxtDgt_ :: Integer -> FloatingX -> Integer
+nxtDgt_ 0 _ = 0
+nxtDgt_ (IS ta#) tcfx = nxtDgtDoubleFxI (int2Double (I# ta#)) tcfx
+nxtDgt_ (IP bn#) tcfx
   | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI (D# (bigNatEncodeDouble# bn# 0#)) tcfx
   | otherwise = computFx (preComputFx (BN# bn#) tcfx) 
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
-nxtDgt (IN _) !_ = error "nxtDgt :: Invalid negative integer argument"
-{-# INLINE nxtDgt #-}
+nxtDgt_ (IN _) !_ = error "nxtDgt :: Invalid negative integer argument"
+{-# INLINE nxtDgt_ #-}
 
 nxtDgtDoubleFxI :: Double -> FloatingX -> Integer
 nxtDgtDoubleFxI pa tcfx = case inline preComputDouble pa tcfx of (a, c, r) -> computDouble a c r
@@ -397,6 +405,10 @@ preComput a# tcfx# = case unsafefx2Double## tcfx# of c# -> (# a#, c#, fmaddDoubl
 preComputFx :: BigNat -> FloatingX -> (FloatingX, FloatingX, FloatingX)
 preComputFx tA__bn tCFX = case unsafeGtWordbn2Fx tA__bn of tAFX -> (tAFX, tCFX, tCFX !**+ tAFX) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComputFx #-}
+
+preComputIFx :: Integer -> FloatingX -> (FloatingX, FloatingX, FloatingX)
+preComputIFx tA tCFX = case unsafeN2Fx tA of tAFX -> (tAFX, tCFX, tCFX !**+ tAFX) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+{-# INLINE preComputIFx #-}
 
 preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
