@@ -54,11 +54,12 @@ module Math.NumberTheory.Utils.ArthMtic_
     maxSafeInteger,
     maxUnsafeInteger,
     foldr',
+    pred,
   )
 where
 
 -- \*********** BEGIN NEW IMPORTS
-
+import Prelude hiding (pred)
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 -- he says it's coded to be as fast as possible
 import Data.Bits (unsafeShiftL)
@@ -681,3 +682,12 @@ computePar f1 f2 x y z =
   let r1 = f1 x
       r2 = f2 y z 
   in r1 `par` (r2 `pseq` (r1, r2))
+
+-- | because pred is Enum. this version blow is marginally faster
+{-# SPECIALISE pred :: Integer -> Integer  #-}
+{-# SPECIALISE pred :: Word64 -> Word64  #-}
+{-# SPECIALISE pred :: Int -> Int  #-}
+{-# SPECIALISE pred :: Int64 -> Int64  #-}
+pred :: Integral a => a -> a
+pred x = x + (- 1)
+{-# INLINE pred #-}
