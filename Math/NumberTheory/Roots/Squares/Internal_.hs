@@ -50,9 +50,9 @@ isqrtB n = fromInteger . theNextIterations . theFirstXs . stageList . dgtsLstBas
 {-# SPECIALIZE isqrtB_ :: Int -> Integer -> Integer #-}
 isqrtB_ :: (Integral a) => Int -> a -> a
 isqrtB_ _ 0 = 0
-isqrtB_ l n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd_ l . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB_ l n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd_ l . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV_ l .dgtsLstBase32 . fromIntegral $ n
--- isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . stageList_ l . dgtsLstBase32 . fromIntegral $ n
+isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . stageList_ l . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd_ l . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
@@ -81,9 +81,6 @@ karatsubaSqrt n
     k = lgN `unsafeShiftR` 2 + 1
     lgN = I# (word2Int# (integerLog2# n))
     !lgNradixW32 = lenRadixW32 n
-
-lenRadixW32 :: (Integral a) => a -> Int
-lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1
 
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)

@@ -55,6 +55,8 @@ module Math.NumberTheory.Utils.ArthMtic_
     maxUnsafeInteger,
     foldr',
     pred,
+    lenRadixW32,
+    floorDouble_
   )
 where
 
@@ -133,11 +135,13 @@ import GHC.Exts
 import GHC.Float (floorDouble)
 import GHC.Int (Int32, Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
+import GHC.Num.Integer (integerLogBase#)
 import GHC.Num.Integer (integerLogBaseWord)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
 import Control.Parallel (par, pseq)
+import Numeric.Natural (Natural)
 
 -- *********** END NEW IMPORTS
 
@@ -470,21 +474,21 @@ doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromI
 
 {-# INLINE largestNSqLTEOdd #-}
 largestNSqLTEOdd :: Word64 -> Word64
-largestNSqLTEOdd i = floorDouble (sqrt (fromIntegral i) :: Double)
+largestNSqLTEOdd i = floorDouble_ (sqrt (fromIntegral i) :: Double)
 
 {-# INLINE largestNSqLTEEven #-}
 largestNSqLTEEven :: Word64 -> Word64
-largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble (nextUp (sqrt d_))
+largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble_ (nextUp (sqrt d_))
 
 {-# INLINE largestNSqLTEOdd## #-}
 largestNSqLTEOdd## :: Word64# -> Word64#
-largestNSqLTEOdd## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
+largestNSqLTEOdd## w# = case floorDouble_ (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
 
 {-# INLINE largestNSqLTEEven## #-}
 largestNSqLTEEven## :: Word64# -> Word64#
 largestNSqLTEEven## w# =
   let !d_ = nextUp (fromIntegral (W64# w#) :: Double)
-      !(W64# r#) = floorDouble (nextUp (sqrt d_))
+      !(W64# r#) = floorDouble_ (nextUp (sqrt d_))
    in r#
 
 -- | handle overflow
@@ -668,6 +672,24 @@ undigits_ = undigits
 {-# SPECIALIZE undigits_ :: Integer -> [Integer] -> Integer #-}
 {-# SPECIALIZE undigits_ :: Integer -> [Integer] -> Integer #-}
 
+-- | Extract nth digit using fast-digits (note: digits are in reverse order)
+nthDigitFast :: Integer -> Int -> Word32
+nthDigitFast n pos = 
+      let digitList = digitsUnsigned radixW32 (fromIntegral n)  -- Gets digits in reverse order
+          len = length digitList
+      in fromIntegral $ digitList !! (len - (pos-1))
+
+doubleDigitInteger :: Integer -> (Int, Int) -> Word64#
+doubleDigitInteger n (dl, dr) = word64FromRvsrd2ElemList# [nthDigitFast n dl , nthDigitFast n dr]
+{-# INLINE doubleDigitInteger #-}
+
+{-# SPECIALISE lenRadixW32 :: Integer -> Int #-}
+{-# SPECIALISE lenRadixW32 :: Word64 -> Int #-}
+{-# SPECIALISE lenRadixW32 :: Natural -> Int #-}
+lenRadixW32 :: (Integral a) => a -> Int
+lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1
+{-# INLINEABLE lenRadixW32 #-}
+
 foldr' :: (a -> b -> b) -> b -> [a] -> b
 foldr' f z xs = go xs
   where
@@ -691,3 +713,10 @@ computePar f1 f2 x y z =
 pred :: Integral a => a -> a
 pred x = x + (- 1)
 {-# INLINE pred #-}
+
+{-# INLINEABLE floorDouble_ #-}
+{-# SPECIALISE floorDouble_ :: Double -> Integer  #-}
+{-# SPECIALISE floorDouble_ :: Double -> Word64  #-}
+{-# SPECIALISE floorDouble_ :: Double -> Int64  #-}
+floorDouble_ :: Integral a => Double -> a
+floorDouble_ x = floorDouble x

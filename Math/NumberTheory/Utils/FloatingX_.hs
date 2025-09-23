@@ -92,7 +92,7 @@ import GHC.Integer.Logarithms (wordLog2#)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer (integerLog2#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (fromInt64, maxDouble, maxUnsafeInteger, nextDown#, nextUp#, split, split#, sqrtOf2, updateDouble#, _evenInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (floorDouble_, fromInt64, maxDouble, maxUnsafeInteger, nextDown#, nextUp#, split, split#, sqrtOf2, updateDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 
@@ -408,11 +408,11 @@ floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
 
 {-# INLINE floorXW64## #-}
 floorXW64## :: FloatingX# -> Word64#
-floorXW64## f@(FloatingX# s# e#) = case floorDouble (D# $ unsafefx2Double## f) of (W64# w#) -> w#
+floorXW64## f@(FloatingX# s# e#) = case floorDouble_ (D# $ unsafefx2Double## f) of (W64# w#) -> w#
 
 {-# INLINE floorXI64## #-}
 floorXI64## :: FloatingX# -> Int64#
-floorXI64## f@(FloatingX# s# e#) = case floorDouble (D# $ unsafefx2Double## f) of (I64# i#) -> i#
+floorXI64## f@(FloatingX# s# e#) = case floorDouble_ (D# $ unsafefx2Double## f) of (I64# i#) -> i#
 
 scaleByPower2 :: Int64 -> FloatingX -> FloatingX
 scaleByPower2 n (FloatingX s e) = if s == 0 then zeroFx else FloatingX s (e + n) -- normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)

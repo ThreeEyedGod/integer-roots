@@ -58,7 +58,7 @@ library
     Math.NumberTheory.Utils.FloatingX_
     Math.NumberTheory.Utils.ArthMtic_
   default-language: Haskell2010
-  ghc-options: -Wall -Widentities -Wcompat 
+  ghc-options: -Wall -Widentities -Wcompat -Wmissed-specialisations
 
 test-suite integer-roots-tests
   build-depends:
@@ -118,3 +118,25 @@ benchmark weigh
                , random >= 1.3.1
                , time >= 1.12.2 && < 1.13
                , weigh
+
+executable integer-roots-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  build-depends:       base >= 4.15 
+                     , integer-roots
+                     , random >= 1.3.1
+                    --  , time >= 1.12.2 && < 1.13
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Widentities
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wmissing-export-lists
+                       -Wmissing-home-modules
+                       -Wpartial-fields
+                       -Wredundant-constraints
+                       -threaded
+                       -rtsopts
+                       -O2 -fforce-recomp
+                       -with-rtsopts=-N4
