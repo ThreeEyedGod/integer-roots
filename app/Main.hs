@@ -1,11 +1,11 @@
 module Main (main) where
 
--- import Data.Time.Clock
---   ( NominalDiffTime,
---     diffUTCTime,
---     getCurrentTime,
---   )
--- import qualified Math.NumberTheory.Roots as Old (integerSquareRoot)
+import Data.Time.Clock
+  ( NominalDiffTime,
+    diffUTCTime,
+    getCurrentTime,
+  )
+import qualified Math.NumberTheory.Roots as Old (integerSquareRoot)
 import qualified Math.NumberTheory.Roots_ as New (integerSquareRoot)
 import System.Random.Stateful (globalStdGen, uniformRM)
 import GHC.Environment (getFullArgs)
@@ -25,16 +25,28 @@ main = do
   iGoogolplex <- getRndMInt (iRange 511) 
   iFZeight <- getRndMInt (iRange 1023) 
   iBoogol <- getRndMInt (iRange 2046)  
-  _ <- pure $ New.integerSquareRoot iHumongous 
+  putStrLn "iHumongous Old"
+  x2 <- timeit ( pure $ Old.integerSquareRoot iHumongous )
+  print x2
+  putStrLn "iHumongous New"
+  x3 <- timeit ( pure $ New.integerSquareRoot iHumongous )
+  print x3
+  putStrLn "iBoogol Old"
+  x4 <- timeit ( pure $ Old.integerSquareRoot iBoogol )
+  print x4
+  putStrLn "iBoogol New"
+  x5 <- timeit ( pure $ New.integerSquareRoot iBoogol )
+  print x5
+  -- _ <- pure $ New.integerSquareRoot iHumongous 
   putStrLn "------------"
 
 -- -- | Helper function
--- timeit :: IO a -> IO (Maybe a, NominalDiffTime)
--- timeit action = do
---   start <- getCurrentTime
---   value <- action
---   end <- getCurrentTime
---   pure (Just value, diffUTCTime end start)
+timeit :: IO a -> IO (Maybe a, NominalDiffTime)
+timeit action = do
+  start <- getCurrentTime
+  value <- action
+  end <- getCurrentTime
+  pure (Just value, diffUTCTime end start)
 
 -- | Get a Random Integer with uniform probability in the range (l,u)
 getRndMInt :: (Integer, Integer) -> IO Integer

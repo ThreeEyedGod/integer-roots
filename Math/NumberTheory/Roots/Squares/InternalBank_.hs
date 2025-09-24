@@ -166,7 +166,7 @@ theNextIterationsBA (ItrBA !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
           !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
           !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgtW64# tA_ tCFx# of yTilde_# -> computeRemW64# yCAcc_ tA_ yTilde_#
           !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
-       in (Itr__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
+       in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 theNextIterationsUV :: ItrUV -> Integer
@@ -196,7 +196,7 @@ theNextIterationsUVI (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
           !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgtFused tA_ tCFx of yTilde -> case radixW32 * yCAcc_ of ycScaled -> case (ycScaled, tA_ - yTilde * (double ycScaled + yTilde)) of (ycS', rdr) -> if rdr < 0 then (ycS' + pred yTilde, pred yTilde, rdr + double (pred (ycS' + yTilde)) + 1) else (ycS' + yTilde, yTilde, rdr)
           !(W64# yTildeFinal#) = fromIntegral yTildeFinal
           !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then inline nextDownFX# $ (FloatingX# s'# e'#) !+## inline unsafeword64ToFloatingX## yTildeFinal# else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
-       in (Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#)) -- rFinalXs
+       in Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#) -- rFinalXs
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 {-# NOINLINE theNextIterationsUVI #-} 
 
@@ -211,7 +211,7 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
           !tCFx@(FloatingX (D# s'#) (I64# e'#)) = scaleByPower2 32 (FloatingX (D# s#) (I64# e#)) -- sqrtF previous digits being scaled right here
           !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgt tA_ tCFx of yTilde -> computeRem yCAcc_ tA_ yTilde
           !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFx# yTildeFinal else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
-       in (Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#)) -- rFinalXs
+       in Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#) -- rFinalXs
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 {-# NOINLINE theNextIterationsUVIrvrsd #-}
@@ -228,7 +228,7 @@ theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rm
           !tCFx# = inline scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
           !(# ycUpdated, !yTildeFinal#, remFinal #) = case inline nxtDgtW64# tA_ tCFx# of yTilde_# -> inline computeRemW64# yCAcc_ tA_ yTilde_#
           !tcfx# = if isTrue# (cl# <# 3#) then inline nextDownFX# $ tCFx# !+## inline unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
-       in (Itr__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
+       in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
     go :: [Word64] -> Itr__ -> Integer
     go [] itracc = yCumulative___ itracc
     go (x1 : x2 : x3 : x4 : x5 : x6 : x7 : x8 : zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4) x5) x6) x7) x8)
@@ -258,7 +258,7 @@ nxtDgtW64# 0 !_ = 0#Word64
 nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
   | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
   -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
-  | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if (tAFX# !<## threshold#) then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
+  | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
   where    
     threshold# = let !(I64# e64#) = fromIntegral 10 ^ 137 in FloatingX# 1.9## e64#
     -- where
