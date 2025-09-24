@@ -89,7 +89,7 @@ import GHC.Exts
     (>=#),
     (>=##),
   )
-import GHC.Float (divideDouble, floorDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, timesDouble)
+import GHC.Float (properFractionDouble, divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer (Integer (..))
@@ -98,7 +98,6 @@ import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
 
 -- *********** END NEW IMPORTS
-
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
 --- https ://arxiv.org/abs/2406.07751
@@ -152,7 +151,7 @@ theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
           !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
           !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#) 
           !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
-       in (Itr__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
+       in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
 
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
@@ -274,7 +273,7 @@ nxtDgtDoubleFxW64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r#
 nxtDgtDoubleFxHrbie## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxHrbie## pa# tcfx# = case isTrue# (c# <## threshold#) of
   True -> inline computDoubleW64# pa# c# (fmaddDouble# c# c# pa#)
-  False -> case floorDouble (D# (nextUp# (nextUp# pa# /## nextDown# (c# +## nextDown# c#)))) of (W64# w#) -> hndlOvflwW32## w#
+  False -> case floor (D# (nextUp# (nextUp# pa# /## nextDown# (c# +## nextDown# c#)))) of (W64# w#) -> hndlOvflwW32## w#
   where
     !c# = unsafefx2Double## tcfx#
     !(D# threshold#) = 1.9 * 10 ^ 137
@@ -338,11 +337,11 @@ preComputDoubleT tADX_@(D# a#) tcfx = case unsafefx2Double tcfx of tCDX_@(D# c#)
 
 nxtDgtFused :: Integer -> FloatingX -> Integer
 nxtDgtFused 0 _ = 0
-nxtDgtFused (IS ta#) tcfx = case (unsafefx2Double tcfx, (int2Double (I# ta#))) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
+nxtDgtFused (IS ta#) tcfx = case (unsafefx2Double tcfx, (int2Double (I# ta#))) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floor (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
 -- nxtDgtFused (IS ta#) tcfx = case preComputDouble (int2Double (I# ta#)) tcfx of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
 nxtDgtFused n@(IP bn#) tcfx@(FloatingX s@(D# s#) e@(I64# e#))
   --  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComputDouble (D# (bigNatEncodeDouble# bn# 0#)) tcfx of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = case (unsafefx2Double tcfx, (D# (bigNatEncodeDouble# bn# 0#))) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = case (unsafefx2Double tcfx, (D# (bigNatEncodeDouble# bn# 0#))) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floor (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
   --  | otherwise = computFx (preComputFx (BN# bn#) (FloatingX s e)) --computFx (preComputFx bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx (BN# bn#) of tAFX -> hndlOvflwW32 (floorFX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFx (nextDownFX tcfx !**+ tAFX) !+ nextDownFX tcfx)))) -- computFx (tAFX, tcfx, tcfx !**+ tAFX)
   where
@@ -353,11 +352,11 @@ nxtDgtFused (IN _) !_ = error "nxtDgtFused :: Invalid negative integer argument"
 
 {-# INLINE computDouble #-}
 computDouble :: Double -> Double -> Double -> Integer
-computDouble !tADX !tCDX !radDX = hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
+computDouble !tADX !tCDX !radDX = hndlOvflwW32 $ floor (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
 
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Integer
-computDouble# !tAFX# !tCFX# !radFX# = hndlOvflwW32 $ floorDouble (D# (coreD# tAFX# tCFX# radFX#))
+computDouble# !tAFX# !tCFX# !radFX# = hndlOvflwW32 $ floor (D# (coreD# tAFX# tCFX# radFX#))
 
 {-# INLINE computFx #-}
 computFx :: (FloatingX, FloatingX, FloatingX) -> Integer
@@ -379,7 +378,7 @@ computFx# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32 (floorX# (coreFx# (# tAFX
 
 {-# INLINE computDoubleW64# #-}
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
-computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDouble (D# (coreD# tAFX# tCFX# radFX#)) of (W64# w#) -> hndlOvflwW32## w#
+computDoubleW64# !tAFX# !tCFX# !radFX# = case floor (D# (coreD# tAFX# tCFX# radFX#)) of (W64# w#) -> hndlOvflwW32## w#
 
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
 computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
@@ -388,7 +387,7 @@ computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx
 
 {-# INLINE computDoubleI64# #-}
 computDoubleI64# :: Double# -> Double# -> Double# -> Int64#
-computDoubleI64# !tAFX# !tCFX# !radFX# = case floorDouble (D# (coreD# tAFX# tCFX# radFX#)) of (I64# i#) -> hndlOvflwI32## i#
+computDoubleI64# !tAFX# !tCFX# !radFX# = case floor (D# (coreD# tAFX# tCFX# radFX#)) of (I64# i#) -> hndlOvflwI32## i#
 
 computFxI64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Int64#
 computFxI64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwI32## (floorXI64## (coreFx# (# tAFX#, tCFX#, radFX# #)))

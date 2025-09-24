@@ -56,7 +56,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     foldr',
     pred,
     lenRadixW32,
-    floorDouble_
   )
 where
 
@@ -474,21 +473,21 @@ doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromI
 
 {-# INLINE largestNSqLTEOdd #-}
 largestNSqLTEOdd :: Word64 -> Word64
-largestNSqLTEOdd i = floorDouble_ (sqrt (fromIntegral i) :: Double)
+largestNSqLTEOdd i = floorDouble (sqrt (fromIntegral i) :: Double)
 
 {-# INLINE largestNSqLTEEven #-}
 largestNSqLTEEven :: Word64 -> Word64
-largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble_ (nextUp (sqrt d_))
+largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble (nextUp (sqrt d_))
 
 {-# INLINE largestNSqLTEOdd## #-}
 largestNSqLTEOdd## :: Word64# -> Word64#
-largestNSqLTEOdd## w# = case floorDouble_ (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
+largestNSqLTEOdd## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
 
 {-# INLINE largestNSqLTEEven## #-}
 largestNSqLTEEven## :: Word64# -> Word64#
 largestNSqLTEEven## w# =
   let !d_ = nextUp (fromIntegral (W64# w#) :: Double)
-      !(W64# r#) = floorDouble_ (nextUp (sqrt d_))
+      !(W64# r#) = floorDouble (nextUp (sqrt d_))
    in r#
 
 -- | handle overflow
@@ -714,9 +713,4 @@ pred :: Integral a => a -> a
 pred x = x + (- 1)
 {-# INLINE pred #-}
 
-{-# INLINEABLE floorDouble_ #-}
-{-# SPECIALISE floorDouble_ :: Double -> Integer  #-}
-{-# SPECIALISE floorDouble_ :: Double -> Word64  #-}
-{-# SPECIALISE floorDouble_ :: Double -> Int64  #-}
-floorDouble_ :: Integral a => Double -> a
-floorDouble_ x = floorDouble x
+-- //FIXME floor seems to trigger off missing specialization and also properFractionDouble. 

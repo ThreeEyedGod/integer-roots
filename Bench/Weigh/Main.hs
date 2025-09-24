@@ -15,15 +15,18 @@ one,two :: String
 one = "one"
 two = "two"
 
+iRange :: Integer -> (Integer, Integer) 
+iRange x = (2 ^ x, 2 ^ (x+1))
+
 main :: IO ()
 main = do 
-  iIntInteger <- getRndMInt (2^31, 2^32) 
-  iHugeWord <- getRndMInt (2^63, 2^64)  
-  iHumongous <- getRndMInt (2^129, 2^130) 
-  iGargantuan <- getRndMInt (2^257, 2^258) 
-  iGoogolplex <- getRndMInt (2^511, 2^512) 
-  iFZeight <- getRndMInt (2^1023, 2^1024) 
-  iBoogol <- getRndMInt (2^2046, 2^2047) 
+  iIntInteger <- getRndMInt (iRange 31)
+  iHugeWord <- getRndMInt  (iRange 63)
+  iHumongous <- getRndMInt  (iRange 129) 
+  iGargantuan <- getRndMInt (iRange 257)
+  iGoogolplex <- getRndMInt (iRange 511) 
+  iFZeight <- getRndMInt (iRange 1023) 
+  iBoogol <- getRndMInt (iRange 2046)  
   mainWith $ do
     setColumns [Case, Allocated, Max, Live, GCs, MaxOS, WallTime] -- new
     value "()"         ()

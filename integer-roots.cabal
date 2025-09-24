@@ -136,6 +136,7 @@ executable integer-roots-exe
                        -Wmissing-home-modules
                        -Wpartial-fields
                        -Wredundant-constraints
+                       -Wno-unused-matches
                        -threaded
                        -rtsopts
                        -O2 -fforce-recomp
