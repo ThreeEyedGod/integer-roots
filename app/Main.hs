@@ -37,7 +37,6 @@ main = do
   putStrLn "iBoogol New"
   x5 <- timeit ( pure $ New.integerSquareRoot iBoogol )
   print x5
-  -- _ <- pure $ New.integerSquareRoot iHumongous 
   putStrLn "------------"
 
 -- -- | Helper function

@@ -58,7 +58,7 @@ library
     Math.NumberTheory.Utils.FloatingX_
     Math.NumberTheory.Utils.ArthMtic_
   default-language: Haskell2010
-  ghc-options: -Wall -Widentities -Wcompat -Wmissed-specialisations
+  ghc-options: -Wall -Widentities -Wcompat -Wmissed-specialisations 
 
 test-suite integer-roots-tests
   build-depends:
@@ -141,3 +141,4 @@ executable integer-roots-exe
                        -rtsopts
                        -O2 -fforce-recomp
                        -with-rtsopts=-N4
+                    
