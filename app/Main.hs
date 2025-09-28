@@ -1,3 +1,4 @@
+--  cabal run integer-roots-exe "+RTS -I0 -K256m -A16m -N8 -H24m -T -w -RTS --output=integer-roots.html" -p
 module Main (main) where
 
 import Data.Time.Clock

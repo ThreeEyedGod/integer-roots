@@ -8,7 +8,7 @@
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm dumps else not
 -- removed -fexpose-all-unfoldings may not necessarily help improve max performance. See https://well-typed.com/blog/2024/04/choreographing-specialization-pt1/
-{-# OPTIONS_GHC -Wmissed-specialisations -O2 -fkeep-auto-rules -threaded -optl-m64 -fliberate-case -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 -optc-O3 -optc-ffast-math -optc-march=native -optc-mfpmath=sse #-}
+-- {-# OPTIONS_GHC -Wmissed-specialisations -O2 -fkeep-auto-rules -threaded -optl-m64 -fliberate-case -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fstrictness -funbox-small-strict-fields  -fmax-worker-args=32 -optc-O3 -optc-ffast-math -optc-march=native -optc-mfpmath=sse #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
@@ -105,6 +105,7 @@ import Math.NumberTheory.Utils.FloatingX_
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
 -- | Iteration loop data - these records have vectors / lists in them
+
 data ItrLst_ = ItrLst_ {lvlst# :: {-# UNPACK #-} !Int#, lstW32 :: {-# UNPACK #-} ![Word64], yCumulative_ :: !Integer, iRem :: {-# UNPACK #-} !Integer, tb___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
 data ItrBA = ItrBA {lBA :: Int#, ba :: !ByteArray, ycBA :: Integer, irBA :: !Integer, tbBAFx :: !FloatingX#} deriving (Eq)
@@ -114,32 +115,22 @@ data ItrUV = ItrUV {luv :: Int#, uv :: !(VU.Vector Word64), ycuv :: !Integer, ir
 data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 data Itr' = Itr' {lv'# :: {-# UNPACK #-} !Int#, yCumulative' :: !Integer, iRem':: {-# UNPACK #-} !Integer, tb' :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
-theFirstXs :: (Bool, [Word64], [Word32]) -> ItrLst_
-theFirstXs (evenLen, passXs, dxs') =
-  case rmdrFn i# of
-    (# !yVal, !yWord#, !remInteger #) ->
-      ItrLst_ 1# passXs yVal remInteger (unsafeword64ToFloatingX## yWord#)
+theFirstCore :: (Bool, [Word32]) -> (# Integer, Word64#, Integer #) 
+theFirstCore (evenLen, dxs')  = let !i# = word64FromRvsrd2ElemList# dxs' in rmdrFn i# 
   where
-    !i# = word64FromRvsrd2ElemList# dxs'
     !rmdrFn = if evenLen then evenFirstRmdr else oddFirstRmdr
+
+theFirstXs :: (Bool, [Word64], [Word32]) -> ItrLst_
+theFirstXs (evenLen, passXs, dxs') = case theFirstCore (evenLen, dxs') of 
+          (# !yVal, !yWord#, !remInteger #) -> ItrLst_ 1# passXs yVal remInteger (unsafeword64ToFloatingX## yWord#)
 
 theFirstBA :: (Bool, ByteArray, [Word32])  -> ItrBA
-theFirstBA (evenLen, passBA, dxs') =
-  case rmdrFn i# of
-    (# !yVal, !yWord#, !remInteger #) ->
-      ItrBA 1# passBA yVal remInteger (unsafeword64ToFloatingX## yWord#)
-  where
-    !i# = word64FromRvsrd2ElemList# dxs'
-    !rmdrFn = if evenLen then evenFirstRmdr else oddFirstRmdr
+theFirstBA (evenLen, passBA, dxs') = case theFirstCore (evenLen, dxs') of 
+          (# !yVal, !yWord#, !remInteger #) -> ItrBA 1# passBA yVal remInteger (unsafeword64ToFloatingX## yWord#)
 
 theFirstUV :: (Bool, VU.Vector Word64, [Word32]) -> ItrUV
-theFirstUV (evenLen, passUV, dxs') =
-  case rmdrFn i# of
-    (# !yc, !y1#, !remInteger #) ->
-      ItrUV 1# passUV yc remInteger (unsafeword64ToFloatingX## y1#)
-  where
-    !i# = word64FromRvsrd2ElemList# dxs'
-    !rmdrFn = if evenLen then evenFirstRmdr else oddFirstRmdr
+theFirstUV (evenLen, passUV, dxs') = case theFirstCore (evenLen, dxs') of 
+          (# !yVal, !yWord#, !remInteger #) -> ItrUV 1# passUV yVal remInteger (unsafeword64ToFloatingX## yWord#)
 
 theNextIterations :: ItrLst_ -> Integer
 theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =

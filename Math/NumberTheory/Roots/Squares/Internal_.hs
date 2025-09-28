@@ -5,7 +5,7 @@
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm -ddump-to-file dumps else not
 -- removed -fexpose-all-unfoldings may not necessarily help improve max performance. See https://well-typed.com/blog/2024/04/choreographing-specialization-pt1/
-{-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=16 -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
+-- {-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fstrictness -funbox-small-strict-fields  -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
@@ -52,8 +52,8 @@ isqrtB n = fromInteger . theNextIterations . theFirstXs . stageList . dgtsLstBas
 isqrtB_ :: (Integral a) => Int -> a -> a
 isqrtB_ _ 0 = 0
 -- isqrtB_ l n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd_ l . dgtsLstBase32 . fromIntegral $ n
--- isqrtB_ l n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV_ l .dgtsLstBase32 . fromIntegral $ n
-isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . stageList_ l . dgtsLstBase32 . fromIntegral $ n
+isqrtB_ l n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV_ l .dgtsLstBase32 . fromIntegral $ n
+-- isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . stageList_ l . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd_ l . dgtsLstBase32 . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
