@@ -132,21 +132,22 @@ theFirstUV :: (Bool, VU.Vector Word64, [Word32]) -> ItrUV
 theFirstUV (evenLen, passUV, dxs') = case theFirstCore (evenLen, dxs') of 
           (# !yVal, !yWord#, !remInteger #) -> ItrUV 1# passUV yVal remInteger (unsafeword64ToFloatingX## yWord#)
 
+{-# SPECIALISE  tniCore :: Integer -> Itr__ -> Itr__ #-}
+{-# SPECIALISE  tniCore :: Word64 -> Itr__ -> Itr__ #-}
+{-# SPECIALISE  tniCore :: Int64 -> Itr__ -> Itr__ #-}
+{-# INLINE tniCore #-}
+tniCore :: Integral a => a -> Itr__ -> Itr__
+tniCore i (Itr__ !cl# !yCAcc_ !tA !t#) =
+  let !tA_ = tA * secndPlaceW32Radix + fromIntegral i
+      !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#) 
+      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
+    in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
+
 theNextIterations :: ItrLst_ -> Integer
 theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
-  yCumulative___ $ foldr' tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) (fromIntegral <$> wrd64Xs)
-  where
-    {-# INLINE tni #-}
-    tni :: Integer -> Itr__ -> Itr__
-    tni i (Itr__ !cl# !yCAcc_ !tA !t#) =
-      let !tA_ = tA * secndPlaceW32Radix + i
-          !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-          !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#) 
-          !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
-       in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
+  yCumulative___ $ foldr' tniCore (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) (fromIntegral <$> wrd64Xs)
 
-
--- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 theNextIterationsBA :: ItrBA -> Integer
 theNextIterationsBA (ItrBA !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
   yCumulative___ $ foldrByteArray tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
@@ -163,33 +164,12 @@ theNextIterationsBA (ItrBA !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 theNextIterationsUV :: ItrUV -> Integer
 theNextIterationsUV (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
-  yCumulative___ $ VU.foldr' tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
-  where
-    {-# INLINE tni #-}
-    tni :: Word64 -> Itr__ -> Itr__
-    tni sqW64 (Itr__ !cl# !yCAcc_ !tA !t#) =
-      let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
-          !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-          !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgtW64# tA_ tCFx# of yTilde_# -> computeRemW64# yCAcc_ tA_ yTilde_#
-          !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
-       in (Itr__ (cl# +# 1#) ycUpdated remFinal tcfx#) -- rFinalXs
+  yCumulative___ $ VU.foldr' tniCore (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 theNextIterationsUVI :: ItrUV -> Integer
 theNextIterationsUVI (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
-  yCumulative___ $ VU.foldr' tni (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
-  where
-    {-# INLINE tni #-}
-    tni :: Word64 -> Itr__ -> Itr__
-    tni sqW64 (Itr__ !cl# !yCAcc_ !tA t@(FloatingX# s# e#)) =
-      let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
-          !tCFx@(FloatingX (D# s'#) (I64# e'#)) = inline scaleByPower2 32 (FloatingX (D# s#) (I64# e#)) -- sqrtF previous digits being scaled right here
-          -- computeRem yCAcc_ tA_ yTilde :: manual fusing of the left code into the line below
-          !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgtFused tA_ tCFx of yTilde -> case radixW32 * yCAcc_ of ycScaled -> case (ycScaled, tA_ - yTilde * (double ycScaled + yTilde)) of (ycS', rdr) -> if rdr < 0 then (ycS' + pred yTilde, pred yTilde, rdr + double (pred (ycS' + yTilde)) + 1) else (ycS' + yTilde, yTilde, rdr)
-          !(W64# yTildeFinal#) = fromIntegral yTildeFinal
-          !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then inline nextDownFX# $ (FloatingX# s'# e'#) !+## inline unsafeword64ToFloatingX## yTildeFinal# else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
-       in Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#) -- rFinalXs
--- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
+  yCumulative___ $ VU.foldr' tniCore (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
 {-# NOINLINE theNextIterationsUVI #-} 
 
 theNextIterationsUVIrvrsd :: ItrUV -> Integer
@@ -198,12 +178,7 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
   where
     {-# INLINE tniRvr #-}
     tniRvr :: Itr__ -> Word64 -> Itr__
-    tniRvr (Itr__ !cl# !yCAcc_ !tA !t@(FloatingX# s# e#)) sqW64 =
-      let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
-          !tCFx@(FloatingX (D# s'#) (I64# e'#)) = scaleByPower2 32 (FloatingX (D# s#) (I64# e#)) -- sqrtF previous digits being scaled right here
-          !(ycUpdated, !yTildeFinal, remFinal) = case nxtDgt tA_ tCFx of yTilde -> computeRem yCAcc_ tA_ yTilde
-          !tcfx@(FloatingX# s_# e_#) = if isTrue# (cl# <# 3#) then nextDownFX# $ (FloatingX# s'# e'#) !+## unsafeword64ToFx# yTildeFinal else (FloatingX# s'# e'#) -- recall tcfx is already scaled by 32. Do not use normalize here
-       in Itr__ (cl# +# 1#) ycUpdated remFinal (FloatingX# s_# e_#) -- rFinalXs
+    tniRvr = flip tniCore
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 {-# NOINLINE theNextIterationsUVIrvrsd #-}
@@ -215,12 +190,8 @@ theNextIterationsRvrsdSLCode :: ItrLst_ -> Integer
 theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldl' tniRvrsdSL (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs--inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
   where
     tniRvrsdSL :: Itr__ -> Word64 -> Itr__
-    tniRvrsdSL (Itr__ !cl# !yCAcc_ !tA !t#) sqW64 =
-      let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
-          !tCFx# = inline scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-          !(# ycUpdated, !yTildeFinal#, remFinal #) = case inline nxtDgtW64# tA_ tCFx# of yTilde_# -> inline computeRemW64# yCAcc_ tA_ yTilde_#
-          !tcfx# = if isTrue# (cl# <# 3#) then inline nextDownFX# $ tCFx# !+## inline unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
-       in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
+    tniRvrsdSL = flip tniCore
+    {-# INLINE tniRvrsdSL #-}
     go :: [Word64] -> Itr__ -> Integer
     go [] itracc = yCumulative___ itracc
     go (x1 : x2 : x3 : x4 : x5 : x6 : x7 : x8 : zs) acc = go zs (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL (tniRvrsdSL acc x1) x2) x3) x4) x5) x6) x7) x8)
