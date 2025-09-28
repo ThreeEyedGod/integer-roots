@@ -180,9 +180,12 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
 
 {-# INLINE theNextIterationsRvrsdSLCode #-}
 
+toItr__ :: ItrLst_ -> Itr__
+toItr__ (ItrLst_ l _ y r t) = Itr__ l y r t
+
 -- | SL = Straight Line Code
 theNextIterationsRvrsdSLCode :: ItrLst_ -> Integer
-theNextIterationsRvrsdSLCode (ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldl' tniRvrsdSL (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64Xs--inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
+theNextIterationsRvrsdSLCode itrxs@(ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldl' tniRvrsdSL (toItr__ itrxs) wrd64Xs--inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
   where
     tniRvrsdSL :: Itr__ -> Word64 -> Itr__
     tniRvrsdSL = flip tniCore
