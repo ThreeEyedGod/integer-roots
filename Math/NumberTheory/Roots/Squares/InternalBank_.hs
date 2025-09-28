@@ -154,12 +154,7 @@ theNextIterationsBA (ItrBA !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
   where
     {-# INLINE tni #-}
     tni :: Word64 -> Itr__ -> Itr__
-    tni sqW64 (Itr__ !cl# !yCAcc_ !tA !t#) =
-      let !tA_ = tA * secndPlaceW32Radix + toInteger sqW64
-          !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-          !(# ycUpdated, !yTildeFinal#, remFinal #) = case nxtDgtW64# tA_ tCFx# of yTilde_# -> computeRemW64# yCAcc_ tA_ yTilde_#
-          !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
-       in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
+    tni = tniCore
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 theNextIterationsUV :: ItrUV -> Integer
@@ -223,7 +218,7 @@ nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#
   -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
   where    
-    threshold# = let !(I64# e64#) = fromIntegral 10 ^ 137 in FloatingX# 1.9## e64#
+    threshold# = let !(I64# e64#) = 10 ^ 137 in FloatingX# 1.9## e64#
     -- where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
