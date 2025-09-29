@@ -1,4 +1,3 @@
---  cabal run integer-roots-exe "+RTS -I0 -K256m -A16m -N8 -H24m -T -w -RTS --output=integer-roots.html" -p
 module Main (main) where
 
 import Data.Time.Clock
@@ -6,13 +5,13 @@ import Data.Time.Clock
     diffUTCTime,
     getCurrentTime,
   )
+import GHC.Environment (getFullArgs)
 import qualified Math.NumberTheory.Roots as Old (integerSquareRoot)
 import qualified Math.NumberTheory.Roots_ as New (integerSquareRoot)
 import System.Random.Stateful (globalStdGen, uniformRM)
-import GHC.Environment (getFullArgs)
 
-iRange :: Integer -> (Integer, Integer) 
-iRange x = (2 ^ x, 2 ^ (x+1))
+iRange :: Integer -> (Integer, Integer)
+iRange x = (2 ^ x, 2 ^ (x + 1))
 
 main :: IO ()
 main = do
@@ -20,23 +19,23 @@ main = do
   args <- getFullArgs
   print args
   iIntInteger <- getRndMInt (iRange 31)
-  iHugeWord <- getRndMInt  (iRange 63)
-  iHumongous <- getRndMInt  (iRange 129) 
+  iHugeWord <- getRndMInt (iRange 63)
+  iHumongous <- getRndMInt (iRange 129)
   iGargantuan <- getRndMInt (iRange 257)
-  iGoogolplex <- getRndMInt (iRange 511) 
-  iFZeight <- getRndMInt (iRange 1023) 
-  iBoogol <- getRndMInt (iRange 2046)  
+  iGoogolplex <- getRndMInt (iRange 511)
+  iFZeight <- getRndMInt (iRange 1023)
+  iBoogol <- getRndMInt (iRange 2046)
   putStrLn "iHumongous Old"
-  x2 <- timeit ( pure $ Old.integerSquareRoot iHumongous )
+  x2 <- timeit (pure $ Old.integerSquareRoot iHumongous)
   print x2
   putStrLn "iHumongous New"
-  x3 <- timeit ( pure $ New.integerSquareRoot iHumongous )
+  x3 <- timeit (pure $ New.integerSquareRoot iHumongous)
   print x3
   putStrLn "iBoogol Old"
-  x4 <- timeit ( pure $ Old.integerSquareRoot iBoogol )
+  x4 <- timeit (pure $ Old.integerSquareRoot iBoogol)
   print x4
   putStrLn "iBoogol New"
-  x5 <- timeit ( pure $ New.integerSquareRoot iBoogol )
+  x5 <- timeit (pure $ New.integerSquareRoot iBoogol)
   print x5
   putStrLn "------------"
 
@@ -51,3 +50,5 @@ timeit action = do
 -- | Get a Random Integer with uniform probability in the range (l,u)
 getRndMInt :: (Integer, Integer) -> IO Integer
 getRndMInt (l, u) = max l . min u <$> uniformRM (l, u) globalStdGen -- uniformRM (a, b) = uniformRM (b, a) holds as per fn defn
+
+--  cabal run integer-roots-exe "+RTS -I0 -K256m -A16m -N8 -H24m -T -w -RTS --output=integer-roots.html" -p

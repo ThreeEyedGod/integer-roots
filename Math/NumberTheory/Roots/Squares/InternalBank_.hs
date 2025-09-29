@@ -3,14 +3,12 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OrPatterns #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnboxedTuples #-}
+
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm dumps else not
 -- removed -fexpose-all-unfoldings may not necessarily help improve max performance. See https://well-typed.com/blog/2024/04/choreographing-specialization-pt1/
 -- {-# OPTIONS_GHC -Wmissed-specialisations -O2 -fkeep-auto-rules -threaded -optl-m64 -fliberate-case -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fstrictness -funbox-small-strict-fields  -fmax-worker-args=32 -optc-O3 -optc-ffast-math -optc-march=native -optc-mfpmath=sse #-}
-{-# OPTIONS_GHC -Wno-type-defaults #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 -- |
 -- Module:      Math.NumberTheory.Roots.Squares.Internal
@@ -23,7 +21,7 @@
 module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
-import Prelude hiding (pred)
+
 -- he says it's coded to be as fast as possible
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.Primitive.ByteArray (ByteArray, byteArrayFromList, foldrByteArray)
@@ -90,22 +88,23 @@ import GHC.Exts
     (>=#),
     (>=##),
   )
-import GHC.Float (properFractionDouble, divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, timesDouble)
+import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer (Integer (..))
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
+import Prelude hiding (pred)
 
 -- *********** END NEW IMPORTS
+
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
 -- | Iteration loop data - these records have vectors / lists in them
-
 data ItrLst_ = ItrLst_ {lvlst# :: {-# UNPACK #-} !Int#, lstW32 :: {-# UNPACK #-} ![Word64], yCumulative_ :: !Integer, iRem :: {-# UNPACK #-} !Integer, tb___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
 data ItrBA = ItrBA {lBA :: Int#, ba :: !ByteArray, ycBA :: Integer, irBA :: !Integer, tbBAFx :: !FloatingX#} deriving (Eq)
@@ -113,36 +112,37 @@ data ItrBA = ItrBA {lBA :: Int#, ba :: !ByteArray, ycBA :: Integer, irBA :: !Int
 data ItrUV = ItrUV {luv :: Int#, uv :: !(VU.Vector Word64), ycuv :: !Integer, iruv :: !Integer, tbuvFx :: !FloatingX#} deriving (Eq)
 
 data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
-data Itr' = Itr' {lv'# :: {-# UNPACK #-} !Int#, yCumulative' :: !Integer, iRem':: {-# UNPACK #-} !Integer, tb' :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
-theFirstCore :: (Bool, [Word32]) -> (# Integer, Word64#, Integer #) 
-theFirstCore (evenLen, dxs')  = let !i# = word64FromRvsrd2ElemList# dxs' in rmdrFn i# 
+data Itr' = Itr' {lv'# :: {-# UNPACK #-} !Int#, yCumulative' :: !Integer, iRem' :: {-# UNPACK #-} !Integer, tb' :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
+
+theFirstCore :: (Bool, [Word32]) -> (# Integer, Word64#, Integer #)
+theFirstCore (evenLen, dxs') = let !i# = word64FromRvsrd2ElemList# dxs' in rmdrFn i#
   where
     !rmdrFn = if evenLen then evenFirstRmdr else oddFirstRmdr
 
 theFirstXs :: (Bool, [Word64], [Word32]) -> ItrLst_
-theFirstXs (evenLen, passXs, dxs') = case theFirstCore (evenLen, dxs') of 
-          (# !yVal, !yWord#, !remInteger #) -> ItrLst_ 1# passXs yVal remInteger (unsafeword64ToFloatingX## yWord#)
+theFirstXs (evenLen, passXs, dxs') = case theFirstCore (evenLen, dxs') of
+  (# !yVal, !yWord#, !remInteger #) -> ItrLst_ 1# passXs yVal remInteger (unsafeword64ToFloatingX## yWord#)
 
-theFirstBA :: (Bool, ByteArray, [Word32])  -> ItrBA
-theFirstBA (evenLen, passBA, dxs') = case theFirstCore (evenLen, dxs') of 
-          (# !yVal, !yWord#, !remInteger #) -> ItrBA 1# passBA yVal remInteger (unsafeword64ToFloatingX## yWord#)
+theFirstBA :: (Bool, ByteArray, [Word32]) -> ItrBA
+theFirstBA (evenLen, passBA, dxs') = case theFirstCore (evenLen, dxs') of
+  (# !yVal, !yWord#, !remInteger #) -> ItrBA 1# passBA yVal remInteger (unsafeword64ToFloatingX## yWord#)
 
 theFirstUV :: (Bool, VU.Vector Word64, [Word32]) -> ItrUV
-theFirstUV (evenLen, passUV, dxs') = case theFirstCore (evenLen, dxs') of 
-          (# !yVal, !yWord#, !remInteger #) -> ItrUV 1# passUV yVal remInteger (unsafeword64ToFloatingX## yWord#)
+theFirstUV (evenLen, passUV, dxs') = case theFirstCore (evenLen, dxs') of
+  (# !yVal, !yWord#, !remInteger #) -> ItrUV 1# passUV yVal remInteger (unsafeword64ToFloatingX## yWord#)
 
-{-# SPECIALISE  tniCore :: Integer -> Itr__ -> Itr__ #-}
-{-# SPECIALISE  tniCore :: Word64 -> Itr__ -> Itr__ #-}
-{-# SPECIALISE  tniCore :: Int64 -> Itr__ -> Itr__ #-}
+{-# SPECIALIZE tniCore :: Integer -> Itr__ -> Itr__ #-}
+{-# SPECIALIZE tniCore :: Word64 -> Itr__ -> Itr__ #-}
+{-# SPECIALIZE tniCore :: Int64 -> Itr__ -> Itr__ #-}
 {-# INLINE tniCore #-}
-tniCore :: Integral a => a -> Itr__ -> Itr__
+tniCore :: (Integral a) => a -> Itr__ -> Itr__
 tniCore i (Itr__ !cl# !yCAcc_ !tA !t#) =
   let !tA_ = tA * secndPlaceW32Radix + fromIntegral i
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#) 
+      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
-    in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
+   in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
 
 theNextIterations :: ItrLst_ -> Integer
 theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
@@ -165,7 +165,7 @@ theNextIterationsUV (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
 theNextIterationsUVI :: ItrUV -> Integer
 theNextIterationsUVI (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
   yCumulative___ $ VU.foldr' tniCore (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) wrd64BA
-{-# NOINLINE theNextIterationsUVI #-} 
+{-# NOINLINE theNextIterationsUVI #-}
 
 theNextIterationsUVIrvrsd :: ItrUV -> Integer
 theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx#) =
@@ -185,7 +185,7 @@ toItr__ (ItrLst_ l _ y r t) = Itr__ l y r t
 
 -- | SL = Straight Line Code
 theNextIterationsRvrsdSLCode :: ItrLst_ -> Integer
-theNextIterationsRvrsdSLCode itrxs@(ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldl' tniRvrsdSL (toItr__ itrxs) wrd64Xs--inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
+theNextIterationsRvrsdSLCode itrxs@(ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldl' tniRvrsdSL (toItr__ itrxs) wrd64Xs -- inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
   where
     tniRvrsdSL :: Itr__ -> Word64 -> Itr__
     tniRvrsdSL = flip tniCore
@@ -218,9 +218,9 @@ nxtDgtW64# :: Integer -> FloatingX# -> Word64#
 nxtDgtW64# 0 !_ = 0#Word64
 nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
   | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
-  -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
+  -- \| otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
-  where    
+  where
     threshold# = let !(I64# e64#) = 10 ^ 137 in FloatingX# 1.9## e64#
     -- where
     thresh# :: Int#
@@ -273,8 +273,8 @@ nxtDgtDoubleFxI## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #
 nxtDgt :: Integer -> FloatingX -> Integer
 nxtDgt 0 _ = 0
 nxtDgt n tcfx
-  | n < 2^512 = nxtDgtDoubleFxI (fromIntegral n) tcfx
-  | otherwise = computFx (preComputIFx n tcfx) 
+  | n < 2 ^ 512 = nxtDgtDoubleFxI (fromIntegral n) tcfx
+  | otherwise = computFx (preComputIFx n tcfx)
 {-# INLINE nxtDgt #-}
 
 -- | same as nxtDgt but without the small value shortcut, lots of branches cause impedance
@@ -283,7 +283,7 @@ nxtDgt_ 0 _ = 0
 nxtDgt_ (IS ta#) tcfx = nxtDgtDoubleFxI (int2Double (I# ta#)) tcfx
 nxtDgt_ (IP bn#) tcfx
   | isTrue# ((bigNatSize# bn#) <# thresh#) = nxtDgtDoubleFxI (D# (bigNatEncodeDouble# bn# 0#)) tcfx
-  | otherwise = computFx (preComputFx (BN# bn#) tcfx) 
+  | otherwise = computFx (preComputFx (BN# bn#) tcfx)
   where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
@@ -298,11 +298,11 @@ preComputDoubleT tADX_@(D# a#) tcfx = case unsafefx2Double tcfx of tCDX_@(D# c#)
 
 nxtDgtFused :: Integer -> FloatingX -> Integer
 nxtDgtFused 0 _ = 0
-nxtDgtFused (IS ta#) tcfx = case (unsafefx2Double tcfx, (int2Double (I# ta#))) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floor (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
+nxtDgtFused (IS ta#) tcfx = case (unsafefx2Double tcfx, int2Double (I# ta#)) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floor (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
 -- nxtDgtFused (IS ta#) tcfx = case preComputDouble (int2Double (I# ta#)) tcfx of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
 nxtDgtFused n@(IP bn#) tcfx@(FloatingX s@(D# s#) e@(I64# e#))
   --  | isTrue# ((bigNatSize# bn#) <# thresh#) = case preComputDouble (D# (bigNatEncodeDouble# bn# 0#)) tcfx of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floorDouble (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = case (unsafefx2Double tcfx, (D# (bigNatEncodeDouble# bn# 0#))) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floor (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = case (unsafefx2Double tcfx, D# (bigNatEncodeDouble# bn# 0#)) of (tCDX_@(D# c#), tADX_@(D# a#)) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> hndlOvflwW32 $ floor (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
   --  | otherwise = computFx (preComputFx (BN# bn#) (FloatingX s e)) --computFx (preComputFx bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx (BN# bn#) of tAFX -> hndlOvflwW32 (floorFX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFx (nextDownFX tcfx !**+ tAFX) !+ nextDownFX tcfx)))) -- computFx (tAFX, tcfx, tcfx !**+ tAFX)
   where
@@ -388,7 +388,7 @@ allInclusivePreComputNToFx## tA tCFX# = case unsafeN2Fx# tA of tAFX# -> (# tAFX#
 computeRem :: Integer -> Integer -> Integer -> (Integer, Integer, Integer)
 computeRem yc ta 0 = (yc * radixW32, 0, ta)
 computeRem yc ta i =
-  let !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta + (- i * (double ycS' + i)))
+  let !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta + (-i * (double ycS' + i)))
       !(yAdj, rdrAdj) = if rdr < 0 then (pred i, rdr + double (pred (ycScaled + i)) + 1) else (i, rdr)
    in -- !(yAdj, rdrAdj) = if rdr < 0 then (pred i, fixRemainder (pred (ycScaled + i)) rdr + 1) else (i, rdr)
       (yAdj + ycScaled, yAdj, rdrAdj)
@@ -490,47 +490,34 @@ stageList_ l xs =
     !evenYes = even l
     !splitFn = if evenYes then splitLastTwo else splitLastOne
 
-sndModifyWith :: ([c] -> [c]) -> (a, [c], b) -> (a, [c], b)
-sndModifyWith f (a, xs, b) = (a, f xs, b)
-{-# INLINE sndModifyWith #-}
-
-sndChangeToBA :: ([c] -> ByteArray) -> (a, [c], b) -> (a, ByteArray, b)
-sndChangeToBA f (a, xs, b) = (a, f xs, b)
-{-# INLINE sndChangeToBA #-}
-
-sndChangeToVU :: ([c] -> VU.Vector c) -> (a, [c], b) -> (a, VU.Vector c, b)
-sndChangeToVU f (a, xs, b) = (a, f xs, b)
-{-# INLINE sndChangeToVU #-}
-
 {-# INLINE stageListRvrsd #-}
 stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])
-stageListRvrsd xs = sndModifyWith reverse (stageList xs)
+stageListRvrsd xs = stageListRvrsd_ (length xs) xs -- sndModifyWith reverse (stageList xs)
 
 {-# INLINE stageListRvrsd_ #-}
 stageListRvrsd_ :: Int -> [Word32] -> (Bool, [Word64], [Word32])
-stageListRvrsd_ l xs  = sndModifyWith reverse (stageList_ l xs)
--- stageListRvrsd_ l xs = case stageList_ l xs of (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
+stageListRvrsd_ l xs = case stageList_ l xs of (evenLen, ws, lastElems) -> (evenLen, reverse ws, lastElems)
 
 {-# INLINE stageBA #-}
 stageBA :: [Word32] -> (Bool, ByteArray, [Word32])
-stageBA xs = sndChangeToBA byteArrayFromList (stageList xs)
+stageBA xs = case stageList xs of (evenLen, ws, lastElems) -> (evenLen, byteArrayFromList ws, lastElems)
 
 {-# INLINE stageBA_ #-}
 stageBA_ :: Int -> [Word32] -> (Bool, ByteArray, [Word32])
-stageBA_ l xs = sndChangeToBA byteArrayFromList (stageList_ l xs)
+stageBA_ l xs = case stageList_ l xs of (evenLen, ws, lastElems) -> (evenLen, byteArrayFromList ws, lastElems)
 
 {-# INLINE stageUV #-}
 stageUV :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUV xs = sndChangeToVU VU.fromList (stageList xs)
+stageUV xs = case stageList xs of (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
 
 {-# INLINE stageUV_ #-}
 stageUV_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUV_ l xs = sndChangeToVU VU.fromList (stageList_ l xs)
+stageUV_ l xs = case stageList_ l xs of (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
 
 {-# INLINE stageUVrvrsd #-}
 stageUVrvrsd :: [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUVrvrsd xs = sndChangeToVU VU.fromList (stageListRvrsd xs)
+stageUVrvrsd xs = case stageListRvrsd xs of (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
 
 {-# INLINE stageUVrvrsd_ #-}
 stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
-stageUVrvrsd_ l xs = sndChangeToVU VU.fromList (stageListRvrsd_ l xs)
+stageUVrvrsd_ l xs = case stageListRvrsd_ l xs of (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)

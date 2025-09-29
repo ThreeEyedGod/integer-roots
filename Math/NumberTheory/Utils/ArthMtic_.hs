@@ -3,15 +3,13 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OrPatterns #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnboxedTuples #-}
+
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
 -- removed -fexpose-all-unfoldings may not necessarily help improve max performance. See https://well-typed.com/blog/2024/04/choreographing-specialization-pt1/
 
 -- {-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr  -fstrictness -funbox-small-strict-fields -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
-{-# OPTIONS_GHC -Wno-type-defaults #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 -- |
 -- Module:      Math.NumberTheory.Roots.Squares.Internal
@@ -62,9 +60,11 @@ module Math.NumberTheory.Utils.ArthMtic_
 where
 
 -- \*********** BEGIN NEW IMPORTS
-import Prelude hiding (pred)
-import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
+
 -- he says it's coded to be as fast as possible
+
+import Control.Parallel (par, pseq)
+import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.Bits (unsafeShiftL)
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.DoubleWord (Int256, Int96)
@@ -136,13 +136,12 @@ import GHC.Exts
 import GHC.Float (floorDouble)
 import GHC.Int (Int32, Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.Integer (integerLogBase#)
-import GHC.Num.Integer (integerLogBaseWord)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
+import GHC.Num.Integer (integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
-import Control.Parallel (par, pseq)
 import Numeric.Natural (Natural)
+import Prelude hiding (pred)
 
 -- *********** END NEW IMPORTS
 
@@ -513,10 +512,10 @@ hndlOvflwI32## i64# = if isTrue# (i64# `eqInt64#` maxW32#) then predmaxW32# else
     !(I64# maxW32#) = radixW32
     !(I64# predmaxW32#) = predRadixW32
 
-{-# INLINE radixW32Length #-} -- this works 
+{-# INLINE radixW32Length #-} -- this works
 radixW32Length :: Integer -> Word
 radixW32Length n
-  | n == 0    = 1
+  | n == 0 = 1
   | otherwise = integerLogBaseWord radixW32 n + 1
 
 {-# INLINE wrd2wrd32 #-}
@@ -675,18 +674,18 @@ undigits_ = undigits
 
 -- | Extract nth digit using fast-digits (note: digits are in reverse order)
 nthDigitFast :: Integer -> Int -> Word32
-nthDigitFast n pos = 
-      let digitList = digitsUnsigned radixW32 (fromIntegral n)  -- Gets digits in reverse order
-          len = length digitList
-      in fromIntegral $ digitList !! (len - (pos-1))
+nthDigitFast n pos =
+  let digitList = digitsUnsigned radixW32 (fromIntegral n) -- Gets digits in reverse order
+      len = length digitList
+   in fromIntegral $ digitList !! (len - (pos - 1))
 
 doubleDigitInteger :: Integer -> (Int, Int) -> Word64#
-doubleDigitInteger n (dl, dr) = word64FromRvsrd2ElemList# [nthDigitFast n dl , nthDigitFast n dr]
+doubleDigitInteger n (dl, dr) = word64FromRvsrd2ElemList# [nthDigitFast n dl, nthDigitFast n dr]
 {-# INLINE doubleDigitInteger #-}
 
-{-# SPECIALISE lenRadixW32 :: Integer -> Int #-}
-{-# SPECIALISE lenRadixW32 :: Word64 -> Int #-}
-{-# SPECIALISE lenRadixW32 :: Natural -> Int #-}
+{-# SPECIALIZE lenRadixW32 :: Integer -> Int #-}
+{-# SPECIALIZE lenRadixW32 :: Word64 -> Int #-}
+{-# SPECIALIZE lenRadixW32 :: Natural -> Int #-}
 lenRadixW32 :: (Integral a) => a -> Int
 lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1
 {-# INLINEABLE lenRadixW32 #-}
@@ -703,16 +702,16 @@ foldr' f z xs = go xs
 computePar :: (a -> d) -> (b -> c -> e) -> a -> b -> c -> (d, e)
 computePar f1 f2 x y z =
   let r1 = f1 x
-      r2 = f2 y z 
-  in r1 `par` (r2 `pseq` (r1, r2))
+      r2 = f2 y z
+   in r1 `par` (r2 `pseq` (r1, r2))
 
 -- | because pred is Enum. this version blow is marginally faster
-{-# SPECIALISE pred :: Integer -> Integer  #-}
-{-# SPECIALISE pred :: Word64 -> Word64  #-}
-{-# SPECIALISE pred :: Int -> Int  #-}
-{-# SPECIALISE pred :: Int64 -> Int64  #-}
-pred :: Integral a => a -> a
-pred x = x + (- 1)
+{-# SPECIALIZE pred :: Integer -> Integer #-}
+{-# SPECIALIZE pred :: Word64 -> Word64 #-}
+{-# SPECIALIZE pred :: Int -> Int #-}
+{-# SPECIALIZE pred :: Int64 -> Int64 #-}
+pred :: (Integral a) => a -> a
+pred x = x + (-1)
 {-# INLINE pred #-}
 
--- //FIXME floor seems to trigger off missing specialization and also properFractionDouble. 
+-- //FIXME floor seems to trigger off missing specialization and also properFractionDouble.

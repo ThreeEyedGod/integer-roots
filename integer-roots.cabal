@@ -61,7 +61,10 @@ library
   ghc-options: -Wall 
                -Widentities 
                -Wcompat 
-               -Wmissed-specialisations 
+               -Wno-type-defaults
+               -Wno-unused-top-binds
+               -Wno-unused-matches
+               -Wno-missed-specialisations 
                -O2 
                -threaded 
                -fllvm 

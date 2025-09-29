@@ -3,15 +3,13 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OrPatterns #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnboxedTuples #-}
+
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
 -- removed -fexpose-all-unfoldings may not necessarily help improve max performance. See https://well-typed.com/blog/2024/04/choreographing-specialization-pt1/
 
 -- {-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr  -fstrictness -funbox-small-strict-fields  -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
-{-# OPTIONS_GHC -Wno-type-defaults #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 -- |
 -- Module:      Math.NumberTheory.Roots.Squares.Internal
@@ -22,6 +20,7 @@
 -- Internal functions dealing with square roots. End-users should not import this module.
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
 module Math.NumberTheory.Utils.FloatingX_ where
+
 -- \*********** BEGIN NEW IMPORTS
 
 import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -87,7 +86,7 @@ import GHC.Exts
     (>=#),
     (>=##),
   )
-import GHC.Float (properFractionDouble, divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, timesDouble)
+import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
@@ -159,7 +158,7 @@ addFx a@(FloatingX sA expA) b@(FloatingX sB expB)
     combine big@(FloatingX sBig expBig) little@(FloatingX sLittle expLittle) =
       let !scale = expLittle - expBig
           !scaleD@(D# scaleD#) = fromIntegral scale
-          !scaledLittle = sLittle `timesDouble` (powerDouble 2.00 scaleD)
+          !scaledLittle = sLittle `timesDouble` powerDouble 2.00 scaleD
           !resSignif = sBig + scaledLittle
        in FloatingX resSignif expBig
 
@@ -191,7 +190,7 @@ unsafeDivFx n@(FloatingX s1 e1) d@(FloatingX s2 e2) =
 
 {-# INLINE fsqraddFloatingX #-}
 fsqraddFloatingX :: FloatingX -> FloatingX -> FloatingX
-fsqraddFloatingX !(FloatingX (D# sA#) expA) !(FloatingX (D# sC#) expC)
+fsqraddFloatingX (FloatingX (D# sA#) expA) (FloatingX (D# sC#) expC)
   | diff == 0 = FloatingX (D# (fmaddDouble# sA# sA# sC#)) expC
   | otherwise = case updateDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX (D# (fmaddDouble# sA# sA# sC_#)) twoTimesExpA -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
   where
@@ -561,7 +560,7 @@ cI2D2_ bn#
       --  | otherwise = case _bigNatLog2# bn# bnsz# of
       l# -> case l# `minusWord#` 94## of
         rawSh# ->
-          let !shift# = rawSh# `and#` (not# 1##)
+          let !shift# = rawSh# `and#` not# 1##
            in case bigNatShiftR# bn# shift# of
                 -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
                 --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
@@ -579,7 +578,7 @@ convNToDblExp n
   | otherwise = case integerLog2# n of
       l# -> case l# `minusWord#` 94## of
         rawSh# ->
-          let !shift# = rawSh# `and#` (not# 1##)
+          let !shift# = rawSh# `and#` not# 1##
            in case shiftRInteger n (word2Int# shift#) of
                 mbn -> case fromIntegral mbn of (D# dmbn#) -> (# dmbn#, intToInt64# (word2Int# shift#) #)
 
@@ -589,7 +588,7 @@ bnToFxGtWord# bn# = case bigNatLog2# bn# of
   --  | otherwise = case _bigNatLog2# bn# bnsz# of
   l# -> case l# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
     rawSh# ->
-      let !shift# = rawSh# `and#` (not# 1##)
+      let !shift# = rawSh# `and#` not# 1##
        in case bigNatShiftR# bn# shift# of
             -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
             --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
@@ -601,7 +600,7 @@ bnToFxGtWord bn@(BN# bn#) = case bigNatLog2 bn# of
   --  | otherwise = case _bigNatLog2# bn# bnsz# of
   l -> case l - 94 of -- //FIXME is shift# calc needed. workd without it.
     rawSh ->
-      let !shift = rawSh .&. (complement 1)
+      let !shift = rawSh .&. complement 1
        in case bigNatShiftR bn# shift of
             -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
             --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
