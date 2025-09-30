@@ -8,7 +8,6 @@
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
 -- removed -fexpose-all-unfoldings may not necessarily help improve max performance. See https://well-typed.com/blog/2024/04/choreographing-specialization-pt1/
-
 -- {-# OPTIONS_GHC -O2 -threaded -optl-m64  -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr  -fstrictness -funbox-small-strict-fields -fmax-worker-args=32 -optc-O3 -optc-ffast-math #-}
 
 -- |
@@ -56,6 +55,10 @@ module Math.NumberTheory.Utils.ArthMtic_
     foldr',
     pred,
     lenRadixW32,
+    cI2D2_,
+    convNToDblExp,
+    bnToFxGtWord,
+    bnToFxGtWord#
   )
 where
 
@@ -63,9 +66,13 @@ where
 
 -- he says it's coded to be as fast as possible
 
+import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
+import GHC.Num.Integer (integerLog2#)
+import GHC.Integer.Logarithms (wordLog2#)
+
 import Control.Parallel (par, pseq)
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
-import Data.Bits (unsafeShiftL)
+import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.DoubleWord (Int256, Int96)
 import Data.FastDigits (digitsUnsigned, undigits)
@@ -715,3 +722,123 @@ pred x = x + (-1)
 {-# INLINE pred #-}
 
 -- //FIXME floor seems to trigger off missing specialization and also properFractionDouble.
+
+-- The maximum integral value that can be unambiguously represented as a
+-- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
+{-# INLINE cI2D2_ #-}
+cI2D2_ :: BigNat# -> (# Double#, Int64# #)
+cI2D2_ bn#
+  | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) = let d# = word2Double# (bigNatIndex# bn# 0#) in (# d#, 0#Int64 #)
+  -- \| isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
+  | otherwise = bnToFxGtWord# bn#
+-- where
+--   bnsz# = bigNatSize# bn#
+--   thresh# :: Int#
+--   !thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
+
+{-# INLINE convNToDblExp #-}
+convNToDblExp :: Integer -> (# Double#, Int64# #)
+convNToDblExp n
+  | n <= maxUnsafeInteger = let !(D# d#) = fromIntegral n in (# d#, 0#Int64 #) -- don't use maxsafeInteger
+  | otherwise = case integerLog2# n of
+      l# -> case l# `minusWord#` 94## of
+        rawSh# ->
+          let !shift# = rawSh# `and#` not# 1##
+           in case shiftRInteger n (word2Int# shift#) of
+                mbn -> case fromIntegral mbn of (D# dmbn#) -> (# dmbn#, intToInt64# (word2Int# shift#) #)
+
+{-# INLINE bnToFxGtWord# #-}
+bnToFxGtWord# :: BigNat# -> (# Double#, Int64# #)
+bnToFxGtWord# bn# = case bigNatLog2# bn# of
+  --  | otherwise = case _bigNatLog2# bn# bnsz# of
+  l# -> case l# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
+    rawSh# ->
+      let !shift# = rawSh# `and#` not# 1##
+       in case bigNatShiftR# bn# shift# of
+            -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
+            --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
+            mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
+
+{-# INLINE bnToFxGtWord #-}
+bnToFxGtWord :: BigNat -> (Double, Int64)
+bnToFxGtWord bn@(BN# bn#) = case bigNatLog2 bn# of
+  --  | otherwise = case _bigNatLog2# bn# bnsz# of
+  l -> case l - 94 of -- //FIXME is shift# calc needed. workd without it.
+    rawSh ->
+      let !shift = rawSh .&. complement 1
+       in case bigNatShiftR bn# shift of
+            -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
+            --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
+            mbn# -> (D# $ bigNatEncodeDouble# mbn# 0#, fromIntegral shift)
+
+{-# INLINE cI2D2_FAST #-}
+cI2D2_FAST :: BigNat# -> (# Double#, Int64# #)
+cI2D2_FAST bn# =
+  case bigNatSize# bn# of
+    -- Single‐Word shortcut, exact up to 2^53–1
+    1#
+      | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) ->
+          let w# = bigNatIndex# bn# 0#
+           in (# word2Double# w#, 0#Int64 #)
+    -- General path: only touch two Words
+    sz# ->
+      -- 1) Bit-length l = (sz-1)*64 + log2(topWord)
+      let hi# = sz# -# 1#
+          topW# = bigNatIndex# bn# (word2Int# (int2Word# hi#))
+          l# = int2Word# (wordLog2# topW#) `plusWord#` (int2Word# hi# `uncheckedShiftL#` 6#)
+
+          -- 2) How many bits to drop to get a 53-bit mantissa
+          rawSh# = l# `minusWord#` 52##
+
+          -- 3) Split that into whole-Word and intra-Word shifts
+          !(# wSh#, bSh# #) = rawSh# `quotRemWord#` 64##
+
+          -- 4) Pick the two relevant Words
+          idx1# = word2Int# (int2Word# hi# `minusWord#` wSh#)
+          idx2# = idx1# -# 1#
+          w1# = bigNatIndex# bn# idx1#
+          w2# = if isTrue# (idx2# >=# 0#) then bigNatIndex# bn# idx2# else 0##
+
+          -- 5) Assemble a 64-bit “payload” containing the top ~66 bits
+          payload# =
+            (w1# `uncheckedShiftL#` word2Int# (64## `minusWord#` bSh#))
+              `or#` (w2# `uncheckedShiftRL#` word2Int# bSh#)
+
+          -- 6) Peel off 53 mantissa bits (and keep the low 11 for rounding)
+          mantRaw# = payload# `uncheckedShiftRL#` 11# -- 64-53 = 11
+
+          -- 7) Half-even rounding using the next bit + sticky
+          !(# mant53#, expInc# #) = roundHalfEven mantRaw# payload#
+
+          -- 8) Build the final exponent + mantissa bitpattern
+          rawExp# = rawSh# `plusWord#` expInc#
+          finalExp# = rawExp# `plusWord#` 1023##
+          bits# = (finalExp# `uncheckedShiftL#` 52#) `or#` mant53#
+       in (# word2Double# bits#, intToInt64# (word2Int# rawSh#) #)
+
+-- | Half-even rounding of a candidate 53-bit mantissa.
+roundHalfEven :: Word# -> Word# -> (# Word#, Word# #)
+roundHalfEven m# payload# =
+  let roundBit# = payload# `and#` (1## `uncheckedShiftL#` 10#) -- the 11th low bit
+      sticky# =
+        (payload# `and#` ((1## `uncheckedShiftL#` 10#) `minusWord#` 1##))
+          `neWord#` 0##
+      mAndOne# = m# `and#` 1##
+      mAndOneInt# = word2Int# mAndOne#
+      linkUp# = isTrue# (roundBit# `neWord#` 0##) && (isTrue# (sticky#) || isTrue# (mAndOneInt# /=# 0#))
+      m'# = if linkUp# then m# `plusWord#` 1## else m#
+   in if isTrue# (m'# `eqWord#` (1## `uncheckedShiftL#` 53#))
+        then (# 0##, 1## #) -- carry into exponent
+        else (# m'# `and#` (1## `uncheckedShiftL#` 52# `minusWord#` 1##), 0## #)
+
+-- | Base 2 logarithm a bit faster
+_bigNatLog2# :: BigNat# -> Int# -> Word#
+_bigNatLog2# a s -- s = bigNatSize# a
+  | bigNatIsZero a = 0##
+  | otherwise =
+      -- let i = int2Word# (bigNatSize# a) `minusWord#` 1##
+      let i = int2Word# s `minusWord#` 1##
+       in int2Word# (wordLog2# (bigNatIndex# a (word2Int# i))) `plusWord#` (i `uncheckedShiftL#` 6#) -- WORD_SIZE_BITS_SHIFT#)
+{-# INLINE _bigNatLog2# #-}
+
+-- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
