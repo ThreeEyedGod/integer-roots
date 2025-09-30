@@ -817,6 +817,7 @@ cI2D2_FAST bn# =
        in (# word2Double# bits#, intToInt64# (word2Int# rawSh#) #)
 
 -- | Half-even rounding of a candidate 53-bit mantissa.
+{-# INLINABLE roundHalfEven #-}
 roundHalfEven :: Word# -> Word# -> (# Word#, Word# #)
 roundHalfEven m# payload# =
   let roundBit# = payload# `and#` (1## `uncheckedShiftL#` 10#) -- the 11th low bit
