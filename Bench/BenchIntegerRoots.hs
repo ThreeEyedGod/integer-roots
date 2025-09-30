@@ -1,13 +1,13 @@
+import Criterion.Main
 import qualified Math.NumberTheory.Roots as Old (integerSquareRoot)
 import qualified Math.NumberTheory.Roots_ as New (integerSquareRoot)
-import Criterion.Main
 import System.Random.Stateful (globalStdGen, uniformRM)
 
 iRange :: Integer -> (Integer, Integer)
 iRange x = (2 ^ x, 2 ^ (x + 1))
 
 main :: IO ()
-main = do 
+main = do
   iIntInteger <- getRndMInt (iRange 31)
   iHugeWord <- getRndMInt (iRange 63)
   iHumongous <- getRndMInt (iRange 129)
@@ -18,21 +18,20 @@ main = do
   defaultMain
     [ bgroup
         "IntegerSquare Roots"
-        [ 
-            bench "Old Int Integer" $ whnf Old.integerSquareRoot (fromIntegral iIntInteger :: Int)
-          , bench "New Int Integer" $ whnf New.integerSquareRoot (fromIntegral iIntInteger :: Int)
-          , bench "Old Huge Integer" $ whnf Old.integerSquareRoot (fromIntegral iHugeWord :: Word)
-          , bench "New Huge Integer" $ whnf New.integerSquareRoot (fromIntegral iHugeWord :: Word)
-          , bench "Old Humoungous Integer " $ whnf Old.integerSquareRoot iHumongous
-          , bench "New Humoungous Integer " $ whnf New.integerSquareRoot iHumongous
-          , bench "Old Gargantuan Integer" $ whnf Old.integerSquareRoot iGargantuan
-          , bench "New Gargantuan Integer" $ whnf New.integerSquareRoot iGargantuan
-          , bench "Old Googolplex Integer " $ whnf Old.integerSquareRoot iGoogolplex
-          , bench "New Googolplex Integer " $ whnf New.integerSquareRoot iGoogolplex
-          , bench "Old FZeight Integer " $ whnf Old.integerSquareRoot iFZeight
-          , bench "New FZeight Integer " $ whnf New.integerSquareRoot iFZeight
-          , bench "Old Boogol Integer " $ whnf Old.integerSquareRoot iBoogol
-          , bench "New Boogol Integer " $ whnf New.integerSquareRoot iBoogol
+        [ bench "Old Int Integer" $ whnf Old.integerSquareRoot (fromIntegral iIntInteger :: Int),
+          bench "New Int Integer" $ whnf New.integerSquareRoot (fromIntegral iIntInteger :: Int),
+          bench "Old Huge Integer" $ whnf Old.integerSquareRoot (fromIntegral iHugeWord :: Word),
+          bench "New Huge Integer" $ whnf New.integerSquareRoot (fromIntegral iHugeWord :: Word),
+          bench "Old Humoungous Integer " $ whnf Old.integerSquareRoot iHumongous,
+          bench "New Humoungous Integer " $ whnf New.integerSquareRoot iHumongous,
+          bench "Old Gargantuan Integer" $ whnf Old.integerSquareRoot iGargantuan,
+          bench "New Gargantuan Integer" $ whnf New.integerSquareRoot iGargantuan,
+          bench "Old Googolplex Integer " $ whnf Old.integerSquareRoot iGoogolplex,
+          bench "New Googolplex Integer " $ whnf New.integerSquareRoot iGoogolplex,
+          bench "Old FZeight Integer " $ whnf Old.integerSquareRoot iFZeight,
+          bench "New FZeight Integer " $ whnf New.integerSquareRoot iFZeight,
+          bench "Old Boogol Integer " $ whnf Old.integerSquareRoot iBoogol,
+          bench "New Boogol Integer " $ whnf New.integerSquareRoot iBoogol
         ]
     ]
 

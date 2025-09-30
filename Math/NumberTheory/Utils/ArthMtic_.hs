@@ -58,17 +58,13 @@ module Math.NumberTheory.Utils.ArthMtic_
     cI2D2_,
     convNToDblExp,
     bnToFxGtWord,
-    bnToFxGtWord#
+    bnToFxGtWord#,
   )
 where
 
 -- \*********** BEGIN NEW IMPORTS
 
 -- he says it's coded to be as fast as possible
-
-import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
-import GHC.Num.Integer (integerLog2#)
-import GHC.Integer.Logarithms (wordLog2#)
 
 import Control.Parallel (par, pseq)
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
@@ -142,9 +138,10 @@ import GHC.Exts
   )
 import GHC.Float (floorDouble)
 import GHC.Int (Int32, Int64 (I64#))
-import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
+import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
+import GHC.Integer.Logarithms (wordLog2#)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
-import GHC.Num.Integer (integerLogBase#, integerLogBaseWord)
+import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
 import Numeric.Natural (Natural)
@@ -731,6 +728,7 @@ cI2D2_ bn#
   | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) = let d# = word2Double# (bigNatIndex# bn# 0#) in (# d#, 0#Int64 #)
   -- \| isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
   | otherwise = bnToFxGtWord# bn#
+
 -- where
 --   bnsz# = bigNatSize# bn#
 --   thresh# :: Int#
@@ -817,7 +815,7 @@ cI2D2_FAST bn# =
        in (# word2Double# bits#, intToInt64# (word2Int# rawSh#) #)
 
 -- | Half-even rounding of a candidate 53-bit mantissa.
-{-# INLINABLE roundHalfEven #-}
+{-# INLINEABLE roundHalfEven #-}
 roundHalfEven :: Word# -> Word# -> (# Word#, Word# #)
 roundHalfEven m# payload# =
   let roundBit# = payload# `and#` (1## `uncheckedShiftL#` 10#) -- the 11th low bit

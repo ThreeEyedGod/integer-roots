@@ -207,23 +207,23 @@ floorFX (FloatingX s e) = case fx2Double (FloatingX s e) of
   Just d -> floor d
   _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
-{-# INLINE (!+##) #-}
+{-# NOINLINE [0] (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!+##) x y = x `addFx#` y
 
-{-# INLINE (!*##) #-}
+{-# NOINLINE [0] (!*##) #-}
 (!*##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!*##) x y = x `mulFx#` y
 
-{-# INLINE (!/##) #-}
+{-# NOINLINE [0] (!/##) #-}
 (!/##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!/##) x y = x `unsafeDivFx#` y ---- note this is the unsafest version of divide
 
 (!<##) :: FloatingX# -> FloatingX# -> Bool
 (!<##) (FloatingX# x# xe#) (FloatingX# y# ye#) = if isTrue# (xe# `eqInt64#` ye#) then isTrue# (x# <## y#) else if isTrue# (xe# `ltInt64#` ye#) then isTrue# (x# <## y#) else False
-{-# INLINE (!<##) #-}
+{-# NOINLINE [0] (!<##) #-}
 
-{-# INLINE (!**+##) #-}
+{-# NOINLINE [0] (!**+##) #-}
 (!**+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!**+##) x y = x `fsqraddFloatingX#` y
 

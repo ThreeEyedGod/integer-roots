@@ -75,7 +75,7 @@ library
                -optc-O3
                -optc-ffast-math
                -optc-march=native
-
+               
 test-suite integer-roots-tests
   build-depends:
     base >=4.9 && <5,
@@ -152,5 +152,5 @@ executable integer-roots-exe
                        -fproc-alignment=64 
                        -threaded
                        -rtsopts                       
-                       -with-rtsopts=-N4 -w
+                       -with-rtsopts=-N4 -w 
                     
