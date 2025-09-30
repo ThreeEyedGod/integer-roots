@@ -1,8 +1,8 @@
-all: build test doc profile package_upload doc_upload
-all_butno_package: build test doc profile
+all: build test doc package_upload doc_upload
+all_butno_package: build test doc 
 	
 build:
-	@echo "Build"
+	@echo "_______________Build___________"
 	@rm -rf ./build/*
 	@rm -rf *.tix
 	@rm -rf hpc*.html
@@ -11,7 +11,7 @@ build:
 	cabal build
 
 test:
-	@echo "Testing"
+	@echo "_______________Testing__________"
 	cabal test 
 
 doc:
@@ -32,7 +32,7 @@ bench_weigh:
 	cabal bench weigh
 
 profile:
-	@echo "creating profile"
+	@echo "_____________________creating profile___________"
 	@rm -rf *.tix
 	cabal run integer-roots-exe -- +RTS -p -s -N4
 
@@ -41,11 +41,6 @@ main:
 	@rm -rf *.tix
 # 	cabal run integer-roots-exe -- +RTS -N4
 	cabal run integer-roots-exe "+RTS -I0 -K256m -A16m -N8 -H24m -T -w -RTS --output=integer-roots.html" -p
-
-profile_stack:
-	@echo "creating profile w/stack"
-	stack build --profile
-	stack exec -- integer-roots-exe  100000 +RTS -p -N4 -RTS
 
 package_upload:
 	@echo "creating tarball"

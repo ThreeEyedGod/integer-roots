@@ -15,9 +15,9 @@ iRange x = (2 ^ x, 2 ^ (x + 1))
 
 main :: IO ()
 main = do
-  putStrLn "Searching args..."
-  args <- getFullArgs
-  print args
+  -- putStrLn "Searching args..."
+  -- args <- getFullArgs
+  -- print args
   iIntInteger <- getRndMInt (iRange 31)
   iHugeWord <- getRndMInt (iRange 63)
   iHumongous <- getRndMInt (iRange 129)
@@ -25,19 +25,19 @@ main = do
   iGoogolplex <- getRndMInt (iRange 511)
   iFZeight <- getRndMInt (iRange 1023)
   iBoogol <- getRndMInt (iRange 2046)
-  putStrLn "iHumongous Old"
+  -- putStrLn "iHumongous Old"
   x2 <- timeit (pure $ Old.integerSquareRoot iHumongous)
   print x2
-  putStrLn "iHumongous New"
+  -- putStrLn "iHumongous New"
   x3 <- timeit (pure $ New.integerSquareRoot iHumongous)
   print x3
-  putStrLn "iBoogol Old"
+  -- putStrLn "iBoogol Old"
   x4 <- timeit (pure $ Old.integerSquareRoot iBoogol)
   print x4
-  putStrLn "iBoogol New"
+  -- putStrLn "iBoogol New"
   x5 <- timeit (pure $ New.integerSquareRoot iBoogol)
   print x5
-  putStrLn "------------"
+  -- putStrLn "------------"
 
 -- -- | Helper function
 timeit :: IO a -> IO (Maybe a, NominalDiffTime)
