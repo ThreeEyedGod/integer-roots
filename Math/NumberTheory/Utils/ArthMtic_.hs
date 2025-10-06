@@ -59,6 +59,11 @@ module Math.NumberTheory.Utils.ArthMtic_
     convNToDblExp,
     bnToFxGtWord,
     bnToFxGtWord#,
+    splitFirstOne,
+    splitFirstTwo,
+    word64From2ElemList#,
+    dgtsLstBase32_,
+    mkIW32EvenRestLstN_,
   )
 where
 
@@ -182,6 +187,7 @@ data MaxBounds
   | IsIN
   deriving (Eq, Show, Ord) -- Ord for using maximum later on
 
+-- //FIXME use of fromMaybe and Maybe impacts performance in tight loops
 maxIntSizeAcross :: Integer -> Integer -> Integer -> MaxBounds
 maxIntSizeAcross n1 n2 n3 = maximum (fromMaybe IsIN <$> firstTrueOf <$> lazyXsFits <$> [n1, n2, n3])
 {-# INLINE maxIntSizeAcross #-}
@@ -333,6 +339,10 @@ safeMulW256 x y =
 dgtsLstBase32 :: Integer -> [Word32]
 dgtsLstBase32 n = mkIW32Lst n radixW32
 
+{-# INLINE [0] dgtsLstBase32_ #-} -- digits in normal format MSB --> LSB
+dgtsLstBase32_ :: Integer -> [Word32]
+dgtsLstBase32_ n = mkIW32Lst_ n radixW32
+
 -- | Word64# from a "reversed" List of at least 1 and at most 2 Word32 digits
 word64FromRvsrd2ElemList# :: [Word32] -> Word64#
 word64FromRvsrd2ElemList# [] = error "word64FromRvsrd2ElemList# : null list"
@@ -341,12 +351,26 @@ word64FromRvsrd2ElemList# [llsb, lmsb] = word64FromRvsrdTuple# (llsb, lmsb) 4294
 word64FromRvsrd2ElemList# (_ : _ : _) = error "word64FromRvsrd2ElemList# : more than 2 elems list"
 {-# INLINE word64FromRvsrd2ElemList# #-}
 
+-- | Word64# from a "normal" List of at least 1 and at most 2 Word32 digits
+word64From2ElemList# :: [Word32] -> Word64#
+word64From2ElemList# [] = error "word64From2ElemList# : null list"
+word64From2ElemList# [llsb] = word64FromRvsrdTuple# (llsb, 0) 4294967296#Word64
+word64From2ElemList# [lmsb,llsb] = word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
+word64From2ElemList# (_ : _ : _) = error "word64From2ElemList# : more than 2 elems list"
+{-# INLINE word64From2ElemList# #-}
+
+
 {-# INLINE mkIW32Lst #-}
 
 -- | Spit out the Word32 List from digitsUnsigned which comes in reversed format.
 mkIW32Lst :: Integer -> Word -> [Word32]
 mkIW32Lst 0 _ = [0] -- safety
 mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b)
+
+-- | Spit out the Word32 List from digits which comes in normal format. MSB...LSB
+mkIW32Lst_ :: Integer -> Word -> [Word32]
+mkIW32Lst_ 0 _ = [0] -- safety
+mkIW32Lst_ i b = wrd2wrd32 (iToWrdListBase_ i b) -- using the normal format digits function
 
 {-# INLINE splitLastTwo #-}
 splitLastTwo :: [a] -> Int -> ([a], [a])
@@ -355,6 +379,14 @@ splitLastTwo xs l = splitAt (l - 2) xs
 {-# INLINE splitLastOne #-}
 splitLastOne :: [a] -> Int -> ([a], [a])
 splitLastOne xs l = splitAt (l - 1) xs
+
+{-# INLINE splitFirstTwo #-}
+splitFirstTwo :: [a] -> Int -> ([a], [a])
+splitFirstTwo xs l = splitAt 2 xs
+
+{-# INLINE splitFirstOne #-}
+splitFirstOne :: [a] -> Int -> ([a], [a])
+splitFirstOne xs l = splitAt 1 xs
 
 {-# INLINE pairUp #-}
 pairUp :: Bool -> [a] -> [(a, a)]
@@ -369,7 +401,7 @@ pairUpAcc xs = go xs []
   where
     go (x : y : zs) !acc = go zs ((x, y) : acc)
     go [] acc = reverse acc
-    go [_] _ = error "pairUp: odd length"
+    go [_] _ = error "pairUpAcc: odd length"
 
 {-# INLINE pairUpUnfold #-}
 pairUpUnfold :: [a] -> [(a, a)]
@@ -377,7 +409,7 @@ pairUpUnfold = unfoldr step
   where
     step (x : y : zs) = Just ((x, y), zs)
     step [] = Nothing
-    step [_] = error "pairUp: odd length"
+    step [_] = error "pairUpUnfold: odd length"
 
 {-# INLINE pairUpBuild #-}
 pairUpBuild :: [a] -> [(a, a)]
@@ -385,7 +417,7 @@ pairUpBuild xs = build (\c n -> go c n xs)
   where
     go c n (x : y : zs) = c (x, y) (go c n zs)
     go _ n [] = n
-    go _ _ [_] = error "pairUp: odd length"
+    go _ _ [_] = error "pairUpBuild: odd length"
 
 -- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s list
 {-# INLINE [0] integerOfNxtPairsLst #-}
@@ -393,6 +425,13 @@ pairUpBuild xs = build (\c n -> go c n xs)
 {-# SPECIALIZE integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Integer] #-}
 integerOfNxtPairsLst :: (NFData a, Integral a) => Int -> [(Word32, Word32)] -> [a]
 integerOfNxtPairsLst l = if l < 8 then map iFrmTupleBaseW32 else parallelMap Split 2 iFrmTupleBaseW32 -- assuming even dual core Split/Buffer work better than Chunk
+
+-- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s list
+{-# INLINE [0] integerOfNxtPairsLstN_ #-}
+{-# SPECIALIZE integerOfNxtPairsLstN_ :: Int -> [(Word32, Word32)] -> [Word64] #-}
+{-# SPECIALIZE integerOfNxtPairsLstN_ :: Int -> [(Word32, Word32)] -> [Integer] #-}
+integerOfNxtPairsLstN_ :: (NFData a, Integral a) => Int -> [(Word32, Word32)] -> [a]
+integerOfNxtPairsLstN_ l = if l < 8 then map iFrmTupleBaseW32_ else parallelMap Split 2 iFrmTupleBaseW32_ -- assuming even dual core Split/Buffer work better than Chunk
 
 -- | Strategies that may be used with parallel calls
 data Strats
@@ -418,12 +457,23 @@ parallelMap strat stratParm f = case strat of
 iFrmTupleBaseW32 :: (Integral a) => (Word32, Word32) -> a
 iFrmTupleBaseW32 tu = integralFromRvsrdTuple tu radixW32
 
+iFrmTupleBaseW32_ :: (Integral a) => (Word32, Word32) -> a
+iFrmTupleBaseW32_ tu = integralFromTuple tu radixW32
+
 {-# INLINE [0] mkIW32EvenRestLst #-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Integer] #-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64] #-}
 {-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word] #-}
 mkIW32EvenRestLst :: (NFData a, Integral a) => Int -> Bool -> [Word32] -> [a]
 mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) -- (pairUpUnfold xs) --(pairUpAcc xs) --(pairUp evenLen xs)
+
+{-# INLINE [0] mkIW32EvenRestLstN_ #-}
+{-# SPECIALIZE mkIW32EvenRestLstN_ :: Int -> Bool -> [Word32] -> [Integer] #-}
+{-# SPECIALIZE mkIW32EvenRestLstN_ :: Int -> Bool -> [Word32] -> [Word64] #-}
+{-# SPECIALIZE mkIW32EvenRestLstN_ :: Int -> Bool -> [Word32] -> [Word] #-}
+mkIW32EvenRestLstN_ :: (NFData a, Integral a) => Int -> Bool -> [Word32] -> [a]
+mkIW32EvenRestLstN_ len evenLen xs = integerOfNxtPairsLstN_ len (pairUpBuild xs) -- (pairUpUnfold xs) --(pairUpAcc xs) --(pairUp evenLen xs)
+
 
 --- END helpers
 --- BEGIN Core numeric helper functions
@@ -442,7 +492,14 @@ integralFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
 integralFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
 integralFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
-{-# INLINE intgrFromRvsrdTuple #-}
+
+{-# INLINE [0] integralFromTuple #-}
+{-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Integer -> Integer #-}
+{-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
+{-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Word256 -> Word256 #-}
+integralFromTuple :: (Integral a) => (Word32, Word32) -> a -> a
+integralFromTuple (lMSB, lLSB) = integralFromRvsrdTuple (lLSB, lMSB)
+
 
 -- | Integer from a "reversed" tuple of Word32 digits
 -- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259
@@ -530,6 +587,34 @@ wrd2wrd32 xs = fromIntegral <$> xs
 iToWrdListBase :: Integer -> Word -> [Word]
 iToWrdListBase 0 _ = [0]
 iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reversed format
+
+{-# INLINE iToWrdListBase_ #-}
+iToWrdListBase_ :: Integer -> Word -> [Word]
+iToWrdListBase_ 0 _ = [0]
+-- iToWrdListBase_ i b = digits b (fromIntegral i) -- digits come in normal format MSB --> LSB //FIXME big bug here. 
+-- iToWrdListBase_ i b = reverse $ digitsUnsigned b (fromIntegral i) -- digits come in normal format MSB --> LSB //FIXME reverse defeats the purpose no longer lazy. Evaluated !
+iToWrdListBase_ i b = digitsInOrder (fromIntegral i) b -- digits come in normal format MSB --> LSB //FIXME reverse defeats the purpose no longer lazy. Evaluated !
+
+digitsInOrder :: (Integral a) => a -> Word -> [Word]
+digitsInOrder _ base | base <= 1 = error "Base must be greater than 1"
+digitsInOrder n base = map fromInteger $ go (toInteger n) (highestPower (toInteger n) (toInteger base))
+  where
+    -- Compute the highest power of base less than or equal to n
+    highestPower :: Integer -> Integer -> Int
+    highestPower x b
+      | x < b     = 0
+      | otherwise = 1 + highestPower (x `div` b) b
+
+    -- Extract digits from most significant to least significant
+    go :: Integer -> Int -> [Integer]
+    go x p
+      | p < 0     = []
+      | otherwise =
+          let b = toInteger base
+              power = b ^ p
+              digit = x `div` power
+          in digit : go (x - digit * power) (p - 1)
+
 
 {-# INLINE convertBase #-}
 convertBase :: Word -> Word -> [Word] -> [Word]

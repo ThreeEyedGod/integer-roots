@@ -22,7 +22,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 
--- he says it's coded to be as fast as possible
+import Data.List (foldl', unfoldr)
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.Primitive.ByteArray (ByteArray, byteArrayFromList, foldrByteArray)
 import qualified Data.Vector.Unboxed as VU
@@ -106,6 +106,7 @@ import Prelude hiding (pred)
 
 -- | Iteration loop data - these records have vectors / lists in them
 data ItrLst_ = ItrLst_ {lvlst# :: {-# UNPACK #-} !Int#, lstW32 :: {-# UNPACK #-} ![Word64], yCumulative_ :: !Integer, iRem :: {-# UNPACK #-} !Integer, tb___# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
+data ItrLstPP = ItrLstPP {lpp# :: {-# UNPACK #-} !Int#, lstW32pp :: {-# UNPACK #-} ![Word32], yCumulativePP :: !Integer, iRemPP :: {-# UNPACK #-} !Integer, tbPP# :: {-# UNPACK #-} !FloatingX#} deriving (Eq)
 
 data ItrBA = ItrBA {lBA :: Int#, ba :: !ByteArray, ycBA :: Integer, irBA :: !Integer, tbBAFx :: !FloatingX#} deriving (Eq)
 
@@ -123,6 +124,28 @@ theFirstCore (evenLen, dxs') = let !i# = word64FromRvsrd2ElemList# dxs' in rmdrF
 theFirstXs :: (Bool, [Word64], [Word32]) -> ItrLst_
 theFirstXs (evenLen, passXs, dxs') = case theFirstCore (evenLen, dxs') of
   (# !yVal, !yWord#, !remInteger #) -> ItrLst_ 1# passXs yVal remInteger (unsafeword64ToFloatingX## yWord#)
+
+-- | operates on normal list MSB -> LSB
+theFirstCoreN :: (Bool, [Word32]) -> (# Integer, Word64#, Integer #)
+theFirstCoreN (evenLen, dxs') = let !i# = word64From2ElemList# dxs' in rmdrFn i#
+  where
+    !rmdrFn = if evenLen then evenFirstRmdr else oddFirstRmdr
+
+-- | operates on normal list MSB -> LSB
+theFirstXsN :: (Bool, [Word64], [Word32]) -> ItrLst_
+theFirstXsN (evenLen, passXs, dxs') = case theFirstCoreN (evenLen, dxs') of
+  (# !yVal, !yWord#, !remInteger #) -> ItrLst_ 1# passXs yVal remInteger (unsafeword64ToFloatingX## yWord#)
+
+-- | operates on normal list MSB -> LSB
+theFirstPostProcess :: (Bool, [Word32]) -> (# Integer, Word64#, Integer #)
+theFirstPostProcess (evenLen, dxs') = let !i# = word64From2ElemList# dxs' in rmdrFn i#
+  where
+    !rmdrFn = if evenLen then evenFirstRmdr else oddFirstRmdr
+
+-- | operates on normal list MSB -> LSB
+theFirstXsPostProcess :: (Bool, [Word32], [Word32]) -> ItrLstPP
+theFirstXsPostProcess (evenLen, passXs, dxs') = case theFirstPostProcess (evenLen, dxs') of
+  (# !yVal, !yWord#, !remInteger #) -> ItrLstPP 1# passXs yVal remInteger (unsafeword64ToFloatingX## yWord#)
 
 theFirstBA :: (Bool, ByteArray, [Word32]) -> ItrBA
 theFirstBA (evenLen, passBA, dxs') = case theFirstCore (evenLen, dxs') of
@@ -144,8 +167,17 @@ tniCore i (Itr__ !cl# !yCAcc_ !tA !t#) =
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
    in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
 
-theNextIterations :: ItrLst_ -> Integer
-theNextIterations (ItrLst_ !currlen# !wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
+{-# INLINE tniCorePP #-}
+tniCorePP :: (Word32, Word32) -> Itr__ -> Itr__
+tniCorePP (i1,i2) (Itr__ !cl# !yCAcc_ !tA !t#) =
+  let !tA_ = tA * secndPlaceW32Radix + fromIntegral i1 * radixW32 + fromIntegral i2
+      !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
+      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
+   in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
+
+theNextIterations :: ItrLst_ -> Integer -- //FIXME wrd64Xs should not be strict so that it can be streamed?
+theNextIterations (ItrLst_ !currlen# wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) =
   yCumulative___ $ foldr' tniCore (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) (fromIntegral <$> wrd64Xs)
 
 theNextIterationsBA :: ItrBA -> Integer
@@ -183,6 +215,9 @@ theNextIterationsUVIrvrsd (ItrUV !currlen# !wrd64BA !yCumulatedAcc0 !rmndr !tbfx
 toItr__ :: ItrLst_ -> Itr__
 toItr__ (ItrLst_ l _ y r t) = Itr__ l y r t
 
+fromPPtoItr__ :: ItrLstPP -> Itr__
+fromPPtoItr__ (ItrLstPP l _ y r t) = Itr__ l y r t
+
 -- | SL = Straight Line Code
 theNextIterationsRvrsdSLCode :: ItrLst_ -> Integer
 theNextIterationsRvrsdSLCode itrxs@(ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldl' tniRvrsdSL (toItr__ itrxs) wrd64Xs -- inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
@@ -207,6 +242,33 @@ theNextIterationsRvrsdSLCode itrxs@(ItrLst_ !currlen# !wrd64Xs@(_) !yCumulatedAc
           !tcfx__# = if isTrue# ((cl# +# 1#) <# 3#) then inline nextDownFX# $ tCFx__# !+## inline unsafeword64ToFloatingX## yTildeFinal__# else tCFx__# -- recall tcfx is already scaled by 32. Do not use normalize here
        in go zs (Itr__ (cl# +# 2#) ycUpdated__ remFinal__ tcfx__#) -- rFinalXs
     go [x1] itracc = go [] (inline tniRvrsdSL itracc x1)
+
+-- | SL = Straight Line Code
+theNextIterationsN_ :: ItrLst_ -> Integer
+theNextIterationsN_ itrxs@(ItrLst_ !currlen# wrd64Xs !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldl' tniRvrsdSL (toItr__ itrxs) wrd64Xs -- inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
+  where
+    tniRvrsdSL :: Itr__ -> Word64 -> Itr__
+    tniRvrsdSL = flip tniCore
+    {-# INLINE tniRvrsdSL #-}
+
+-- Step 1: Pair up the list
+pairUp :: [Word32] -> [(Word32, Word32)]
+pairUp (x:y:rest) = (x, y) : pairUp rest
+pairUp _          = []  -- drop last if odd number
+
+pairUpUnfoldr :: [Word32] -> [(Word32, Word32)]
+pairUpUnfoldr = unfoldr step
+  where
+    step (x:y:rest) = Just ((x, y), rest)
+    step _          = Nothing
+
+theNextIterationsPP :: Int -> ItrLstPP -> Integer
+theNextIterationsPP len itrxs@(ItrLstPP !currlen# wrd32Xs !yCumulatedAcc0 !rmndr !tbfx#) = yCumulative___ $ foldl' tniRvrsdPP (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) (pairUpUnfoldr wrd32Xs) -- inline go wrd64Xs (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
+  where
+    tniRvrsdPP :: Itr__ -> (Word32, Word32) -> Itr__
+    tniRvrsdPP = flip tniCorePP
+    {-# INLINE tniRvrsdPP #-}
+
 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
@@ -489,6 +551,24 @@ stageList_ l xs =
   where
     !evenYes = even l
     !splitFn = if evenYes then splitLastTwo else splitLastOne
+
+{-# INLINE stageListN_ #-} -- incoming xs is a normal format list of digits (MSB first)
+stageListN_ :: Int -> [Word32] -> (Bool, [Word64], [Word32]) -- //FIXME WHY WORD64 LIST?
+stageListN_ l xs =
+  case splitFn xs l of
+    (firstElems, rstEvenLen) -> (evenYes, mkIW32EvenRestLstN_ l True rstEvenLen, firstElems)
+  where
+    !evenYes = even l
+    !splitFn = if evenYes then splitFirstTwo else splitFirstOne
+
+{-# INLINE preProcessList #-} -- incoming xs is a normal format list of digits (MSB first)
+preProcessList :: Int -> [Word32] -> (Bool, [Word32], [Word32]) 
+preProcessList l xs =
+  case splitFn xs l of
+    (firstElems, rstEvenLen) -> (evenYes, rstEvenLen, firstElems)
+  where
+    !evenYes = even l
+    !splitFn = if evenYes then splitFirstTwo else splitFirstOne
 
 {-# INLINE stageListRvrsd #-}
 stageListRvrsd :: [Word32] -> (Bool, [Word64], [Word32])

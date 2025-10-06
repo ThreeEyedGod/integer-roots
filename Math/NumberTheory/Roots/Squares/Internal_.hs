@@ -51,8 +51,10 @@ isqrtB_ :: (Integral a) => Int -> a -> a
 isqrtB_ _ 0 = 0
 -- isqrtB_ l n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd_ l . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV_ l .dgtsLstBase32 . fromIntegral $ n
-isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . stageList_ l . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . stageList_ l . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd_ l . dgtsLstBase32 . fromIntegral $ n
+-- isqrtB_ l n = fromInteger . theNextIterationsN_ . theFirstXsN . stageListN_ l . dgtsLstBase32_ . fromIntegral $ n
+isqrtB_ l n = fromInteger . theNextIterationsPP l . theFirstXsPostProcess . preProcessList l . dgtsLstBase32_ . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
 karatsubaSqrt :: Integer -> (Integer, Integer)
