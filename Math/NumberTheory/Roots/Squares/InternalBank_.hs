@@ -602,37 +602,30 @@ stageUVrvrsd xs = case stageListRvrsd xs of (evenLen, ws, lastElems) -> (evenLen
 stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
 stageUVrvrsd_ l xs = case stageListRvrsd_ l xs of (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
 
-streamDigitsInOrder :: Int -> Bool -> [Integer] -> Integer -> Integer
-streamDigitsInOrder l eY rPwrs n = yCumulative___ $ go n pm pm (Itr__ 1# 0 0 zeroFx#) 
+streamDigitsInOrder :: Int -> Bool -> Integer -> Integer
+streamDigitsInOrder l eY n = yCumulative___ $ go n (radixW32^pm) pm pm (Itr__ 1# 0 0 zeroFx#) 
   where
     !pm = l - 1 
     -- Extract digits from most significant to least significant
-    go :: Integer -> Int -> Int -> Itr__ -> Itr__
-    go x pMax p acc
+    go :: Integer -> Integer -> Int -> Int -> Itr__ -> Itr__
+    go x powr pMax p acc
       | firstIter && not eY  = 
           let 
-              !power = rPwrs !! p --radixW32 ^ p
-              !(digit, y) = x `quotRem` power
-          in go y pMax (p - 1) (theFirstIter False [fromIntegral digit] acc) -- accFn False [fromIntegral digit] acc
+              !(digit, y) = x `quotRem` powr
+          in go y powr pMax (p - 1) (theFirstIter False [fromIntegral digit] acc) -- accFn False [fromIntegral digit] acc
       | firstIter && eY = 
           let 
-              !power = rPwrs !! p -- radixW32 ^ p
-              !(digit, y) = x `quotRem` power
-              !p2 = p - 1
-              !power2 = rPwrs !! p2 --radixW32 ^ p2
+              [power1, power2] = scanl div powr [radixW32]
+              !(digit, y) = x `quotRem` powr
               !(digit2, z) = y `quotRem` power2
-              !p3 = p2 - 1
-          in go z pMax p3 (theFirstIter True [fromIntegral digit,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
+          in go z power2 pMax (p-2) (theFirstIter True [fromIntegral digit,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
       | p < 0  = acc
       | otherwise = 
           let 
-              !power1 = rPwrs !! p -- radixW32 ^ p
+              [_, power1, power2] = scanl div powr [radixW32, radixW32]
               !(digit1, y) = x `quotRem` power1
-              !p2 = p - 1
-              !power2 = rPwrs !! p2 --radixW32 ^ p2
               !(digit2, z) = y `quotRem` power2
-              !p3 = p2 - 1 
-          in go z pMax p3 (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
+          in go z power2 pMax (p-2) (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
      where 
         !firstIter = p == pMax 
         theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
