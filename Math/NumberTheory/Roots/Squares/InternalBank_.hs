@@ -606,7 +606,7 @@ streamDigitsInOrder :: Int -> Bool -> Integer -> Integer
 streamDigitsInOrder l eY n = yCumulative___ $ go n (radixW32^pm) pm pm (Itr__ 1# 0 0 zeroFx#) 
   where
     !pm = l - 1 
-    -- Extract digits from most significant to least significant
+    -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
     go :: Integer -> Integer -> Int -> Int -> Itr__ -> Itr__
     go x powr pMax p acc
       | not firstIter && p >= 1 = 
@@ -621,7 +621,7 @@ streamDigitsInOrder l eY n = yCumulative___ $ go n (radixW32^pm) pm pm (Itr__ 1#
           in go y powr pMax (p - 1) (theFirstIter False [fromIntegral digit] acc) -- accFn False [fromIntegral digit] acc
       | firstIter && eY = 
           let 
-              ![power1, power2] = scanl div powr [radixW32]
+              ![power1, power2] = scanl div powr [radixW32] -- [powr, powr `div` radixW32]
               !(digit1, y) = x `quotRem` power1 -- powr
               !(digit2, z) = y `quotRem` power2
           in go z power2 pMax (p-2) (theFirstIter True [fromIntegral digit1,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
@@ -630,7 +630,7 @@ streamDigitsInOrder l eY n = yCumulative___ $ go n (radixW32^pm) pm pm (Itr__ 1#
      where 
         !firstIter = p == pMax 
         theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
-        theFirstIter ev pairdgt _ = case theFirstPostProcess (ev, pairdgt) of  (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
+        theFirstIter evn pairdgt _ = case theFirstPostProcess (evn, pairdgt) of  (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
         theNextIters :: [Word32] -> Itr__ -> Itr__
         theNextIters [x1,x2] (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) = tniCorePP (x1, x2) (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
         theNextIters _ _ = error "Poor inputs"
