@@ -609,23 +609,24 @@ streamDigitsInOrder l eY n = yCumulative___ $ go n (radixW32^pm) pm pm (Itr__ 1#
     -- Extract digits from most significant to least significant
     go :: Integer -> Integer -> Int -> Int -> Itr__ -> Itr__
     go x powr pMax p acc
+      | not firstIter && p >= 1 = 
+          let 
+              ![_, power1, power2] = scanl div powr [radixW32, radixW32]
+              !(digit1, y) = x `quotRem` power1
+              !(digit2, z) = y `quotRem` power2
+          in go z power2 pMax (p-2) (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
       | firstIter && not eY  = 
           let 
               !(digit, y) = x `quotRem` powr
           in go y powr pMax (p - 1) (theFirstIter False [fromIntegral digit] acc) -- accFn False [fromIntegral digit] acc
       | firstIter && eY = 
           let 
-              [power1, power2] = scanl div powr [radixW32]
-              !(digit, y) = x `quotRem` powr
+              ![power1, power2] = scanl div powr [radixW32]
+              !(digit1, y) = x `quotRem` power1 -- powr
               !(digit2, z) = y `quotRem` power2
-          in go z power2 pMax (p-2) (theFirstIter True [fromIntegral digit,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
+          in go z power2 pMax (p-2) (theFirstIter True [fromIntegral digit1,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
       | p < 0  = acc
-      | otherwise = 
-          let 
-              [_, power1, power2] = scanl div powr [radixW32, radixW32]
-              !(digit1, y) = x `quotRem` power1
-              !(digit2, z) = y `quotRem` power2
-          in go z power2 pMax (p-2) (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
+      | otherwise = error "undefined entry in go"
      where 
         !firstIter = p == pMax 
         theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
