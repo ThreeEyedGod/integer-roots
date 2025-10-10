@@ -602,49 +602,43 @@ stageUVrvrsd xs = case stageListRvrsd xs of (evenLen, ws, lastElems) -> (evenLen
 stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
 stageUVrvrsd_ l xs = case stageListRvrsd_ l xs of (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
 
-streamDigitsInOrder :: (Integral a) => Int -> a -> Integer
-streamDigitsInOrder l n = yCumulative___ $ go (toInteger n) pm pm (Itr__ 1# 0 0 zeroFx#) 
+streamDigitsInOrder :: (Integral a) => Int -> Bool -> [Integer] -> a -> Integer
+streamDigitsInOrder l eY rPwrs n = yCumulative___ $ go (toInteger n) pm pm (Itr__ 1# 0 0 zeroFx#) 
   where
-    pm = l - 1 
+    !pm = l - 1 
     -- Extract digits from most significant to least significant
     go :: Integer -> Int -> Int -> Itr__ -> Itr__
     go x pMax p acc
       | p < 0  = acc
-      | firstIter && not evenYes  = 
-          let b = radixW32 
-              power = b ^ p
-              digit = x `div` power
-              y = x - digit * power
+      | firstIter && not eY  = 
+          let 
+              !power = rPwrs !! p --radixW32 ^ p
+              !(digit, y) = x `quotRem` power
           in go y pMax (p - 1) (theFirstIter False [fromIntegral digit] acc) -- accFn False [fromIntegral digit] acc
-      | firstIter && evenYes = 
-          let b = radixW32 
-              power = b ^ p
-              digit = x `div` power
-              y = x - digit * power
-              p2 = p - 1
-              power2 = b ^ p2
-              digit2 = y `div` power2
-              p3 = p2 - 1
-              z = y - digit2 * power2
+      | firstIter && eY = 
+          let 
+              !power = rPwrs !! p -- radixW32 ^ p
+              !(digit, y) = x `quotRem` power
+              !p2 = p - 1
+              !power2 = rPwrs !! p2 --radixW32 ^ p2
+              !(digit2, z) = y `quotRem` power2
+              !p3 = p2 - 1
           in go z pMax p3 (theFirstIter True [fromIntegral digit,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
       | otherwise = 
-          let b = radixW32 
-              power1 = b ^ p
-              digit1 = x `div` power1
-              y = x - digit1 * power1
-              p2 = p - 1
-              power2 = b ^ p2
-              digit2 = y `div` power2
-              p3 = p2 - 1 
-              z = y - digit2 * power2
+          let 
+              !power1 = rPwrs !! p -- radixW32 ^ p
+              !(digit1, y) = x `quotRem` power1
+              !p2 = p - 1
+              !power2 = rPwrs !! p2 --radixW32 ^ p2
+              !(digit2, z) = y `quotRem` power2
+              !p3 = p2 - 1 
           in 
-            go z pMax p3 (theNextIters True [fromIntegral digit1,fromIntegral digit2] acc) 
+            go z pMax p3 (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
      where 
         !firstIter = p == pMax 
-        !evenYes = even l
         theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
         theFirstIter True pairdgt _ = case theFirstPostProcess (True, pairdgt) of  (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
         theFirstIter False pairdgt _ = case theFirstPostProcess (False, pairdgt) of (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
-        theNextIters :: Bool -> [Word32] -> Itr__ -> Itr__
-        theNextIters _ [x1,x2] (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) = tniCorePP (x1, x2) (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
-        theNextIters _ _ _ = error "Poor inputs"
+        theNextIters :: [Word32] -> Itr__ -> Itr__
+        theNextIters [x1,x2] (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) = tniCorePP (x1, x2) (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
+        theNextIters _ _ = error "Poor inputs"
