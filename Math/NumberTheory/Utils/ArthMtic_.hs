@@ -595,6 +595,7 @@ iToWrdListBase_ 0 _ = [0]
 -- iToWrdListBase_ i b = reverse $ digitsUnsigned b (fromIntegral i) -- digits come in normal format MSB --> LSB //FIXME reverse defeats the purpose no longer lazy. Evaluated !
 iToWrdListBase_ i b = digitsInOrder (fromIntegral i) b -- digits come in normal format MSB --> LSB //FIXME reverse defeats the purpose no longer lazy. Evaluated !
 
+-- | this is not lazy and will definitely be fully eagerly evaluated !!!
 digitsInOrder :: (Integral a) => a -> Word -> [Word]
 digitsInOrder _ base | base <= 1 = error "Base must be greater than 1"
 digitsInOrder n base = map fromInteger $ go (toInteger n) (highestPower (toInteger n) (toInteger base))
@@ -614,7 +615,6 @@ digitsInOrder n base = map fromInteger $ go (toInteger n) (highestPower (toInteg
               power = b ^ p
               digit = x `div` power
           in digit : go (x - digit * power) (p - 1)
-
 
 {-# INLINE convertBase #-}
 convertBase :: Word -> Word -> [Word] -> [Word]
