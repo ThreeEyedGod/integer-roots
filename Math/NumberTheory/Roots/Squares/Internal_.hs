@@ -55,7 +55,7 @@ isqrtB_ _ 0 = 0
 -- isqrtB_ l n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd_ l . dgtsLstBase32 . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsN_ . theFirstXsN . stageListN_ l . dgtsLstBase32_ . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsPP l . theFirstXsPostProcess . preProcessList l . dgtsLstBase32_ . fromIntegral $ n
-isqrtB_ l n = let radixW32Powers = [ powers | x <- [0..], let powers = radixW32^x  ] in fromInteger . streamDigitsInOrder l (even l) radixW32Powers . fromIntegral $ n
+isqrtB_ l n = let radixW32Powers = [ powers | x <- [0..l-1], let powers = radixW32^x  ] in fromInteger . streamDigitsInOrder l (even l) radixW32Powers . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
 karatsubaSqrt :: Integer -> (Integer, Integer)
