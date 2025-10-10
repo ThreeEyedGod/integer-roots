@@ -602,14 +602,13 @@ stageUVrvrsd xs = case stageListRvrsd xs of (evenLen, ws, lastElems) -> (evenLen
 stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
 stageUVrvrsd_ l xs = case stageListRvrsd_ l xs of (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
 
-streamDigitsInOrder :: (Integral a) => Int -> Bool -> [Integer] -> a -> Integer
-streamDigitsInOrder l eY rPwrs n = yCumulative___ $ go (toInteger n) pm pm (Itr__ 1# 0 0 zeroFx#) 
+streamDigitsInOrder :: Int -> Bool -> [Integer] -> Integer -> Integer
+streamDigitsInOrder l eY rPwrs n = yCumulative___ $ go n pm pm (Itr__ 1# 0 0 zeroFx#) 
   where
     !pm = l - 1 
     -- Extract digits from most significant to least significant
     go :: Integer -> Int -> Int -> Itr__ -> Itr__
     go x pMax p acc
-      | p < 0  = acc
       | firstIter && not eY  = 
           let 
               !power = rPwrs !! p --radixW32 ^ p
@@ -624,6 +623,7 @@ streamDigitsInOrder l eY rPwrs n = yCumulative___ $ go (toInteger n) pm pm (Itr_
               !(digit2, z) = y `quotRem` power2
               !p3 = p2 - 1
           in go z pMax p3 (theFirstIter True [fromIntegral digit,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
+      | p < 0  = acc
       | otherwise = 
           let 
               !power1 = rPwrs !! p -- radixW32 ^ p
@@ -632,13 +632,11 @@ streamDigitsInOrder l eY rPwrs n = yCumulative___ $ go (toInteger n) pm pm (Itr_
               !power2 = rPwrs !! p2 --radixW32 ^ p2
               !(digit2, z) = y `quotRem` power2
               !p3 = p2 - 1 
-          in 
-            go z pMax p3 (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
+          in go z pMax p3 (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
      where 
         !firstIter = p == pMax 
         theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
-        theFirstIter True pairdgt _ = case theFirstPostProcess (True, pairdgt) of  (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
-        theFirstIter False pairdgt _ = case theFirstPostProcess (False, pairdgt) of (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
+        theFirstIter ev pairdgt _ = case theFirstPostProcess (ev, pairdgt) of  (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
         theNextIters :: [Word32] -> Itr__ -> Itr__
         theNextIters [x1,x2] (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) = tniCorePP (x1, x2) (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
         theNextIters _ _ = error "Poor inputs"
