@@ -167,6 +167,15 @@ tniCore i (Itr__ !cl# !yCAcc_ !tA !t#) =
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
    in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
 
+{-# INLINE tniCoreReverse #-}
+tniCoreReverse :: (Word32, Word32) -> Itr__ -> Itr__
+tniCoreReverse (i1,i2) (Itr__ !cl# !yCAcc_ !tA !t#) =
+  let !tA_ = tA * secndPlaceW32Radix + fromIntegral i2 * radixW32 + fromIntegral i1
+      !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
+      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
+   in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
+
 {-# INLINE tniCorePP #-}
 tniCorePP :: (Word32, Word32) -> Itr__ -> Itr__
 tniCorePP (i1,i2) (Itr__ !cl# !yCAcc_ !tA !t#) =
@@ -634,3 +643,51 @@ streamDigitsInOrder l eY n = yCumulative___ $ go n (radixW32^pm) pm pm (Itr__ 1#
         theNextIters :: [Word32] -> Itr__ -> Itr__
         theNextIters [x1,x2] (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) = tniCorePP (x1, x2) (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
         theNextIters _ _ = error "Poor inputs"
+-- //FIXME TRY USING QUOTQUOT PACKAGE?
+
+
+
+-- -- | Returns the digits of a positive integer as a Maybe list, in reverse order
+-- --   or Nothing if a zero or negative base is given
+-- --   This is slightly more efficient than in forward order.
+-- mDigitsRev :: Integral n
+--     => n         -- ^ The base to use.
+--     -> n         -- ^ The number to convert to digit form.
+--     -> Maybe [n] -- ^ Nothing or Just the digits of the number in list form, in reverse.
+-- mDigitsRev base i = if base < 1
+--                     then Nothing -- We do not support zero or negative bases
+--                     else Just $ dr base i
+--     where
+--       dr _ 0 = []
+--       dr b x = case base of
+--                 1 -> genericTake x $ repeat 1
+--                 _ -> let (rest, lastDigit) = quotRem x b
+--                      in lastDigit : dr b rest
+
+streamDigitsInReverse :: Int -> Bool -> Integer -> Integer
+streamDigitsInReverse l eY n = yCumulative___ $ go n n 1 l (Itr__ 1# 0 0 zeroFx#) 
+  where
+    go :: Integer -> Integer -> Int -> Int -> Itr__ -> Itr__
+    go x n p l acc
+      | not firstIter && p <= l = 
+          let 
+              !(digit1, y) = x `quotRem` radixW32
+              !(digit2, z) = y `quotRem` radixW32
+          in go z n (p+1) l (theNextIters [fromIntegral digit2,fromIntegral digit1] acc) 
+      | firstIter && not eY  = 
+          let 
+              !(digit2, y) = x `quotRem` radixW32
+          in go y n (p+1) l (theFirstIter False [fromIntegral digit2, 0] acc) -- accFn False [fromIntegral digit] acc
+      | firstIter && eY = 
+          let 
+              !(digit1, y) = x `quotRem` radixW32 -- powr
+              !(digit2, z) = y `quotRem` radixW32
+          in go z n (p+1) l (theFirstIter True [fromIntegral digit2,fromIntegral digit1] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
+      | p > l = acc
+      | otherwise = error "undefined entry in go"
+     where 
+        !firstIter = x == n 
+        theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
+        theFirstIter evn pairdgt _ = case theFirstCore (evn, pairdgt) of (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
+        theNextIters :: [Word32] -> Itr__ -> Itr__
+        theNextIters [x1, x2] = tniCoreReverse (x1,x2)

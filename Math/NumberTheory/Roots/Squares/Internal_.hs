@@ -56,6 +56,7 @@ isqrtB_ _ 0 = 0
 -- isqrtB_ l n = fromInteger . theNextIterationsN_ . theFirstXsN . stageListN_ l . dgtsLstBase32_ . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsPP l . theFirstXsPostProcess . preProcessList l . dgtsLstBase32_ . fromIntegral $ n
 isqrtB_ l n = fromInteger . streamDigitsInOrder l (even l) . fromIntegral $ n
+-- isqrtB_ l n = fromInteger . streamDigitsInReverse l (even l) . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
 karatsubaSqrt :: Integer -> (Integer, Integer)
