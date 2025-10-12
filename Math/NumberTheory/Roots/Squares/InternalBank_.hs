@@ -612,28 +612,28 @@ stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
 stageUVrvrsd_ l xs = case stageListRvrsd_ l xs of (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
 
 streamDigitsInOrder :: Int -> Bool -> Integer -> Integer
-streamDigitsInOrder l eY n = yCumulative___ $ go n (radixW32^pm) pm pm (Itr__ 1# 0 0 zeroFx#) 
+streamDigitsInOrder l eY n = yCumulative___ $ go n pm pm (Itr__ 1# 0 0 zeroFx#) 
   where
     !pm = l - 1 
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
-    go :: Integer -> Integer -> Int -> Int -> Itr__ -> Itr__
-    go x powr pMax p acc
+    go :: Integer -> Int -> Int -> Itr__ -> Itr__
+    go x pMax p acc
       | not firstIter && p >= 1 = 
           let 
-              ![_, power1, power2] = scanl div powr [radixW32, radixW32]
+              ![power1, power2] = scanr1 (*) [radixW32, radixW32^(p-1)]
               !(digit1, y) = x `quotRem` power1
               !(digit2, z) = y `quotRem` power2
-          in go z power2 pMax (p-2) (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
+          in go z pMax (p-2) (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
       | firstIter && not eY  = 
           let 
-              !(digit, y) = x `quotRem` powr
-          in go y powr pMax (p - 1) (theFirstIter False [fromIntegral digit] acc) -- accFn False [fromIntegral digit] acc
+              !(digit, y) = x `quotRem` (radixW32 ^ pMax) 
+          in go y pMax (p - 1) (theFirstIter False [fromIntegral digit] acc) 
       | firstIter && eY = 
           let 
-              ![power1, power2] = scanl div powr [radixW32] -- [powr, powr `div` radixW32]
+              ![power1, power2] = scanr1 (*) [radixW32, radixW32^(pMax-1)]
               !(digit1, y) = x `quotRem` power1 -- powr
               !(digit2, z) = y `quotRem` power2
-          in go z power2 pMax (p-2) (theFirstIter True [fromIntegral digit1,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
+          in go z pMax (p-2) (theFirstIter True [fromIntegral digit1,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
       | p < 0  = acc
       | otherwise = error "undefined entry in go"
      where 
