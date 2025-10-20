@@ -21,7 +21,7 @@
 module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
-
+import GHC.Num.BigNat (BigNat(..), bigNatIsZero, bigNatQuotRemWord#, bigNatSize#, BigNat#)
 import Data.List (foldl', unfoldr)
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.Primitive.ByteArray (ByteArray, byteArrayFromList, foldrByteArray)
@@ -96,6 +96,12 @@ import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
 import Prelude hiding (pred)
+
+import Data.Bits (finiteBitSize)
+import GHC.Exts (Word#, Word(..), uncheckedShiftRL#, and#, timesWord2#, minusWord#, quotRemWord#, timesWord#, Int(..), iShiftRL#, isTrue#, word2Int#, (>#), (*#))
+import GHC.Natural (Natural(..))
+import GHC.Num.Natural (naturalFromBigNat#)
+import GHC.Num.BigNat (BigNat(..), bigNatIsZero, bigNatQuotRemWord#, bigNatSize#, BigNat#)
 
 -- *********** END NEW IMPORTS
 
@@ -645,49 +651,56 @@ streamDigitsInOrder l eY n = yCumulative___ $ go n pm pm (Itr__ 1# 0 0 zeroFx#)
         theNextIters _ _ = error "Poor inputs"
 -- //FIXME TRY USING QUOTQUOT PACKAGE?
 
-
-
--- -- | Returns the digits of a positive integer as a Maybe list, in reverse order
--- --   or Nothing if a zero or negative base is given
--- --   This is slightly more efficient than in forward order.
--- mDigitsRev :: Integral n
---     => n         -- ^ The base to use.
---     -> n         -- ^ The number to convert to digit form.
---     -> Maybe [n] -- ^ Nothing or Just the digits of the number in list form, in reverse.
--- mDigitsRev base i = if base < 1
---                     then Nothing -- We do not support zero or negative bases
---                     else Just $ dr base i
---     where
---       dr _ 0 = []
---       dr b x = case base of
---                 1 -> genericTake x $ repeat 1
---                 _ -> let (rest, lastDigit) = quotRem x b
---                      in lastDigit : dr b rest
-
-streamDigitsInReverse :: Int -> Bool -> Integer -> Integer
-streamDigitsInReverse l eY n = yCumulative___ $ go n n 1 l (Itr__ 1# 0 0 zeroFx#) 
+-- This will not work. The Fabio Romano algo will only work as MSB to LSB
+streamDigitsLSBtoMSB :: Int -> Bool -> Integer -> Integer
+streamDigitsLSBtoMSB l eY n = yCumulative___ $ go (fromIntegral n) True pm (Itr__ 1# 0 0 zeroFx#) 
   where
-    go :: Integer -> Integer -> Int -> Int -> Itr__ -> Itr__
-    go x n p l acc
-      | not firstIter && p <= l = 
-          let 
-              !(digit1, y) = x `quotRem` radixW32
-              !(digit2, z) = y `quotRem` radixW32
-          in go z n (p+1) l (theNextIters [fromIntegral digit2,fromIntegral digit1] acc) 
+    theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
+    theFirstIter evn pairdgt _ = case theFirstCore (evn, pairdgt) of  (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
+    theNextIters :: [Word32] -> Itr__ -> Itr__
+    theNextIters [x1,x2] (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) = tniCoreReverse (x1, x2) (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
+    theNextIters _ _ = error "Poor inputs"
+    grab2Words :: Word# -> (Word32, Word32, Word)
+    grab2Words w# = let !(# qw1#, rw1# #) = w# `quotRemWord#` radixW32# 
+                        !digit1 = W# rw1#
+                        !(# qw2#, rw2# #) = qw1# `quotRemWord#` radixW32# 
+                        !digit2 = W# rw2#
+                    in (fromIntegral digit1, fromIntegral digit2, W# qw2#)
+    grab2Word32BN :: BigNat# -> (Word32, Word32, Natural)
+    grab2Word32BN n# = let !(# qbn1#, rw1# #) = n# `bigNatQuotRemWord#` radixW32# 
+                           !digit1 = W# rw1#
+                           !(# qbn2#, rw2# #) = qbn1# `bigNatQuotRemWord#` radixW32# 
+                           !digit2 = W# rw2#
+                       in (fromIntegral digit1, fromIntegral digit2, naturalFromBigNat# qbn2#)
+    !pm = l - 1 
+    !(W# radixW32#) = radixW32 
+    --  digits from least significant to most significant index 0 to max 
+    go :: Natural -> Bool -> Int -> Itr__ -> Itr__
+    go (NatS# snw#) firstIter p acc
+      | not firstIter && p >= 1 = let (lsb, msb, qw2) = grab2Words snw#
+          in go (fromIntegral qw2) False (p-2) (theNextIters [fromIntegral lsb,fromIntegral msb] acc) 
       | firstIter && not eY  = 
           let 
-              !(digit2, y) = x `quotRem` radixW32
-          in go y n (p+1) l (theFirstIter False [fromIntegral digit2, 0] acc) -- accFn False [fromIntegral digit] acc
-      | firstIter && eY = 
-          let 
-              !(digit1, y) = x `quotRem` radixW32 -- powr
-              !(digit2, z) = y `quotRem` radixW32
-          in go z n (p+1) l (theFirstIter True [fromIntegral digit2,fromIntegral digit1] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
-      | p > l = acc
+              !(# qw1#, rw1# #) = snw# `quotRemWord#` radixW32# 
+              !digit1 = W# rw1#
+          in go (fromIntegral $ W# qw1#) False (p - 1) (theFirstIter False [fromIntegral digit1,0] acc) 
+      | firstIter && eY = let (lsb, msb, qw2) = grab2Words snw#
+          in go (fromIntegral qw2) False (p-2) (theFirstIter True [fromIntegral lsb,fromIntegral msb] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
+      | p < 0  = acc
       | otherwise = error "undefined entry in go"
-     where 
-        !firstIter = x == n 
-        theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
-        theFirstIter evn pairdgt _ = case theFirstCore (evn, pairdgt) of (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
-        theNextIters :: [Word32] -> Itr__ -> Itr__
-        theNextIters [x1, x2] = tniCoreReverse (x1,x2)
+    go x@(NatJ# n@(BN# n#)) firstIter p acc
+      | not firstIter && p >= 1 = 
+          let (lsb, msb, qbn2) = grab2Word32BN n#
+          in go qbn2 False (p-2) (theNextIters [fromIntegral lsb,fromIntegral msb] acc) 
+      | firstIter && not eY  = 
+          let 
+              !(# qbn1#, rw1# #) = n# `bigNatQuotRemWord#` radixW32# 
+              !digit1 = W# rw1#
+          in go (naturalFromBigNat# qbn1#) False (p - 1) (theFirstIter False [fromIntegral digit1,0] acc) 
+      | firstIter && eY = 
+          let (lsb, msb, qbn2) = grab2Word32BN n#
+          in go qbn2 False (p-2) (theFirstIter True [fromIntegral lsb,fromIntegral msb] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
+      | p < 0  = acc
+      | otherwise = error "undefined entry in go"
+    
+-- //FIXME TRY USING QUOTQUOT PACKAGE?

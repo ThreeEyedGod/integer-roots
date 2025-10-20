@@ -1,3 +1,6 @@
+{-# LANGUAGE BangPatterns  #-}
+{-# LANGUAGE MagicHash     #-}
+{-# LANGUAGE UnboxedTuples #-}
 module Main (main) where
 
 import Data.Time.Clock
@@ -9,6 +12,10 @@ import GHC.Environment (getFullArgs)
 import qualified Math.NumberTheory.Roots as Old (integerSquareRoot)
 import qualified Math.NumberTheory.Roots_ as New (integerSquareRoot)
 import System.Random.Stateful (globalStdGen, uniformRM)
+import GHC.Num.BigNat (BigNat(..), bigNatSize#)
+import GHC.Exts (Word#, Word(..), Int(..))
+import GHC.Natural (Natural(..))
+
 
 iRange :: Integer -> (Integer, Integer)
 iRange x = (2 ^ x, 2 ^ (x + 1))
@@ -25,6 +32,7 @@ main = do
   iGoogolplex <- getRndMInt (iRange 511)
   iFZeight <- getRndMInt (iRange 1023)
   iBoogol <- getRndMInt (iRange 2046)
+  printNatSize (fromInteger iBoogol)
   -- putStrLn "iHumongous Old"
   x2 <- timeit (pure $ Old.integerSquareRoot iHumongous)
   print x2
@@ -50,5 +58,11 @@ timeit action = do
 -- | Get a Random Integer with uniform probability in the range (l,u)
 getRndMInt :: (Integer, Integer) -> IO Integer
 getRndMInt (l, u) = max l . min u <$> uniformRM (l, u) globalStdGen -- uniformRM (a, b) = uniformRM (b, a) holds as per fn defn
+
+printNatSize :: Natural -> IO ()
+printNatSize (NatS# n#) = putStrLn $ "Natural size in words: " ++ show (W# (1##))
+printNatSize (NatJ# n@(BN# n#)) = do 
+  let fullSize = bigNatSize# n# 
+  putStrLn $ "Natural size in words: " ++ show (I# fullSize)
 
 --  cabal run integer-roots-exe "+RTS -I0 -K256m -A16m -N8 -H24m -T -w -RTS --output=integer-roots.html" -p
