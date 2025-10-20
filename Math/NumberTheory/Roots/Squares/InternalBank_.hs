@@ -655,7 +655,6 @@ streamDigitsInOrder l eY n = yCumulative___ $ go n pm pm (Itr__ 1# 0 0 zeroFx#)
 strmsblsbNat :: Int -> Bool -> Natural -> Integer
 strmsblsbNat l eY n = yCumulative___ $ go n True pm (Itr__ 1# 0 0 zeroFx#) 
   where
-    !(W# radixW32#) = radixW32 
     !pm = l - 1 
     theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
     theFirstIter evn pairdgt _ = case theFirstPostProcess (evn, pairdgt) of  (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
@@ -666,7 +665,7 @@ strmsblsbNat l eY n = yCumulative___ $ go n True pm (Itr__ 1# 0 0 zeroFx#)
     grab2Words pow w# =  
             let 
               ![W# power1#, W# power2#] = scanr1 (*) [radixW32, radixW32^(pow-1)]
-              !(# digit1#, y# #) = w# `quotRemWord#` power1#
+              !(# digit1#, y# #) = w# `quotRemWord#` power1# -- //FIXME HOW DOES THIS WORK?
               !(# digit2#, z# #) = y# `quotRemWord#` power2#
             in (fromIntegral (W# digit1#), fromIntegral (W# digit2#), W# z#)
     grab2Word32BN :: Int -> BigNat# -> (Word32, Word32, Natural)
@@ -681,7 +680,7 @@ strmsblsbNat l eY n = yCumulative___ $ go n True pm (Itr__ 1# 0 0 zeroFx#)
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
     go :: Natural -> Bool -> Int -> Itr__ -> Itr__
     go (NatS# x#) firstIter p acc
-      | not firstIter && p >= 1 = let (digit1, digit2, z) = grab2Words p x# 
+      | not firstIter && p >= 1 = let !(digit1, digit2, z) = grab2Words p x# 
           in go (fromIntegral z) False (p-2) (theNextIters [digit1, digit2] acc) 
       | firstIter && not eY  = 
           let 
@@ -694,7 +693,7 @@ strmsblsbNat l eY n = yCumulative___ $ go n True pm (Itr__ 1# 0 0 zeroFx#)
       | otherwise = error "undefined entry in go"
 
     go x@(NatJ# n@(BN# n#)) firstIter p acc
-      | not firstIter && p >= 1 = let (digit1, digit2, z) = grab2Word32BN p n# 
+      | not firstIter && p >= 1 = let !(digit1, digit2, z) = grab2Word32BN p n# 
           in go z False (p-2) (theNextIters [digit1, digit2] acc) 
       | firstIter && not eY  = let 
               pw# =  naturalToBigNat# (radixW32 ^ p) 
