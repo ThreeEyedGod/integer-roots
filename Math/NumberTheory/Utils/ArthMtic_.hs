@@ -679,6 +679,7 @@ split# d# =
 
 -- | Some Constants
 {-# INLINE radixW32 #-}
+{-# SPECIALIZE radixW32 :: Natural #-}
 {-# SPECIALIZE radixW32 :: Integer #-}
 {-# SPECIALIZE radixW32 :: Word64 #-}
 {-# SPECIALIZE radixW32 :: Int64 #-}
