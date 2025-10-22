@@ -33,6 +33,7 @@ library
    ,parallel >= 3.2.2.0
    ,primitive >= 0.9.1.0
    ,vector >= 0.13.2.0
+   ,quote-quot >= 0.2.1.0
    -- Note if ever using containers 0.8 of containers results in a confilct
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
@@ -68,6 +69,7 @@ library
                -O2 
                -threaded 
                -fllvm 
+              --  -funfolding-use-threshold=50
                -mfma 
                -fproc-alignment=64
                -funbox-strict-fields

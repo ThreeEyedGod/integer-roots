@@ -64,6 +64,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     word64From2ElemList#,
     dgtsLstBase32_,
     mkIW32EvenRestLstN_,
+    radixW32Squared
   )
 where
 
@@ -679,6 +680,7 @@ split# d# =
 
 -- | Some Constants
 {-# INLINE radixW32 #-}
+{-# SPECIALIZE radixW32 :: Word #-}
 {-# SPECIALIZE radixW32 :: Natural #-}
 {-# SPECIALIZE radixW32 :: Integer #-}
 {-# SPECIALIZE radixW32 :: Word64 #-}
@@ -697,7 +699,12 @@ secndPlaceW32Radix :: Integer
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 {-# INLINE secndPlaceW32Radix #-}
 
-radixW32Squared :: Integer
+{-# SPECIALIZE radixW32Squared :: Word #-}
+{-# SPECIALIZE radixW32Squared :: Natural #-}
+{-# SPECIALIZE radixW32Squared :: Integer #-}
+{-# SPECIALIZE radixW32Squared :: Word64 #-}
+{-# SPECIALIZE radixW32Squared :: Int64 #-}
+radixW32Squared :: (Integral a) => a 
 radixW32Squared = 18446744073709551616 -- secndPlaceRadix
 
 radixW32Cubed :: Integer

@@ -4,6 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OrPatterns #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm dumps else not
@@ -21,6 +22,7 @@
 module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
+import Numeric.QuoteQuot
 import GHC.Num.BigNat (BigNat(..), bigNatIsZero, bigNatQuotRemWord#, bigNatSize#, BigNat#, bigNatFromWord#, bigNatQuotRem#)
 import Data.List (foldl', unfoldr)
 import Data.Bits.Floating (nextDown, nextUp)
@@ -661,7 +663,16 @@ strmsblsbNat l eY n = yCumulative___ $ go n True pm (Itr__ 1# 0 0 zeroFx#)
     theNextIters :: [Word32] -> Itr__ -> Itr__
     theNextIters [x1,x2] (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) = tniCorePP (x1, x2) (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
     theNextIters _ _ = error "Poor inputs"
+    -- Equivalent to (`quot` radixw32).
+    quotremradixW32 :: Word -> (Word, Word)
+    quotremradixW32 = $$(quoteQuotRem 4294967296)
     grab2Words :: Int -> Word# -> (Word32, Word32, Word)
+    grab2Words 1 w# =  
+            let 
+              -- ![W# power1#, W# power2#] = scanr1 (*) [radixW32, 1]
+              !(W# digit1#, W# y#) = quotremradixW32 (W# w#) 
+              !(# digit2#, z# #) = y# `quotRemWord#` 1##
+            in (fromIntegral (W# digit1#), fromIntegral (W# digit2#), W# z#)
     grab2Words pow w# =  
             let 
               ![W# power1#, W# power2#] = scanr1 (*) [radixW32, radixW32^(pow-1)]

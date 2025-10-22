@@ -33,8 +33,16 @@ bench_weigh:
 
 profile:
 	@echo "_____________________creating profile___________"
+	cabal clean
+# 	cabal configure --enable-library-profiling --enable-executable-profiling
+	cabal build --enable-library-profiling  --enable-executable-profiling
 	@rm -rf *.tix
 	cabal run integer-roots-exe -- +RTS -p -s -N4
+
+profile_stack:
+	@echo "creating profile w/stack"
+	stack build --profile
+	stack exec -- grfn-exe  100000 +RTS -p -N4 -RTS
 
 main:
 	@echo "creating main"
