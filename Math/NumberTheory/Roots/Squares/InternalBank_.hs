@@ -101,8 +101,8 @@ import Prelude hiding (pred)
 
 import Data.Bits (finiteBitSize)
 import GHC.Exts (Word#, Word(..), uncheckedShiftRL#, and#, timesWord2#, minusWord#, quotRemWord#, timesWord#, Int(..), iShiftRL#, isTrue#, word2Int#, (>#), (*#))
-import GHC.Natural (Natural(..))
-import GHC.Num.Natural (naturalFromBigNat#, naturalToBigNat#)
+import GHC.Natural (Natural(..),naturalFromInteger)
+import GHC.Num.Natural (naturalFromBigNat#, naturalToBigNat#, )
 import GHC.Num.BigNat (BigNat(..), bigNatIsZero, bigNatQuotRemWord#, bigNatSize#, BigNat#)
 
 -- *********** END NEW IMPORTS
@@ -189,7 +189,8 @@ tniCorePP :: (Word32, Word32) -> Itr__ -> Itr__
 tniCorePP (i1,i2) (Itr__ !cl# !yCAcc_ !tA !t#) =
   let !tA_ = tA * secndPlaceW32Radix + fromIntegral i1 * radixW32 + fromIntegral i2
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
+      -- !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
+      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtNatW64# (naturalFromInteger tA_) tCFx#)
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
    in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
 
@@ -306,6 +307,20 @@ nxtDgtW64# (IP bn#) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 nxtDgtW64# (IS ta#) tcfx# = inline nxtDgtDoubleFxW64## (int2Double# ta#) tcfx# -- chances are this branch is never taken (see how squares_. hs is structured)
 nxtDgtW64# (IN _) !_ = error "nxtDgtW64# :: Invalid negative integer argument"
+
+nxtDgtNatW64# :: Natural -> FloatingX# -> Word64#
+-- nxtDgtW64# n tcfx# = computFxW64# (allInclusivePreComputNToFx## n tcfx#) -- works ! but not any faster
+nxtDgtNatW64# 0 !_ = 0#Word64
+nxtDgtNatW64# x@(NatJ# n@(BN# bn#)) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
+  | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
+  -- \| otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
+  | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
+  where
+    threshold# = let !(I64# e64#) = 10 ^ 137 in FloatingX# 1.9## e64#
+    -- where
+    thresh# :: Int#
+    thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
+nxtDgtNatW64# (NatS# ta#) tcfx# = inline nxtDgtDoubleFxW64## (word2Double# ta#) tcfx# -- chances are this branch is never taken (see how squares_. hs is structured)
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#

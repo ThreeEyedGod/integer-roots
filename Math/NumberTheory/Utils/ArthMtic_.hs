@@ -689,13 +689,20 @@ radixW32 :: (Integral a) => a
 radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
 
 {-# INLINE predRadixW32 #-}
+{-# SPECIALIZE predRadixW32 :: Word #-}
+{-# SPECIALIZE predRadixW32 :: Natural #-}
 {-# SPECIALIZE predRadixW32 :: Integer #-}
 {-# SPECIALIZE predRadixW32 :: Word64 #-}
 {-# SPECIALIZE predRadixW32 :: Int64 #-}
 predRadixW32 :: (Integral a) => a
 predRadixW32 = 4294967295 -- 2 ^ finiteBitSize (0 :: Word32) -1
 
-secndPlaceW32Radix :: Integer
+{-# SPECIALIZE secndPlaceW32Radix :: Word #-}
+{-# SPECIALIZE secndPlaceW32Radix :: Natural #-}
+{-# SPECIALIZE secndPlaceW32Radix :: Integer #-}
+{-# SPECIALIZE secndPlaceW32Radix :: Word64 #-}
+{-# SPECIALIZE secndPlaceW32Radix :: Int64 #-}
+secndPlaceW32Radix :: Integral a => a
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 {-# INLINE secndPlaceW32Radix #-}
 
