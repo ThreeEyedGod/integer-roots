@@ -31,6 +31,7 @@ import qualified Data.Vector.Unboxed as VU
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
+    word64ToWord#,
     Double#,
     Int (..),
     Int#,
@@ -93,7 +94,7 @@ import GHC.Exts
   )
 import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat (..), bigNatSubUnsafe, bigNatMulWord#, BigNat#, bigNatGe, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
+import GHC.Num.BigNat (BigNat (..), bigNatSubUnsafe, bigNatOne#, bigNatAddWord#, bigNatMulWord#, BigNat#, bigNatGe, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer (Integer (..))
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
@@ -491,17 +492,11 @@ computeRem yc ta i =
 
 computeRemW64# :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
 computeRemW64# yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
-computeRemW64# !yc !ta !yTilde_# =
-  let !i = toInteger (W64# yTilde_#)
-      -- !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-      -- !(ycScaled, rdr) = rmdr yc ta i (fromIntegral (W64# yTilde_#))
-      !(ycScaled, rdr) = rmdrNat (fromInteger yc) (fromInteger ta) yTilde_# 
-      !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled + i)) + 1 #) else (# yTilde_#, rdr #)
-   in -- !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, fixRemainder (pred (ycScaled + i)) rdr + 1 #) else (# yTilde_#, rdr #)
-      (# toInteger (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #)
+computeRemW64# !yc !ta !yTilde_# = let  !(# ycScaled, rdrAdj, yAdj# #) = rmdrNat (fromInteger yc) (fromInteger ta) yTilde_# 
+      in (# toInteger (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #)
 {-# INLINE computeRemW64# #-}
 
-rmdrNat :: Natural -> Natural -> Word64# -> (Integer, Integer)
+rmdrNat :: Natural -> Natural -> Word64# -> (# Integer, Integer, Word64# #)
 rmdrNat yc@(NatS# ycw#) ta@(NatS# taw#) yTw# = let 
       !ycScaledBN# = case ycw# `timesWord2#` 0x100000000## of (# hi,lo #) -> bigNatFromWord2# hi lo -- 0x100000000## = 2^32 = radixW32
       !tabn# = bigNatFromWord# taw#
@@ -530,19 +525,22 @@ coreBigNatRmndr# ta# sbtnd# = let
   in (# res#, reg #)
 {-# INLINE coreBigNatRmndr# #-}
 
-coreR :: BigNat# -> Word64# -> BigNat# -> (Integer, Integer)
+coreR :: BigNat# -> Word64# -> BigNat# -> (# Integer, Integer, Word64# #)
 coreR yScaledBN# yTilde# tabn# = let 
     !sbtnd# = subtrahend yScaledBN# (bigNatFromWord64# yTilde#)
-    !rdr = coreRmdr# tabn# sbtnd#  
-  in (naturalToInteger (NatJ# (BN# yScaledBN#)), rdr)
+    !(# yTildeAdj#, rdr #) = coreRmdr# yScaledBN# yTilde# tabn# sbtnd#  
+  in (# naturalToInteger (NatJ# (BN# yScaledBN#)), rdr, yTildeAdj# #)
 {-# INLINE coreR #-}
 
-coreRmdr# :: BigNat# -> BigNat# -> Integer
-coreRmdr# tabn# sbtnd# = let 
+coreRmdr# :: BigNat# -> Word64# -> BigNat# -> BigNat# -> (# Word64#, Integer #)
+coreRmdr# ycScaledbn# yTilde# tabn# sbtnd# = let 
     !(# !abn#,!pos #) = coreBigNatRmndr# tabn# sbtnd# 
     !rdr' = toInteger (NatJ# (BN# abn#)) 
-    !rdr = if pos then rdr' else 0 - rdr' -- watch out negate does not work
-  in rdr
+    !ytrdr = if pos then (# yTilde#, rdr' #) else (# yTilde# `subWord64#` 1#Word64, - rdr' + toInteger (NatJ# (BN# ((ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde# `bigNatSubUnsafe` oneBigNat#) `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#))) #) -- watch out negate does not work
+  in ytrdr
+  where 
+    oneBigNat# :: BigNat#
+    oneBigNat# = bigNatOne# (# #)
 {-# INLINE coreRmdr# #-}
 
 handleFirstRem :: (# Word64#, Integer #) -> (# Integer, Word64#, Integer #)
