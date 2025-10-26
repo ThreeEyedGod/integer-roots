@@ -501,17 +501,6 @@ computeRemW64# !yc !ta !yTilde_# =
       (# toInteger (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #)
 {-# INLINE computeRemW64# #-}
 
-computeRemI64# :: Integer -> Integer -> Int64# -> (# Integer, Int64#, Integer #)
-computeRemI64# yc ta 0#Int64 = (# yc * radixW32, 0#Int64, ta #)
-computeRemI64# yc ta yTilde_# =
-  let !i = toInteger (I64# yTilde_#)
-      !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-      -- !(ycScaled, rdr) = rmdr yc ta i (I64# yTilde_#)
-      !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subInt64#` 1#Int64, rdr + double (pred (ycScaled + i)) + 1 #) else (# yTilde_#, rdr #)
-   in -- !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subInt64#` 1#Int64, fixRemainder (pred (ycScaled + i)) rdr + 1 #) else (# yTilde_#, rdr #)
-      (# toInteger (I64# yAdj#) + ycScaled, yAdj#, rdrAdj #)
-{-# INLINE computeRemI64# #-}
-
 rmdrNat :: Natural -> Natural -> Word64# -> (Integer, Integer)
 rmdrNat yc@(NatS# ycw#) ta@(NatS# taw#) yTw# = let 
       !ycScaledBN# = case ycw# `timesWord2#` 0x100000000## of (# hi,lo #) -> bigNatFromWord2# hi lo -- 0x100000000## = 2^32 = radixW32
@@ -654,41 +643,6 @@ stageUVrvrsd xs = case stageListRvrsd xs of (evenLen, ws, lastElems) -> (evenLen
 {-# INLINE stageUVrvrsd_ #-}
 stageUVrvrsd_ :: Int -> [Word32] -> (Bool, VU.Vector Word64, [Word32])
 stageUVrvrsd_ l xs = case stageListRvrsd_ l xs of (evenLen, ws, lastElems) -> (evenLen, VU.fromList ws, lastElems)
-
-streamDigitsInOrder :: Int -> Bool -> Integer -> Integer
-streamDigitsInOrder l eY n = yCumulative___ $ go n pm pm (Itr__ 1# 0 0 zeroFx#) 
-  where
-    !pm = l - 1 
-    -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
-    go :: Integer -> Int -> Int -> Itr__ -> Itr__
-    go x pMax p acc
-      | not firstIter && p >= 1 = 
-          let 
-              ![power1, power2] = scanr1 (*) [radixW32, radixW32^(p-1)]
-              !(digit1, y) = x `quotRem` power1
-              !(digit2, z) = y `quotRem` power2
-          in go z pMax (p-2) (theNextIters [fromIntegral digit1,fromIntegral digit2] acc) 
-      | firstIter && not eY  = 
-          let 
-              !(digit, y) = x `quotRem` (radixW32 ^ pMax) 
-          in go y pMax (p - 1) (theFirstIter False [fromIntegral digit] acc) 
-      | firstIter && eY = 
-          let 
-              ![power1, power2] = scanr1 (*) [radixW32, radixW32^(pMax-1)]
-              !(digit1, y) = x `quotRem` power1 -- powr
-              !(digit2, z) = y `quotRem` power2
-          in go z pMax (p-2) (theFirstIter True [fromIntegral digit1,fromIntegral digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
-      | p < 0  = acc
-      | otherwise = error "undefined entry in go"
-     where 
-        !firstIter = p == pMax 
-        theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
-        theFirstIter evn pairdgt _ = case theFirstPostProcess (evn, pairdgt) of  (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
-        theNextIters :: [Word32] -> Itr__ -> Itr__
-        theNextIters [x1,x2] (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) = tniCorePP (x1, x2) (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
-        theNextIters _ _ = error "Poor inputs"
--- //FIXME TRY USING QUOTQUOT PACKAGE?
-
 
 strmsblsbNat :: Int -> Bool -> Natural -> Integer
 strmsblsbNat l eY n = yCumulative___ $ go n True pm (Itr__ 1# 0 0 zeroFx#) 
