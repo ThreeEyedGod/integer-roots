@@ -67,7 +67,7 @@ library
                -Wno-unused-matches
                -Wno-missed-specialisations 
                -O2 
-               -threaded 
+              --  -threaded 
                -fllvm 
               --  -funfolding-use-threshold=50
                -mfma 
@@ -77,7 +77,7 @@ library
                -optc-O3
                -optc-ffast-math
                -optc-march=native
-               
+
 test-suite integer-roots-tests
   build-depends:
     base >=4.9 && <5,
@@ -130,9 +130,9 @@ benchmark weigh
   default-language: Haskell2010
   ghc-options     : -O2 
                     -fforce-recomp 
-                    -threaded
-                    -rtsopts
-                    -with-rtsopts=-N6 -w
+                    -- -threaded
+                    -- -rtsopts
+                    -- -with-rtsopts=-N6 -w
   main-is         : Main.hs
   hs-source-dirs  : bench/Weigh
   build-depends: base >= 4.15

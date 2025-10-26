@@ -23,7 +23,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Numeric.QuoteQuot
-import GHC.Num.BigNat (BigNat(..), bigNatIsZero, bigNatQuotRemWord#, bigNatSize#, BigNat#, bigNatFromWord#, bigNatQuotRem#)
+import GHC.Num.BigNat (BigNat(..), bigNatIsZero, bigNatSub, bigNatMul, bigNatAdd, bigNatZero#, bigNatQuotRemWord#, bigNatSize#, BigNat#, bigNatFromWord#, bigNatQuotRem#)
 import Data.List (foldl', unfoldr)
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.Primitive.ByteArray (ByteArray, byteArrayFromList, foldrByteArray)
@@ -38,6 +38,7 @@ import GHC.Exts
     Word (..),
     Word#,
     Word64#,
+    timesWord2#,
     and#,
     build,
     eqInt64#,
@@ -92,7 +93,7 @@ import GHC.Exts
   )
 import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
+import GHC.Num.BigNat (BigNat (..), bigNatSubUnsafe, bigNatMulWord#, BigNat#, bigNatGe, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Num.Integer (Integer (..))
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
@@ -101,9 +102,9 @@ import Prelude hiding (pred)
 
 import Data.Bits (finiteBitSize)
 import GHC.Exts (Word#, Word(..), uncheckedShiftRL#, and#, timesWord2#, minusWord#, quotRemWord#, timesWord#, Int(..), iShiftRL#, isTrue#, word2Int#, (>#), (*#))
-import GHC.Natural (Natural(..),naturalFromInteger)
-import GHC.Num.Natural (naturalFromBigNat#, naturalToBigNat#, )
-import GHC.Num.BigNat (BigNat(..), bigNatIsZero, bigNatQuotRemWord#, bigNatSize#, BigNat#)
+import GHC.Natural (Natural(..),naturalFromInteger,quotRemNatural,timesNatural,naturalToInteger)
+import GHC.Num.Natural (naturalFromBigNat#, naturalToBigNat#, Natural(..))
+import GHC.Num.BigNat (BigNat(..), bigNatGt, bigNatIsZero, bigNatFromWord2#, bigNatQuotRemWord#, bigNatSize#, BigNat#, bigNatZero#, bigNatOne#, bigNatFromWord64#)
 
 -- *********** END NEW IMPORTS
 
@@ -171,7 +172,7 @@ tniCore :: (Integral a) => a -> Itr__ -> Itr__
 tniCore i (Itr__ !cl# !yCAcc_ !tA !t#) =
   let !tA_ = tA * secndPlaceW32Radix + fromIntegral i
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
+      !(# !ycUpdated, !yTildeFinal#, !remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
    in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
 
@@ -180,17 +181,17 @@ tniCoreReverse :: (Word32, Word32) -> Itr__ -> Itr__
 tniCoreReverse (i1,i2) (Itr__ !cl# !yCAcc_ !tA !t#) =
   let !tA_ = tA * secndPlaceW32Radix + fromIntegral i2 * radixW32 + fromIntegral i1
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
+      !(# !ycUpdated, !yTildeFinal#, !remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
    in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
 
 {-# INLINE tniCorePP #-}
 tniCorePP :: (Word32, Word32) -> Itr__ -> Itr__
-tniCorePP (i1,i2) (Itr__ !cl# !yCAcc_ !tA !t#) =
+tniCorePP (!i1,!i2) (Itr__ !cl# !yCAcc_ !tA !t#) =
   let !tA_ = tA * secndPlaceW32Radix + fromIntegral i1 * radixW32 + fromIntegral i2
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
       -- !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtW64# tA_ tCFx#)
-      !(# ycUpdated, !yTildeFinal#, remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtNatW64# (naturalFromInteger tA_) tCFx#)
+      !(# !ycUpdated, !yTildeFinal#, !remFinal #) = computeRemW64# yCAcc_ tA_ (nxtDgtNatW64# (naturalFromInteger tA_) tCFx#)
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
    in Itr__ (cl# +# 1#) ycUpdated remFinal tcfx# -- rFinalXs
 
@@ -490,10 +491,11 @@ computeRem yc ta i =
 
 computeRemW64# :: Integer -> Integer -> Word64# -> (# Integer, Word64#, Integer #)
 computeRemW64# yc ta 0#Word64 = (# yc * radixW32, 0#Word64, ta #)
-computeRemW64# yc ta yTilde_# =
+computeRemW64# !yc !ta !yTilde_# =
   let !i = toInteger (W64# yTilde_#)
       -- !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-      !(ycScaled, rdr) = rmdr yc ta i (fromIntegral (W64# yTilde_#))
+      -- !(ycScaled, rdr) = rmdr yc ta i (fromIntegral (W64# yTilde_#))
+      !(ycScaled, rdr) = rmdrNat (fromInteger yc) (fromInteger ta) yTilde_# 
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, rdr + double (pred (ycScaled + i)) + 1 #) else (# yTilde_#, rdr #)
    in -- !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subWord64#` 1#Word64, fixRemainder (pred (ycScaled + i)) rdr + 1 #) else (# yTilde_#, rdr #)
       (# toInteger (W64# yAdj#) + ycScaled, yAdj#, rdrAdj #)
@@ -503,12 +505,56 @@ computeRemI64# :: Integer -> Integer -> Int64# -> (# Integer, Int64#, Integer #)
 computeRemI64# yc ta 0#Int64 = (# yc * radixW32, 0#Int64, ta #)
 computeRemI64# yc ta yTilde_# =
   let !i = toInteger (I64# yTilde_#)
-      -- !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-      !(ycScaled, rdr) = rmdr yc ta i (I64# yTilde_#)
+      !(ycScaled, rdr) = let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
+      -- !(ycScaled, rdr) = rmdr yc ta i (I64# yTilde_#)
       !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subInt64#` 1#Int64, rdr + double (pred (ycScaled + i)) + 1 #) else (# yTilde_#, rdr #)
    in -- !(# yAdj#, rdrAdj #) = if rdr < 0 then (# yTilde_# `subInt64#` 1#Int64, fixRemainder (pred (ycScaled + i)) rdr + 1 #) else (# yTilde_#, rdr #)
       (# toInteger (I64# yAdj#) + ycScaled, yAdj#, rdrAdj #)
 {-# INLINE computeRemI64# #-}
+
+rmdrNat :: Natural -> Natural -> Word64# -> (Integer, Integer)
+rmdrNat yc@(NatS# ycw#) ta@(NatS# taw#) yTw# = let 
+      !ycScaledBN# = case ycw# `timesWord2#` 0x100000000## of (# hi,lo #) -> bigNatFromWord2# hi lo -- 0x100000000## = 2^32 = radixW32
+      !tabn# = bigNatFromWord# taw#
+    in coreR ycScaledBN# yTw# tabn#
+rmdrNat yc@(NatJ# (BN# ycbn#)) ta@(NatS# taw#) yTw# = let 
+      !ycScaledBN# = bigNatMulWord# ycbn# 0x100000000## -- 0x100000000## = 2^32 = radixW32
+      !tabn# = bigNatFromWord# taw#
+    in coreR ycScaledBN# yTw# tabn#
+rmdrNat yc@(NatS# ycw#) ta@(NatJ# (BN# tabn#)) yTw# = let 
+      !ycScaledBN# = case ycw# `timesWord2#` 0x100000000## of (# hi,lo #) -> bigNatFromWord2# hi lo -- 0x100000000## = 2^32 = radixW32
+    in coreR ycScaledBN# yTw# tabn#
+rmdrNat yc@(NatJ# (BN# ycbn#)) ta@(NatJ# (BN# tabn#)) yTw#  = let
+      !ycScaledBN# = bigNatMulWord# ycbn# 0x100000000## -- 0x100000000## = 2^32 = radixW32
+    in coreR ycScaledBN# yTw# tabn#
+{-# INLINE rmdrNat #-}
+
+subtrahend :: BigNat# -> BigNat# -> BigNat#
+subtrahend yScaled# yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAdd` yTilde# of
+    r1# -> r1# `bigNatMul` yTilde#
+{-# INLINE subtrahend #-}
+
+coreBigNatRmndr# :: BigNat# -> BigNat# -> (# BigNat#, Bool #)
+coreBigNatRmndr# ta# sbtnd# = let 
+    !reg = ta# `bigNatGe` sbtnd# 
+    !res# = if reg then ta# `bigNatSubUnsafe` sbtnd# else sbtnd# `bigNatSubUnsafe` ta#
+  in (# res#, reg #)
+{-# INLINE coreBigNatRmndr# #-}
+
+coreR :: BigNat# -> Word64# -> BigNat# -> (Integer, Integer)
+coreR yScaledBN# yTilde# tabn# = let 
+    !sbtnd# = subtrahend yScaledBN# (bigNatFromWord64# yTilde#)
+    !rdr = coreRmdr# tabn# sbtnd#  
+  in (naturalToInteger (NatJ# (BN# yScaledBN#)), rdr)
+{-# INLINE coreR #-}
+
+coreRmdr# :: BigNat# -> BigNat# -> Integer
+coreRmdr# tabn# sbtnd# = let 
+    !(# !abn#,!pos #) = coreBigNatRmndr# tabn# sbtnd# 
+    !rdr' = toInteger (NatJ# (BN# abn#)) 
+    !rdr = if pos then rdr' else 0 - rdr' -- watch out negate does not work
+  in rdr
+{-# INLINE coreRmdr# #-}
 
 rmdr :: Integer -> Integer -> Integer -> Int64 -> (Integer, Integer)
 rmdr yc ta i yTilde_ =
@@ -702,10 +748,22 @@ strmsblsbNat l eY n = yCumulative___ $ go n True pm (Itr__ 1# 0 0 zeroFx#)
               !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
               !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
             in (fromIntegral $ naturalFromBigNat# digit1#, fromIntegral $ naturalFromBigNat# digit2#, naturalFromBigNat# zbn#)
+    grab2Word32Natural :: Int -> Natural -> (Word32, Word32, Natural)
+    grab2Word32Natural 8 nt = let 
+              -- ![power1, power2] = scanr1 (*) [radixW32, radixW32^(pow-1)]
+              ![power1, power2] = [radixW32^8, radixW32^7]
+              !(digit1, yNat) = nt `quotRemNatural` power1
+              !(digit2, zNat) = yNat `quotRemNatural` power2
+            in (fromIntegral digit1, fromIntegral digit2, zNat)
+    grab2Word32Natural pow nt = let 
+              ![power1, power2] = scanr1 (*) [radixW32, radixW32^(pow-1)]
+              !(digit1, yNat) = nt `quotRemNatural` power1
+              !(digit2, zNat) = yNat `quotRemNatural` power2
+            in (fromIntegral digit1, fromIntegral digit2, zNat)
 
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
     go :: Natural -> Bool -> Int -> Itr__ -> Itr__
-    go (NatS# x#) firstIter p acc
+    go (NatS# x#) !firstIter !p !acc
       | not firstIter && p >= 1 = let !(digit1, digit2, z) = grab2Words p x# 
           in go (fromIntegral z) False (p-2) (theNextIters [digit1, digit2] acc) 
       | firstIter && not eY  = 
@@ -718,7 +776,7 @@ strmsblsbNat l eY n = yCumulative___ $ go n True pm (Itr__ 1# 0 0 zeroFx#)
       | p < 0  = acc
       | otherwise = error "undefined entry in go"
 
-    go x@(NatJ# n@(BN# n#)) firstIter p acc
+    go x@(NatJ# n@(BN# n#)) !firstIter !p !acc
       | not firstIter && p >= 1 = let !(digit1, digit2, z) = grab2Word32BN p n# 
           in go z False (p-2) (theNextIters [digit1, digit2] acc) 
       | firstIter && not eY  = let 

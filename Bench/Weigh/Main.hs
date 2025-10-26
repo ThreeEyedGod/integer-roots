@@ -1,3 +1,5 @@
+{-# LANGUAGE MagicHash #-}
+
 module Main (main) where
 
 import Data.Time.Clock
@@ -5,6 +7,7 @@ import Data.Time.Clock
     diffUTCTime,
     getCurrentTime,
   )
+import GHC.Exts (Int#)
 import GHC.Environment (getFullArgs)
 import qualified Math.NumberTheory.Roots as Old (integerSquareRoot)
 import qualified Math.NumberTheory.Roots_ as New (integerSquareRoot)
@@ -14,6 +17,8 @@ import Weigh
 one, two :: String
 one = "one"
 two = "two"
+
+data Itr__ = Itr__ {lv__# :: {-# UNPACK #-} !Int#, yCumulative___ :: !Integer, iRem___ :: {-# UNPACK #-} !Integer, tb__# :: {-# UNPACK #-} !FloatingX#} deriving (Generic, NFData, Eq)
 
 iRange :: Integer -> (Integer, Integer)
 iRange x = (2 ^ x, 2 ^ (x + 1))
@@ -35,6 +40,7 @@ main = do
     value "[0..3]" ([0 .. 3] :: [Int])
     value "[0,1,2,3]" ([0, 1, 2, 3] :: [Int])
     value "one" one
+    value "Itr__" Itr__
     func "Old Int Integer" Old.integerSquareRoot (fromIntegral iIntInteger :: Int)
     func "New Int Integer" New.integerSquareRoot (fromIntegral iIntInteger :: Int)
     func "Old Huge Integer" Old.integerSquareRoot (fromIntegral iHugeWord :: Word)
