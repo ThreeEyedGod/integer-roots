@@ -556,31 +556,6 @@ coreRmdr# tabn# sbtnd# = let
   in rdr
 {-# INLINE coreRmdr# #-}
 
-rmdr :: Integer -> Integer -> Integer -> Int64 -> (Integer, Integer)
-rmdr yc ta i yTilde_ =
-  let !intToUse = maxIntSizeAcross yc ta i
-      !(ycScaled, rdr) = case intToUse of
-        Is32 -> case radixW32 `safePosMul64` fromIntegral yc of
-          Right ycScaled64 -> case yTilde_ `safePosAdd64` ycScaled64 of
-            Right iPlusycScaled -> case ycScaled64 `safePosAdd64` iPlusycScaled of
-              Right iPlusDoubleYcScaled -> case yTilde_ `safePosMul64` iPlusDoubleYcScaled of
-                Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr64 -> (fromIntegral ycScaled64, fromIntegral rdr64)
-                Left iTimesiPlusDoubleYcScaledIN -> (fromIntegral ycScaled64, ta - iTimesiPlusDoubleYcScaledIN)
-              Left iPlusDoubleYcScaledIN -> (fromIntegral ycScaled64, ta - i * iPlusDoubleYcScaledIN)
-            Left iPlusycScaledIN -> (fromIntegral ycScaled64, ta - i * (iPlusycScaledIN + fromIntegral ycScaled64))
-          Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-        (Is32; Is64; Is96) -> case radixW32 `safePosMul256` fromIntegral yc of
-          Right ycScaled256 -> case fromIntegral yTilde_ `safePosAdd256` ycScaled256 of
-            Right iPlusycScaled -> case ycScaled256 `safePosAdd256` iPlusycScaled of
-              Right iPlusDoubleYcScaled -> case fromIntegral yTilde_ `safePosMul256` iPlusDoubleYcScaled of
-                Right iTimesiPlusDoubleYcScaled -> case negate iTimesiPlusDoubleYcScaled + fromIntegral ta of rdr256 -> (fromIntegral ycScaled256, fromIntegral rdr256)
-                Left iTimesiPlusDoubleYcScaledIN -> (fromIntegral ycScaled256, ta - iTimesiPlusDoubleYcScaledIN)
-              Left iPlusDoubleYcScaledIN -> (fromIntegral ycScaled256, ta - i * iPlusDoubleYcScaledIN)
-            Left iPlusycScaledIN -> (fromIntegral ycScaled256, ta - i * (iPlusycScaledIN + fromIntegral ycScaled256))
-          Left ycScaled' -> (ycScaled', ta - i * (double ycScaled' + i))
-        (Is128; Is256; IsIN; _) -> let !ycS' = radixW32 * yc in (ycS', ta - i * (double ycS' + i))
-   in (ycScaled, rdr)
-
 handleFirstRem :: (# Word64#, Integer #) -> (# Integer, Word64#, Integer #)
 handleFirstRem (# yi64#, ri_ #)
   | ri_ < 0 =
@@ -787,59 +762,4 @@ strmsblsbNat l eY n = yCumulative___ $ go n True pm (Itr__ 1# 0 0 zeroFx#)
           in go z False (p-2) (theFirstIter True [digit1, digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
       | p < 0  = acc
       | otherwise = error "undefined entry in go"
--- //FIXME TRY USING QUOTQUOT PACKAGE?
-
-
--- This will not work. The Fabio Romano algo will only work as MSB to LSB
--- streamDigitsLSBtoMSB :: Int -> Bool -> Integer -> Integer
--- streamDigitsLSBtoMSB l eY n = yCumulative___ $ go (fromIntegral n) True pm (Itr__ 1# 0 0 zeroFx#) 
---   where
---     theFirstIter :: Bool -> [Word32] -> Itr__ -> Itr__
---     theFirstIter evn pairdgt _ = case theFirstCore (evn, pairdgt) of  (# yVal, yWord#, remInteger #) -> Itr__ 1# yVal remInteger (unsafeword64ToFloatingX## yWord#) -- rFinalXs
---     theNextIters :: [Word32] -> Itr__ -> Itr__
---     theNextIters [x1,x2] (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#) = tniCoreReverse (x1, x2) (Itr__ currlen# yCumulatedAcc0 rmndr tbfx#)
---     theNextIters _ _ = error "Poor inputs"
---     grab2Words :: Word# -> (Word32, Word32, Word)
---     grab2Words w# = let !(# qw1#, rw1# #) = w# `quotRemWord#` radixW32# 
---                         !digit1 = W# rw1#
---                         !(# qw2#, rw2# #) = qw1# `quotRemWord#` radixW32# 
---                         !digit2 = W# rw2#
---                     in (fromIntegral digit1, fromIntegral digit2, W# qw2#)
---     grab2Word32BN :: BigNat# -> (Word32, Word32, Natural)
---     grab2Word32BN n# = let !(# qbn1#, rw1# #) = n# `bigNatQuotRemWord#` radixW32# 
---                            !digit1 = W# rw1#
---                            !(# qbn2#, rw2# #) = qbn1# `bigNatQuotRemWord#` radixW32# 
---                            !digit2 = W# rw2#
---                        in (fromIntegral digit1, fromIntegral digit2, naturalFromBigNat# qbn2#)
---     !pm = l - 1 
---     !(W# radixW32#) = radixW32 
---     --  digits from least significant to most significant index 0 to max 
---     go :: Natural -> Bool -> Int -> Itr__ -> Itr__
---     go (NatS# snw#) firstIter p acc
---       | not firstIter && p >= 1 = let (lsb, msb, qw2) = grab2Words snw#
---           in go (fromIntegral qw2) False (p-2) (theNextIters [fromIntegral lsb,fromIntegral msb] acc) 
---       | firstIter && not eY  = 
---           let 
---               !(# qw1#, rw1# #) = snw# `quotRemWord#` radixW32# 
---               !digit1 = W# rw1#
---           in go (fromIntegral $ W# qw1#) False (p - 1) (theFirstIter False [fromIntegral digit1,0] acc) 
---       | firstIter && eY = let (lsb, msb, qw2) = grab2Words snw#
---           in go (fromIntegral qw2) False (p-2) (theFirstIter True [fromIntegral lsb,fromIntegral msb] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
---       | p < 0  = acc
---       | otherwise = error "undefined entry in go"
---     go x@(NatJ# n@(BN# n#)) firstIter p acc
---       | not firstIter && p >= 1 = 
---           let (lsb, msb, qbn2) = grab2Word32BN n#
---           in go qbn2 False (p-2) (theNextIters [fromIntegral lsb,fromIntegral msb] acc) 
---       | firstIter && not eY  = 
---           let 
---               !(# qbn1#, rw1# #) = n# `bigNatQuotRemWord#` radixW32# 
---               !digit1 = W# rw1#
---           in go (naturalFromBigNat# qbn1#) False (p - 1) (theFirstIter False [fromIntegral digit1,0] acc) 
---       | firstIter && eY = 
---           let (lsb, msb, qbn2) = grab2Word32BN n#
---           in go qbn2 False (p-2) (theFirstIter True [fromIntegral lsb,fromIntegral msb] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
---       | p < 0  = acc
---       | otherwise = error "undefined entry in go"
-    
 -- //FIXME TRY USING QUOTQUOT PACKAGE?
