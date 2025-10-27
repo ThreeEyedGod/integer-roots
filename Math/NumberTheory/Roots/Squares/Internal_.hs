@@ -28,9 +28,10 @@ import GHC.Exts
   ( Int (..),
     word2Int#,
   )
-import GHC.Num.Integer (integerLog2#)
+import GHC.Num.Integer (integerLog2#, integerFromNatural)
 import Math.NumberTheory.Roots.Squares.InternalBank_
 import Math.NumberTheory.Utils.ArthMtic_
+
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
@@ -56,7 +57,8 @@ isqrtB_ _ 0 = 0
 -- isqrtB_ l n = fromInteger . theNextIterationsN_ . theFirstXsN . stageListN_ l . dgtsLstBase32_ . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . theNextIterationsPP l . theFirstXsPostProcess . preProcessList l . dgtsLstBase32_ . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . streamDigitsInOrder l (even l) . fromIntegral $ n
-isqrtB_ l n = fromInteger . strmsblsbNat l (even l) . fromIntegral $ n
+-- isqrtB_ l n = fromInteger . strmsblsbNat l (even l) . fromIntegral $ n
+isqrtB_ l n = fromInteger . integerFromNatural . newappsqrt l (even l) . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . streamDigitsLSBtoMSB l (even l) . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
