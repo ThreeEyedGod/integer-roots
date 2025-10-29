@@ -35,7 +35,7 @@ import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..), naturalFromInteger, naturalToInteger, quotRemNatural, timesNatural)
 import GHC.Num.BigNat (BigNat (..), BigNat#,bigNatToWord, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatZero#)
 import GHC.Num.Integer (Integer (..), integerToNatural)
-import GHC.Num.Natural (Natural (..), naturalFromBigNat#, naturalToBigNat#, naturalAdd, naturalMul, naturalSub)
+import GHC.Num.Natural (Natural (..), naturalShiftL, naturalFromBigNat#, naturalToBigNat#, naturalAdd, naturalMul, naturalSub)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
@@ -723,13 +723,15 @@ newappsqrt l eY n = yacc $ go n True pm (Itr 1# 0 0 zeroFx#)
           !(W# digit2#, W# z#) = quotremradixW32 (W# y#) -- y# `quotRemWord#` power2#
        in (fromIntegral (W# digit1#), fromIntegral (W# digit2#), W# z#)
     grab2Words pow w# =
-      let ![W# power1#, W# power2#] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
+      -- let ![W# power1#, W# power2#] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
+      let ![W# power1#, W# power2#] = scanr1 mulHi [radixW32, radixW32 ^ (pow - 1)]
           !(# digit1#, y# #) = w# `quotRemWord#` power1# -- //FIXME HOW DOES THIS WORK?
           !(# digit2#, z# #) = y# `quotRemWord#` power2#
        in (fromIntegral (W# digit1#), fromIntegral (W# digit2#), W# z#)
     grab2Word32BN :: Int -> BigNat# -> (Word32, Word32, Natural)
     grab2Word32BN pow n# =
-      let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
+      -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
+      let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
           !power1# = naturalToBigNat# power1
           !power2# = naturalToBigNat# power2
           !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
@@ -776,6 +778,7 @@ newappsqrt l eY n = yacc $ go n True pm (Itr 1# 0 0 zeroFx#)
            in go z False (p - 2) (theFirstIter True [digit1, digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
       | p < 0 = acc
       | otherwise = error "undefined entry in go"
+
 
 
 -- //FIXME TRY USING QUOTQUOT PACKAGE?
