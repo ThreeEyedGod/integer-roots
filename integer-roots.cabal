@@ -108,7 +108,8 @@ test-suite integer-roots-tests
                -Wcompat 
                -threaded 
                -rtsopts 
-               -with-rtsopts=-N6 -w 
+               -with-rtsopts=-N6 -w
+              --  -with-rtsopts=-K1028M-H128m-G2m-A-M512m-N6-w-c
 
 benchmark integer-roots-benchmark
   type:                exitcode-stdio-1.0

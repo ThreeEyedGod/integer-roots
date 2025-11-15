@@ -58,7 +58,7 @@ isqrtB_ _ 0 = 0
 -- isqrtB_ l n = fromInteger . theNextIterationsPP l . theFirstXsPostProcess . preProcessList l . dgtsLstBase32_ . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . streamDigitsInOrder l (even l) . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . strmsblsbNat l (even l) . fromIntegral $ n
-isqrtB_ l n = fromInteger . integerFromNatural . newappsqrt l (even l) . fromIntegral $ n
+isqrtB_ l n = fromInteger . integerFromNatural . newappsqrt_ l (even l) . fromIntegral $ n
 -- isqrtB_ l n = fromInteger . streamDigitsLSBtoMSB l (even l) . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
