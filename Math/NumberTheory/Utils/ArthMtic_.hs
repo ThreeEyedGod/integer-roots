@@ -20,6 +20,7 @@
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
 module Math.NumberTheory.Utils.ArthMtic_
   ( 
+    powBigNat#,
     _evenInt64#,
     _oddInt64#,
     _even,
@@ -50,7 +51,8 @@ module Math.NumberTheory.Utils.ArthMtic_
     bnToFxGtWord,
     bnToFxGtWord#,
     word64From2ElemList#,
-    radixW32Squared
+    radixW32Squared,
+    bnConst#
   )
 where
 
@@ -61,9 +63,11 @@ import Data.Bits.Floating (nextDown, nextUp)
 import Data.List (unfoldr)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
+import GHC.Num.BigNat (BigNat (..), bigNatOne#, bigNatZero#, bigNatShiftL#)
 import GHC.Exts
   ( Double (..),
     Double#,
+    leWord#,
     Int (..),
     Int#,
     Int64#,
@@ -135,6 +139,21 @@ import Prelude hiding (pred)
 -- *********** END NEW IMPORTS
 
 -- | HELPER functions
+
+-- powBigNat# :: Int# -> BigNat#
+-- Compute radixW32 ^ p as a BigNat# by shifting 1 << (32 * p)
+-- Requires `bigNatShiftL#` and GHC.Prim primops like (*#), (<=#), isTrue# in scope.
+powBigNat# :: Word# -> BigNat#
+powBigNat# p#
+  | isTrue# (p# `leWord#` 0##) = bnConst# 1
+  | otherwise           = bigNatShiftL# (bnConst# 1) (p# `timesWord#` 32##)
+{-# INLINE powBigNat# #-}
+
+bnConst# :: Int -> BigNat#
+bnConst# i = case i of 
+      0 -> bigNatZero# (# #)
+      1 -> bigNatOne# (# #)
+{-# INLINE bnConst# #-}
 
 -- | Word64# from a "reversed" List of at least 1 and at most 2 Word32 digits
 word64FromRvsrd2ElemList# :: [Word32] -> Word64#

@@ -299,17 +299,6 @@ grab2Word32BN# pow n# =
       !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
     in (# fromIntegral $ bigNatToWord digit1#, fromIntegral $ bigNatToWord digit2#, zbn# #)
 
--- powBigNat# :: Int# -> BigNat#
--- Compute radixW32 ^ p as a BigNat# by shifting 1 << (32 * p)
--- Requires `bigNatShiftL#` and GHC.Prim primops like (*#), (<=#), isTrue# in scope.
-powBigNat# :: Word# -> BigNat#
-powBigNat# p#
-  | isTrue# (p# `leWord#` 0##) = bn1#
-  | otherwise           = bigNatShiftL# bn1# (p# `timesWord#` 32##)
-  where
-    !bn1# = bigNatOne# (# #)
-{-# INLINE powBigNat# #-}
-
 isqrtWord :: Word -> Word
 isqrtWord n
     | n < (r*r)
@@ -334,7 +323,9 @@ goBN# eY n# !firstIter !p !acc
       let !(# digit1, digit2, zbn# #) = grab2Word32BN# p n#
         in go_ eY zbn# False (p - 2) (theNextIters' [digit1, digit2] acc)
   | firstIter && not eY =
-      let pw# = naturalToBigNat# (radixW32 ^ p)
+      let 
+          !(I# pow#) = p
+          !pw# = powBigNat# (int2Word# pow#) 
           !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
         in go_ eY ybn# False (p - 1) (theFirstIter' False [fromIntegral $ naturalFromBigNat# digit#] acc)
   | firstIter && eY =
@@ -357,9 +348,6 @@ bigNat2WrdMaybe# bn# = case bigNatToWordMaybe# bn# of
 
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
 newappsqrt_ l eY n@(NatS# w#) =  let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# 
-newappsqrt_ l eY n@(NatJ# nbn@(BN# nbn#)) = NatJ# (BN# $ yaccbn $ go_ eY nbn# True pm (Itr'' 1# bn0# bn0# zeroFx#))
-  where
-    !bn0# = bigNatZero# (# #)
-    !pm = l - 1
+newappsqrt_ l eY n@(NatJ# nbn@(BN# nbn#)) = NatJ# (BN# $ yaccbn $ go_ eY nbn# True (l-1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
     
 -- //FIXME TRY USING QUOTQUOT PACKAGE?
