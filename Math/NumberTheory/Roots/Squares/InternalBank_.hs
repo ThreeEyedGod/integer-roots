@@ -338,5 +338,4 @@ bigNat2WrdMaybe# bn# = case bigNatToWordMaybe# bn# of
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
 newappsqrt_ l eY n@(NatS# w#) =  let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# 
 newappsqrt_ l eY n@(NatJ# nbn@(BN# nbn#)) = NatJ# (BN# $ yaccbn $ go_ eY nbn# True (l-1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
-    
--- //FIXME TRY USING QUOTQUOT PACKAGE?
+
