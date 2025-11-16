@@ -116,7 +116,7 @@ benchmark integer-roots-benchmark
                        -fproc-alignment=64 
                        -threaded
                        -rtsopts
-                       -with-rtsopts=-N6 -w
+                       -with-rtsopts=-N6-w-H128m-A32m
 
 benchmark weigh
   type            : exitcode-stdio-1.0
