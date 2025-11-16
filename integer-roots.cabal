@@ -26,7 +26,6 @@ library
     base >=4.9 && <5
    ,floating-bits >= 0.3.1.0
    ,ghc-prim >= 0.13.0
-   ,integer-logarithms >= 1.0.4
    ,primitive >= 0.9.1.0
    ,quote-quot >= 0.2.1.0
    -- Note if ever using containers 0.8 of containers results in a confilct

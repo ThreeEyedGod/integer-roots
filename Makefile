@@ -34,8 +34,9 @@ bench_weigh:
 profile:
 	@echo "_____________________creating profile___________"
 	cabal clean
-# 	cabal configure --enable-library-profiling --enable-executable-profiling
-	cabal build --enable-library-profiling  --enable-executable-profiling
+	cabal configure --enable-library-profiling --enable-executable-profiling
+# 	cabal build --enable-library-profiling  --enable-executable-profiling
+	cabal build --enable-profiling --enable-executable-profiling
 	@rm -rf *.tix
 	cabal run integer-roots-exe -- +RTS -p -s -N4
 
