@@ -94,20 +94,9 @@ nxtDgtDoubleFxHrbie## pa# tcfx# = case isTrue# (c# <## threshold#) of
     !c# = unsafefx2Double## tcfx#
     !(D# threshold#) = 1.9 * 10 ^ 137
 
--- preComputDoubleT :: Double -> FloatingX -> (Double, Double, Double)
--- preComputDoubleT tADX_@(D# a#) tcfx = case unsafefx2Double tcfx of tCDX_@(D# c#) -> case fmaddDouble# c# c# a# of r# -> case (tADX_, tCDX_, (D# r#)) of (tADX, tCDX, radDX) -> (tADX, tCDX, radDX)
-
-{-# INLINE computDouble #-}
-computDouble :: Double -> Double -> Double -> Integer
-computDouble !tADX !tCDX !radDX = hndlOvflwW32 $ floor (nextUp (nextUp tADX `divideDouble` nextDown (sqrt (nextDown radDX) `plusDouble` nextDown tCDX)))
-
 {-# INLINE computDouble# #-}
 computDouble# :: Double# -> Double# -> Double# -> Integer
 computDouble# !tAFX# !tCFX# !radFX# = hndlOvflwW32 $ floor (D# (coreD# tAFX# tCFX# radFX#))
-
-{-# INLINE computFx #-}
-computFx :: (FloatingX, FloatingX, FloatingX) -> Integer
-computFx (!tAFX, !tCFX, !radFX) = hndlOvflwW32 (floorFX (nextUpFX (nextUpFX tAFX !/ nextDownFX (sqrtFx (nextDownFX radFX) !+ nextDownFX tCFX))))
 
 coreD# :: Double# -> Double# -> Double# -> Double#
 coreD# da# dc# dr# = nextUp# (nextUp# da# /## nextDown# (sqrtDouble# (nextDown# dr#) +## nextDown# dc#))
@@ -118,44 +107,18 @@ coreFx# (# tAFX#, tCFX#, radFX# #) =
   nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))
 {-# INLINE coreFx# #-}
 
-computFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Integer
-computFx# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32 (floorX# (coreFx# (# tAFX#, tCFX#, radFX# #)))
--- hndlOvflwW32 (floorX# (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
-{-# INLINE computFx# #-}
-
 {-# INLINE computDoubleW64# #-}
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
 computDoubleW64# !tAFX# !tCFX# !radFX# = case floor (D# (coreD# tAFX# tCFX# radFX#)) of (W64# w#) -> hndlOvflwW32## w#
-
-{-# INLINE computDoubleI64# #-}
-computDoubleI64# :: Double# -> Double# -> Double# -> Int64#
-computDoubleI64# !tAFX# !tCFX# !radFX# = case floor (D# (coreD# tAFX# tCFX# radFX#)) of (I64# i#) -> hndlOvflwI32## i#
 
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
 computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
 -- hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE computFxW64# #-}
 
-computFxI64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Int64#
-computFxI64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwI32## (floorXI64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
--- hndlOvflwI32## (floorXI64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
-{-# INLINE computFxI64# #-}
-
-preComputDouble :: Double -> FloatingX -> (Double, Double, Double)
-preComputDouble a@(D# a#) (FloatingX (D# s#) (I64# e#)) = case preComput a# (FloatingX# s# e#) of (# a#, c#, r# #) -> (a, D# c#, D# r#)
-{-# INLINE preComputDouble #-}
-
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
 preComput a# tcfx# = case unsafefx2Double## tcfx# of c# -> (# a#, c#, fmaddDouble# c# c# a# #)
 {-# INLINE preComput #-}
-
-preComputFx :: BigNat -> FloatingX -> (FloatingX, FloatingX, FloatingX)
-preComputFx tA__bn tCFX = case unsafeGtWordbn2Fx tA__bn of tAFX -> (tAFX, tCFX, tCFX !**+ tAFX) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
-{-# INLINE preComputFx #-}
-
-preComputIFx :: Integer -> FloatingX -> (FloatingX, FloatingX, FloatingX)
-preComputIFx tA tCFX = case unsafeN2Fx tA of tAFX -> (tAFX, tCFX, tCFX !**+ tAFX) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
-{-# INLINE preComputIFx #-}
 
 preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
