@@ -43,20 +43,16 @@ import Prelude hiding (pred)
 -- *********** END NEW IMPORTS
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
-
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
--- | Iteration loop data - these records have vectors / lists in them
 -- | Iteration loop data 
 data Itr'' = Itr'' {a# :: {-# UNPACK #-} !Int#, yaccbn:: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#} 
 
 tfi'' :: (Bool, [Word32]) -> (# BigNat#, Word64#, BigNat# #)
 tfi'' (evenLen, dxs') = let 
     !i# = word64From2ElemList# dxs' 
-    -- (# a,b,c #) = rmdrFn i# -- //FIXME get it out directly in bignat#
-    -- in (# integerToBigNatClamp# a, b, integerToBigNatClamp# c #)
-    (# a,b,c #) = rmdrFn i# -- //FIXME get it out directly in bignat#
+    (# a,b,c #) = rmdrFn i# 
     in (# a, b, c #)
   where
     !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
@@ -65,23 +61,18 @@ tfi'' (evenLen, dxs') = let
 tni'' :: (Word32, Word32) -> Itr'' -> Itr''
 tni'' (!i1, !i2) (Itr'' !cl# !yCAcc_ !tA !t#) =
   let 
-      -- !tA_ = (tA `naturalMul` secndPlaceW32Radix) `naturalAdd` (fromIntegral i1 `naturalMul` radixW32) `naturalAdd` fromIntegral i2
-      -- //FIXME secondPlaceW32Radix as BigNat# does not fit into word!!! 
-      -- !tA_ = (tA `bigNatMulWord` secndPlaceW32Radix) `bigNatAddWord` (fromIntegral i1 *  radixW32) `bigNatAddWord` fromIntegral i2
-      -- Itr cl_ (NatJ# (BN# ycUpdated#)) (NatJ# (BN# remFinal#)) tcfx# = tni (i1, i2) (Itr cl# (NatJ# (BN# yCAcc_)) (NatJ# (BN# tA)) t#)
       !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` naturalToBigNat#  (fromIntegral i1 `naturalMul`  radixW32) `bigNatAddWord` fromIntegral i2
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
       !(# !(NatJ# (BN# ycUpdated#)), !yTildeFinal#, !(NatJ# (BN# remFinal#)) #) = accRmdrDgt (NatJ# (BN# yCAcc_)) (NatJ# (BN# tA_)) (nxtDgtNatW64# (NatJ# (BN# tA_)) tCFx#)
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- recall tcfx is already scaled by 32. Do not use normalize here
    in Itr'' (cl# +# 1#) ycUpdated# remFinal# tcfx# -- rFinalXs
  where 
-    !bnsp = naturalToBigNat# secndPlaceW32Radix
+    !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!! 
 -- | Early termination of tcfx# if more than the 3rd digit or if digit is 0
 
 nxtDgtNatW64# :: Natural -> FloatingX# -> Word64#
--- nxtDgtW64# n tcfx# = computFxW64# (allInclusivePreComputNToFx## n tcfx#) -- works ! but not any faster
 nxtDgtNatW64# 0 !_ = 0#Word64
-nxtDgtNatW64# x@(NatJ# n@(BN# bn#)) tcfx# -- = computFxW64# (allInclusivePreComputFx## bn# tcfx#) -- works but not faster
+nxtDgtNatW64# x@(NatJ# n@(BN# bn#)) tcfx# 
   | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
   -- \| otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
@@ -290,9 +281,7 @@ grab2Word32BN# pow n# =
   -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
   --     !power1# = naturalToBigNat# power1
   --     !power2# = naturalToBigNat# power2
-  let -- !power2 = radixW32 ^ (pow - 1) 
-      -- !power2# = naturalToBigNat# power2
-      !(I# predpow#) = pow - 1
+  let !(I# predpow#) = pow - 1
       !power2# = powBigNat# (int2Word# predpow#)
       !power1# = bigNatShiftL# power2# 32##
       !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#

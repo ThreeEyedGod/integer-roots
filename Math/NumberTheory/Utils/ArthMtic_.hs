@@ -171,12 +171,6 @@ word64From2ElemList# [lmsb,llsb] = word64FromRvsrdTuple# (llsb, lmsb) 4294967296
 word64From2ElemList# (_ : _ : _) = error "word64From2ElemList# : more than 2 elems list"
 {-# INLINE word64From2ElemList# #-}
 
--- | Spit out the Word32 List from digits which comes in normal format. MSB...LSB
-mkIW32Lst_ :: Integer -> Word -> [Word32]
-mkIW32Lst_ 0 _ = [0] -- safety
-mkIW32Lst_ i b = wrd2wrd32 (iToWrdListBase_ i b) -- using the normal format digits function
-
-
 
 --- END helpers
 --- BEGIN Core numeric helper functions
@@ -280,11 +274,6 @@ radixW32Length n
   | n == 0 = 1
   | otherwise = integerLogBaseWord radixW32 n + 1
 
-{-# INLINE wrd2wrd32 #-}
-wrd2wrd32 :: [Word] -> [Word32]
-wrd2wrd32 xs = fromIntegral <$> xs
-
-
 {-# INLINE iToWrdListBase_ #-}
 iToWrdListBase_ :: Integer -> Word -> [Word]
 iToWrdListBase_ 0 _ = [0]
@@ -345,9 +334,6 @@ unsafesqrtDX :: Double -> Double
 unsafesqrtDX !d = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 {-# INLINE unsafesqrtDX #-}
 
-toInt64 :: Int64# -> Int64
-toInt64 = I64#
-{-# INLINE toInt64 #-}
 
 fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
@@ -455,14 +441,6 @@ double x = x `unsafeShiftL` 1
 lenRadixW32 :: (Integral a) => a -> Int
 lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1
 {-# INLINEABLE lenRadixW32 #-}
-
--- foldr' :: (a -> b -> b) -> b -> [a] -> b
--- foldr' f z xs = go xs
---   where
---     go [] = z
---     go (x : xs) = f x $! go xs
--- {-# INLINEABLE foldr' #-}
-
 
 -- | because pred is Enum. this version blow is marginally faster
 {-# SPECIALIZE pred :: Integer -> Integer #-}
