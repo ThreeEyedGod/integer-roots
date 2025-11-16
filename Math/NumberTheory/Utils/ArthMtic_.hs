@@ -19,8 +19,7 @@
 -- Internal functions dealing with square roots. End-users should not import this module.
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
 module Math.NumberTheory.Utils.ArthMtic_
-  ( 
-    powBigNat#,
+  ( powBigNat#,
     _evenInt64#,
     _oddInt64#,
     _even,
@@ -52,7 +51,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     bnToFxGtWord#,
     word64From2ElemList#,
     radixW32Squared,
-    bnConst#
+    bnConst#,
   )
 where
 
@@ -63,11 +62,9 @@ import Data.Bits.Floating (nextDown, nextUp)
 import Data.List (unfoldr)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
-import GHC.Num.BigNat (BigNat (..), bigNatOne#, bigNatZero#, bigNatShiftL#)
 import GHC.Exts
   ( Double (..),
     Double#,
-    leWord#,
     Int (..),
     Int#,
     Int64#,
@@ -89,6 +86,7 @@ import GHC.Exts
     intToInt64#,
     isTrue#,
     leInt64#,
+    leWord#,
     minusWord#,
     neWord#,
     not#,
@@ -129,7 +127,7 @@ import GHC.Float (floorDouble)
 import GHC.Int (Int32, Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
 import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
@@ -146,13 +144,13 @@ import Prelude hiding (pred)
 powBigNat# :: Word# -> BigNat#
 powBigNat# p#
   | isTrue# (p# `leWord#` 0##) = bnConst# 1
-  | otherwise           = bigNatShiftL# (bnConst# 1) (p# `timesWord#` 32##)
+  | otherwise = bigNatShiftL# (bnConst# 1) (p# `timesWord#` 32##)
 {-# INLINE powBigNat# #-}
 
 bnConst# :: Int -> BigNat#
-bnConst# i = case i of 
-      0 -> bigNatZero# (# #)
-      1 -> bigNatOne# (# #)
+bnConst# i = case i of
+  0 -> bigNatZero# (# #)
+  1 -> bigNatOne# (# #)
 {-# INLINE bnConst# #-}
 
 -- | Word64# from a "reversed" List of at least 1 and at most 2 Word32 digits
@@ -167,10 +165,9 @@ word64FromRvsrd2ElemList# (_ : _ : _) = error "word64FromRvsrd2ElemList# : more 
 word64From2ElemList# :: [Word32] -> Word64#
 word64From2ElemList# [] = error "word64From2ElemList# : null list"
 word64From2ElemList# [llsb] = word64FromRvsrdTuple# (llsb, 0) 4294967296#Word64
-word64From2ElemList# [lmsb,llsb] = word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
+word64From2ElemList# [lmsb, llsb] = word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
 word64From2ElemList# (_ : _ : _) = error "word64From2ElemList# : more than 2 elems list"
 {-# INLINE word64From2ElemList# #-}
-
 
 --- END helpers
 --- BEGIN Core numeric helper functions
@@ -188,13 +185,11 @@ integralFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
 integralFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
 integralFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
-
 {-# INLINE [0] integralFromTuple #-}
 {-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Integer -> Integer #-}
 {-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
 integralFromTuple :: (Integral a) => (Word32, Word32) -> a -> a
 integralFromTuple (lMSB, lLSB) = integralFromRvsrdTuple (lLSB, lMSB)
-
 
 -- | Integer from a "reversed" tuple of Word32 digits
 -- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259
@@ -274,34 +269,6 @@ radixW32Length n
   | n == 0 = 1
   | otherwise = integerLogBaseWord radixW32 n + 1
 
-{-# INLINE iToWrdListBase_ #-}
-iToWrdListBase_ :: Integer -> Word -> [Word]
-iToWrdListBase_ 0 _ = [0]
--- iToWrdListBase_ i b = digits b (fromIntegral i) -- digits come in normal format MSB --> LSB //FIXME big bug here. 
--- iToWrdListBase_ i b = reverse $ digitsUnsigned b (fromIntegral i) -- digits come in normal format MSB --> LSB //FIXME reverse defeats the purpose no longer lazy. Evaluated !
-iToWrdListBase_ i b = digitsInOrder (fromIntegral i) b -- digits come in normal format MSB --> LSB //FIXME reverse defeats the purpose no longer lazy. Evaluated !
-
--- | this is not lazy and will definitely be fully eagerly evaluated !!!
-digitsInOrder :: (Integral a) => a -> Word -> [Word]
-digitsInOrder _ base | base <= 1 = error "Base must be greater than 1"
-digitsInOrder n base = map fromInteger $ go (toInteger n) (highestPower (toInteger n) (toInteger base))
-  where
-    -- Compute the highest power of base less than or equal to n
-    highestPower :: Integer -> Integer -> Int
-    highestPower x b
-      | x < b     = 0
-      | otherwise = 1 + highestPower (x `div` b) b
-
-    -- Extract digits from most significant to least significant
-    go :: Integer -> Int -> [Integer]
-    go x p
-      | p < 0     = []
-      | otherwise =
-          let b = toInteger base
-              power = b ^ p
-              digit = x `div` power
-          in digit : go (x - digit * power) (p - 1)
-
 {-# INLINE intgrFrom3DigitsBase32 #-}
 
 -- | Integer from a 3rd place plus a "reversed" tuple of 2 Word32 digits on base
@@ -333,7 +300,6 @@ sqrtDX d
 unsafesqrtDX :: Double -> Double
 unsafesqrtDX !d = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 {-# INLINE unsafesqrtDX #-}
-
 
 fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
@@ -379,7 +345,7 @@ predRadixW32 = 4294967295 -- 2 ^ finiteBitSize (0 :: Word32) -1
 {-# SPECIALIZE secndPlaceW32Radix :: Integer #-}
 {-# SPECIALIZE secndPlaceW32Radix :: Word64 #-}
 {-# SPECIALIZE secndPlaceW32Radix :: Int64 #-}
-secndPlaceW32Radix :: Integral a => a
+secndPlaceW32Radix :: (Integral a) => a
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 {-# INLINE secndPlaceW32Radix #-}
 
@@ -388,7 +354,7 @@ secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 {-# SPECIALIZE radixW32Squared :: Integer #-}
 {-# SPECIALIZE radixW32Squared :: Word64 #-}
 {-# SPECIALIZE radixW32Squared :: Int64 #-}
-radixW32Squared :: (Integral a) => a 
+radixW32Squared :: (Integral a) => a
 radixW32Squared = 18446744073709551616 -- secndPlaceRadix
 
 radixW32Cubed :: Integer
@@ -574,5 +540,3 @@ _bigNatLog2# a s -- s = bigNatSize# a
 {-# INLINE _bigNatLog2# #-}
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
-
-
