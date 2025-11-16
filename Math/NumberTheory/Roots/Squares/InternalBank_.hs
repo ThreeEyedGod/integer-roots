@@ -272,7 +272,7 @@ goBN# eY n# !firstIter !p !acc
       let !(I# pow#) = p
           !pw# = powBigNat# (int2Word# pow#)
           !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
-       in go_ eY ybn# False (p - 1) (theFirstIter' False [fromIntegral $ naturalFromBigNat# digit#] acc)
+       in go_ eY ybn# False (p - 1) (theFirstIter' False [fromIntegral $ bigNatToWord digit#] acc)
   | firstIter && eY =
       let !(# digit1, digit2, zbn# #) = grab2Word32BN# p n#
        in go_ eY zbn# False (p - 2) (theFirstIter' True [digit1, digit2] acc) -- accFn True [fromIntegral digit,fromIntegral digit2] acc
