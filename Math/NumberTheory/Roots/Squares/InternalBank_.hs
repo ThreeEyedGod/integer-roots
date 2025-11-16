@@ -30,11 +30,11 @@ import Data.List (foldl', unfoldr)
 import Data.Primitive.ByteArray (ByteArray, byteArrayFromList, foldrByteArray)
 import qualified Data.Vector.Unboxed as VU
 import Data.Word (Word32)
-import GHC.Exts (Double (..), (<=#), Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (==##), (>#), (>=#), (>=##))
+import GHC.Exts (Double (..), (<=#), int2Word#, leWord#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (==##), (>#), (>=#), (>=##))
 import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..), naturalFromInteger, naturalToInteger, quotRemNatural, timesNatural)
-import GHC.Num.BigNat (BigNat (..), bigNatToWordMaybe#, bigNatShiftL#, bigNatMulWord,bigNatAddWord, BigNat#,bigNatToWord,bigNatLeWord, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatZero#)
+import GHC.Num.BigNat (BigNat (..), bigNatToWordMaybe#, bigNatOne#,bigNatShiftL#, bigNatMulWord,bigNatAddWord, BigNat#,bigNatToWord,bigNatLeWord, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatZero#)
 import GHC.Num.Integer (Integer (..), integerToNatural, integerToBigNatClamp#)
 import GHC.Num.Natural (Natural (..), naturalShiftL, naturalFromBigNat#, naturalToBigNat#, naturalAdd, naturalMul, naturalSub)
 import GHC.Word (Word64 (..))
@@ -880,12 +880,25 @@ grab2Word32BN# pow n# =
   -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
   --     !power1# = naturalToBigNat# power1
   --     !power2# = naturalToBigNat# power2
-  let !power2 = radixW32 ^ (pow - 1) 
-      !power2# = naturalToBigNat# power2
+  let -- !power2 = radixW32 ^ (pow - 1) 
+      -- !power2# = naturalToBigNat# power2
+      !(I# predpow#) = pow - 1
+      !power2# = powBigNat# (int2Word# predpow#)
       !power1# = bigNatShiftL# power2# 32##
       !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
       !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
     in (# fromIntegral $ bigNatToWord digit1#, fromIntegral $ bigNatToWord digit2#, zbn# #)
+
+-- powBigNat# :: Int# -> BigNat#
+-- Compute radixW32 ^ p as a BigNat# by shifting 1 << (32 * p)
+-- Requires `bigNatShiftL#` and GHC.Prim primops like (*#), (<=#), isTrue# in scope.
+powBigNat# :: Word# -> BigNat#
+powBigNat# p#
+  | isTrue# (p# `leWord#` 0##) = bn1#
+  | otherwise           = bigNatShiftL# bn1# (p# `timesWord#` 32##)
+  where
+    !bn1# = bigNatOne# (# #)
+{-# INLINE powBigNat# #-}
 
 isqrtWord :: Word -> Word
 isqrtWord n
