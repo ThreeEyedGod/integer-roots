@@ -34,7 +34,7 @@ import GHC.Exts (Double (..), (<=#), Double#, Int (..), Int#, Int64#, Word (..),
 import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..), naturalFromInteger, naturalToInteger, quotRemNatural, timesNatural)
-import GHC.Num.BigNat (BigNat (..), bigNatToWordMaybe#, bigNatMulWord,bigNatAddWord, BigNat#,bigNatToWord,bigNatLeWord, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatZero#)
+import GHC.Num.BigNat (BigNat (..), bigNatToWordMaybe#, bigNatShiftL#, bigNatMulWord,bigNatAddWord, BigNat#,bigNatToWord,bigNatLeWord, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatZero#)
 import GHC.Num.Integer (Integer (..), integerToNatural, integerToBigNatClamp#)
 import GHC.Num.Natural (Natural (..), naturalShiftL, naturalFromBigNat#, naturalToBigNat#, naturalAdd, naturalMul, naturalSub)
 import GHC.Word (Word64 (..))
@@ -772,11 +772,14 @@ newappsqrt l eY n = yacc $ go n True pm (Itr 1# 0 0 zeroFx#)
     -- Equivalent to (`quot` radixw32).
     quotremradixW32 :: Word -> (Word, Word)
     quotremradixW32 = $$(quoteQuotRem 4294967296)
+    quotrem1 :: Word -> (Word, Word)
+    quotrem1 = $$(quoteQuotRem 1)
     grab2Words :: Int -> Word# -> (Word32, Word32, Word)
     grab2Words 1 w# =
       let -- ![W# power1#, W# power2#] = scanr1 (*) [radixW32, 1]
           !(W# digit1#, W# y#) = quotremradixW32 (W# w#)
-          !(# digit2#, z# #) = y# `quotRemWord#` 1##
+          -- !(# digit2#, z# #) = y# `quotRemWord#` 1##
+          !(W# digit2#, W# z#)  = quotrem1 (W# y#)
        in (fromIntegral (W# digit1#), fromIntegral (W# digit2#), W# z#)
     grab2Words 2 w# =
       let -- ![W# power1#, W# power2#] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
@@ -849,12 +852,15 @@ theNextIters' _ _ = error "Poor inputs"
 -- Equivalent to (`quot` radixw32).
 quotremradixW32 :: Word -> (Word, Word)
 quotremradixW32 = $$(quoteQuotRem 4294967296)
+quotrem1 :: Word -> (Word, Word)
+quotrem1 = $$(quoteQuotRem 1)
 
 grab2Words# :: Int -> Word# -> (# Word32, Word32, Word# #)
 grab2Words# 1 w# =
   let -- ![W# power1#, W# power2#] = scanr1 (*) [radixW32, 1]
       !(W# digit1#, W# y#) = quotremradixW32 (W# w#)
-      !(# digit2#, z# #) = y# `quotRemWord#` 1##
+      -- !(# digit2#, z# #) = y# `quotRemWord#` 1##
+      !(W# digit2#, W# z#)  = quotrem1 (W# y#)
     in (# fromIntegral (W# digit1#), fromIntegral (W# digit2#), z# #)
 grab2Words# 2 w# =
   let -- ![W# power1#, W# power2#] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
@@ -871,9 +877,12 @@ grab2Words# pow w# =
 grab2Word32BN# :: Int -> BigNat# -> (# Word32, Word32, BigNat# #)
 grab2Word32BN# pow n# =
   -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
-  let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
-      !power1# = naturalToBigNat# power1
+  -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
+  --     !power1# = naturalToBigNat# power1
+  --     !power2# = naturalToBigNat# power2
+  let !power2 = radixW32 ^ (pow - 1) 
       !power2# = naturalToBigNat# power2
+      !power1# = bigNatShiftL# power2# 32##
       !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
       !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
     in (# fromIntegral $ bigNatToWord digit1#, fromIntegral $ bigNatToWord digit2#, zbn# #)
@@ -890,11 +899,10 @@ isqrtWord n
 
 goWrd :: Bool -> Word# -> Bool -> Int -> Itr'' -> Itr''
 goWrd eY w# !firstIter !p !acc 
-  | not firstIter && p > 0  =
+  | p > 0  =   -- | not firstIter && p > 0  =
       let !(# digit1, digit2, z# #) = grab2Words# p w#
         in goWrd eY z# False (p - 2) (theNextIters' [digit1, digit2] acc)
-  | p <= 0 = acc -- note the case of 0 was not taken into account before
-  | otherwise = error "undefined entry in goWrd"
+  | otherwise = acc -- note the case of 0 was not taken into account before
 
 -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
 goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
@@ -925,7 +933,7 @@ bigNat2WrdMaybe# bn# = case bigNatToWordMaybe# bn# of
 {-# INLINE bigNat2WrdMaybe# #-}
 
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ l eY n@(NatS# w#) =  let (W# wo#) = isqrtWord (W# w#) in NatS# wo# 
+newappsqrt_ l eY n@(NatS# w#) =  let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# 
 newappsqrt_ l eY n@(NatJ# nbn@(BN# nbn#)) = NatJ# (BN# $ yaccbn $ go_ eY nbn# True pm (Itr'' 1# bn0# bn0# zeroFx#))
   where
     !bn0# = bigNatZero# (# #)
