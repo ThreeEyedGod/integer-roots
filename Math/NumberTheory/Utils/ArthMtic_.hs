@@ -43,7 +43,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     word64FromRvsrd2ElemList#,
     largestNSqLTEEven##,
     largestNSqLTEOdd##,
-    dgtsLstBase32,
+    -- dgtsLstBase32,
     maxDouble,
     maxSafeInteger,
     maxUnsafeInteger,
@@ -57,7 +57,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     splitFirstOne,
     splitFirstTwo,
     word64From2ElemList#,
-    dgtsLstBase32_,
+    -- dgtsLstBase32_,
     mkIW32EvenRestLstN_,
     radixW32Squared
   )
@@ -65,13 +65,10 @@ where
 
 -- \*********** BEGIN NEW IMPORTS
 
--- he says it's coded to be as fast as possible
-
 import Control.Parallel (par, pseq)
 import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Bits.Floating (nextDown, nextUp)
-import Data.FastDigits (digitsUnsigned, undigits)
 import Data.List (unfoldr)
 import Data.Maybe (fromMaybe)
 import Data.WideWord (Int128, Word256, zeroInt128)
@@ -150,13 +147,6 @@ import Prelude hiding (pred)
 -- *********** END NEW IMPORTS
 
 -- | HELPER functions
-{-# INLINE [0] dgtsLstBase32 #-}
-dgtsLstBase32 :: Integer -> [Word32]
-dgtsLstBase32 n = mkIW32Lst n radixW32
-
-{-# INLINE [0] dgtsLstBase32_ #-} -- digits in normal format MSB --> LSB
-dgtsLstBase32_ :: Integer -> [Word32]
-dgtsLstBase32_ n = mkIW32Lst_ n radixW32
 
 -- | Word64# from a "reversed" List of at least 1 and at most 2 Word32 digits
 word64FromRvsrd2ElemList# :: [Word32] -> Word64#
@@ -173,14 +163,6 @@ word64From2ElemList# [llsb] = word64FromRvsrdTuple# (llsb, 0) 4294967296#Word64
 word64From2ElemList# [lmsb,llsb] = word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
 word64From2ElemList# (_ : _ : _) = error "word64From2ElemList# : more than 2 elems list"
 {-# INLINE word64From2ElemList# #-}
-
-
-{-# INLINE mkIW32Lst #-}
-
--- | Spit out the Word32 List from digitsUnsigned which comes in reversed format.
-mkIW32Lst :: Integer -> Word -> [Word32]
-mkIW32Lst 0 _ = [0] -- safety
-mkIW32Lst i b = wrd2wrd32 (iToWrdListBase i b)
 
 -- | Spit out the Word32 List from digits which comes in normal format. MSB...LSB
 mkIW32Lst_ :: Integer -> Word -> [Word32]
@@ -398,10 +380,6 @@ radixW32Length n
 wrd2wrd32 :: [Word] -> [Word32]
 wrd2wrd32 xs = fromIntegral <$> xs
 
-{-# INLINE iToWrdListBase #-}
-iToWrdListBase :: Integer -> Word -> [Word]
-iToWrdListBase 0 _ = [0]
-iToWrdListBase i b = digitsUnsigned b (fromIntegral i) -- digits come in reversed format
 
 {-# INLINE iToWrdListBase_ #-}
 iToWrdListBase_ :: Integer -> Word -> [Word]
@@ -430,11 +408,6 @@ digitsInOrder n base = map fromInteger $ go (toInteger n) (highestPower (toInteg
               power = b ^ p
               digit = x `div` power
           in digit : go (x - digit * power) (p - 1)
-
-{-# INLINE convertBase #-}
-convertBase :: Word -> Word -> [Word] -> [Word]
-convertBase _ _ [] = []
-convertBase from to xs = digitsUnsigned to $ fromIntegral (undigits from xs)
 
 {-# INLINE intgrFrom3DigitsBase32 #-}
 
@@ -571,35 +544,6 @@ nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
 {-# INLINE double #-}
-
--- | Return an integer, built from given digits in reverse order.
---   Condition 0 ≤ digit < base is not checked.
-undigits_ ::
-  (Integral a, Integral b) =>
-  -- | The base to use
-  a ->
-  -- | The list of digits to convert
-  [b] ->
-  Integer
-undigits_ = undigits
-{-# INLINE [0] undigits_ #-}
-{-# SPECIALIZE undigits_ :: Word -> [Word] -> Integer #-}
-{-# SPECIALIZE undigits_ :: Int -> [Int] -> Integer #-}
-{-# SPECIALIZE undigits_ :: Int64 -> [Int64] -> Integer #-}
-{-# SPECIALIZE undigits_ :: Word64 -> [Word64] -> Integer #-}
-{-# SPECIALIZE undigits_ :: Integer -> [Integer] -> Integer #-}
-{-# SPECIALIZE undigits_ :: Integer -> [Integer] -> Integer #-}
-
--- | Extract nth digit using fast-digits (note: digits are in reverse order)
-nthDigitFast :: Integer -> Int -> Word32
-nthDigitFast n pos =
-  let digitList = digitsUnsigned radixW32 (fromIntegral n) -- Gets digits in reverse order
-      len = length digitList
-   in fromIntegral $ digitList !! (len - (pos - 1))
-
-doubleDigitInteger :: Integer -> (Int, Int) -> Word64#
-doubleDigitInteger n (dl, dr) = word64FromRvsrd2ElemList# [nthDigitFast n dl, nthDigitFast n dr]
-{-# INLINE doubleDigitInteger #-}
 
 {-# SPECIALIZE lenRadixW32 :: Integer -> Int #-}
 {-# SPECIALIZE lenRadixW32 :: Word64 -> Int #-}
