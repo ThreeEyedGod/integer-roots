@@ -17,7 +17,6 @@
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
 module Math.NumberTheory.Roots.Squares.Internal_
   ( karatsubaSqrt,
-    isqrtB,
     isqrtB_,
     lenRadixW32,
   )
@@ -38,28 +37,10 @@ import Math.NumberTheory.Utils.ArthMtic_
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
-{-# SPECIALIZE isqrtB :: Integer -> Integer #-}
-isqrtB :: (Integral a) => a -> a
-isqrtB 0 = 0
--- isqrtB n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd . dgtsLstBase32 . fromIntegral $ n
--- isqrtB n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV .dgtsLstBase32 . fromIntegral $ n
-isqrtB n = fromInteger . theNextIterations . theFirstXs . stageList . dgtsLstBase32 . fromIntegral $ n
--- isqrtB n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd . dgtsLstBase32 . fromIntegral $ n
-{-# INLINEABLE isqrtB #-}
-
 {-# SPECIALIZE isqrtB_ :: Int -> Integer -> Integer #-}
 isqrtB_ :: (Integral a) => Int -> a -> a
 isqrtB_ _ 0 = 0
--- isqrtB_ l n = fromInteger . theNextIterationsUVIrvrsd . theFirstUV . stageUVrvrsd_ l . dgtsLstBase32 . fromIntegral $ n
--- isqrtB_ l n = fromInteger . theNextIterationsUVI . theFirstUV . stageUV_ l .dgtsLstBase32 . fromIntegral $ n
--- isqrtB_ l n = fromInteger . theNextIterations . theFirstXs . stageList_ l . dgtsLstBase32 . fromIntegral $ n
--- isqrtB_ l n = fromInteger . theNextIterationsRvrsdSLCode . theFirstXs . stageListRvrsd_ l . dgtsLstBase32 . fromIntegral $ n
--- isqrtB_ l n = fromInteger . theNextIterationsN_ . theFirstXsN . stageListN_ l . dgtsLstBase32_ . fromIntegral $ n
--- isqrtB_ l n = fromInteger . theNextIterationsPP l . theFirstXsPostProcess . preProcessList l . dgtsLstBase32_ . fromIntegral $ n
--- isqrtB_ l n = fromInteger . streamDigitsInOrder l (even l) . fromIntegral $ n
--- isqrtB_ l n = fromInteger . strmsblsbNat l (even l) . fromIntegral $ n
 isqrtB_ l n = fromInteger . integerFromNatural . newappsqrt_ l (even l) . fromIntegral $ n
--- isqrtB_ l n = fromInteger . streamDigitsLSBtoMSB l (even l) . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
 karatsubaSqrt :: Integer -> (Integer, Integer)
