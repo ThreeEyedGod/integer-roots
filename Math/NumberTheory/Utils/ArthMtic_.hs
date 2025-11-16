@@ -37,41 +37,29 @@ module Math.NumberTheory.Utils.ArthMtic_
     hndlOvflwW32##,
     hndlOvflwI32##,
     secndPlaceW32Radix,
-    mkIW32EvenRestLst,
-    splitLastOne,
-    splitLastTwo,
     word64FromRvsrd2ElemList#,
     largestNSqLTEEven##,
     largestNSqLTEOdd##,
-    -- dgtsLstBase32,
     maxDouble,
     maxSafeInteger,
     maxUnsafeInteger,
-    foldr',
     pred,
     lenRadixW32,
     cI2D2_,
     convNToDblExp,
     bnToFxGtWord,
     bnToFxGtWord#,
-    splitFirstOne,
-    splitFirstTwo,
     word64From2ElemList#,
-    -- dgtsLstBase32_,
-    mkIW32EvenRestLstN_,
     radixW32Squared
   )
 where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Control.Parallel (par, pseq)
-import Control.Parallel.Strategies (NFData, parBuffer, parListChunk, parListSplitAt, rdeepseq, rpar, withStrategy)
 import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.List (unfoldr)
 import Data.Maybe (fromMaybe)
-import Data.WideWord (Int128, Word256, zeroInt128)
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
@@ -169,107 +157,6 @@ mkIW32Lst_ :: Integer -> Word -> [Word32]
 mkIW32Lst_ 0 _ = [0] -- safety
 mkIW32Lst_ i b = wrd2wrd32 (iToWrdListBase_ i b) -- using the normal format digits function
 
-{-# INLINE splitLastTwo #-}
-splitLastTwo :: [a] -> Int -> ([a], [a])
-splitLastTwo xs l = splitAt (l - 2) xs
-
-{-# INLINE splitLastOne #-}
-splitLastOne :: [a] -> Int -> ([a], [a])
-splitLastOne xs l = splitAt (l - 1) xs
-
-{-# INLINE splitFirstTwo #-}
-splitFirstTwo :: [a] -> Int -> ([a], [a])
-splitFirstTwo xs l = splitAt 2 xs
-
-{-# INLINE splitFirstOne #-}
-splitFirstOne :: [a] -> Int -> ([a], [a])
-splitFirstOne xs l = splitAt 1 xs
-
-{-# INLINE pairUp #-}
-pairUp :: Bool -> [a] -> [(a, a)]
-pairUp True (x : y : rs) = (x, y) : pairUp True rs
-pairUp True [] = []
-pairUp _ [_] = error "pairUp: Invalid singleton list"
-pairUp False _ = error "pairUp: Invalid odd length of list"
-
-{-# INLINE pairUpAcc #-}
-pairUpAcc :: [a] -> [(a, a)]
-pairUpAcc xs = go xs []
-  where
-    go (x : y : zs) !acc = go zs ((x, y) : acc)
-    go [] acc = reverse acc
-    go [_] _ = error "pairUpAcc: odd length"
-
-{-# INLINE pairUpUnfold #-}
-pairUpUnfold :: [a] -> [(a, a)]
-pairUpUnfold = unfoldr step
-  where
-    step (x : y : zs) = Just ((x, y), zs)
-    step [] = Nothing
-    step [_] = error "pairUpUnfold: odd length"
-
-{-# INLINE pairUpBuild #-}
-pairUpBuild :: [a] -> [(a, a)]
-pairUpBuild xs = build (\c n -> go c n xs)
-  where
-    go c n (x : y : zs) = c (x, y) (go c n zs)
-    go _ n [] = n
-    go _ _ [_] = error "pairUpBuild: odd length"
-
--- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s list
-{-# INLINE [0] integerOfNxtPairsLst #-}
-{-# SPECIALIZE integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Word64] #-}
-{-# SPECIALIZE integerOfNxtPairsLst :: Int -> [(Word32, Word32)] -> [Integer] #-}
-integerOfNxtPairsLst :: (NFData a, Integral a) => Int -> [(Word32, Word32)] -> [a]
-integerOfNxtPairsLst l = if l < 8 then map iFrmTupleBaseW32 else parallelMap Split 2 iFrmTupleBaseW32 -- assuming even dual core Split/Buffer work better than Chunk
-
--- | trying a bit of parallelization here given that incoming is a small but heavy bunch of word32s list
-{-# INLINE [0] integerOfNxtPairsLstN_ #-}
-{-# SPECIALIZE integerOfNxtPairsLstN_ :: Int -> [(Word32, Word32)] -> [Word64] #-}
-{-# SPECIALIZE integerOfNxtPairsLstN_ :: Int -> [(Word32, Word32)] -> [Integer] #-}
-integerOfNxtPairsLstN_ :: (NFData a, Integral a) => Int -> [(Word32, Word32)] -> [a]
-integerOfNxtPairsLstN_ l = if l < 8 then map iFrmTupleBaseW32_ else parallelMap Split 2 iFrmTupleBaseW32_ -- assuming even dual core Split/Buffer work better than Chunk
-
--- | Strategies that may be used with parallel calls
-data Strats
-  = Chunk
-  | Buffer
-  | Split
-  deriving (Eq)
-
--- | parallel map with 3 optional strategies
-parallelMap :: (NFData a, NFData b) => Strats -> Int -> (a -> b) -> [a] -> [b]
-parallelMap strat stratParm f = case strat of
-  Chunk -> withStrategy (parListChunk stratParm rdeepseq) . map f
-  Buffer -> withStrategy (parBuffer stratParm rpar) . map f
-  Split -> withStrategy (parListSplitAt stratParm rdeepseq rdeepseq) . map f
-
-{-# INLINE [1] iFrmTupleBaseW32 #-}
-
-{-# RULES
-"iFrmTupleBaseW32/Integer" iFrmTupleBaseW32 = intgrFromRvsrdTuple
-"iFrmTupleBaseW32/Word64" iFrmTupleBaseW32 = word64FromRvsrdTuple
-  #-}
-
-iFrmTupleBaseW32 :: (Integral a) => (Word32, Word32) -> a
-iFrmTupleBaseW32 tu = integralFromRvsrdTuple tu radixW32
-
-iFrmTupleBaseW32_ :: (Integral a) => (Word32, Word32) -> a
-iFrmTupleBaseW32_ tu = integralFromTuple tu radixW32
-
-{-# INLINE [0] mkIW32EvenRestLst #-}
-{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Integer] #-}
-{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word64] #-}
-{-# SPECIALIZE mkIW32EvenRestLst :: Int -> Bool -> [Word32] -> [Word] #-}
-mkIW32EvenRestLst :: (NFData a, Integral a) => Int -> Bool -> [Word32] -> [a]
-mkIW32EvenRestLst len evenLen xs = integerOfNxtPairsLst len (pairUpBuild xs) -- (pairUpUnfold xs) --(pairUpAcc xs) --(pairUp evenLen xs)
-
-{-# INLINE [0] mkIW32EvenRestLstN_ #-}
-{-# SPECIALIZE mkIW32EvenRestLstN_ :: Int -> Bool -> [Word32] -> [Integer] #-}
-{-# SPECIALIZE mkIW32EvenRestLstN_ :: Int -> Bool -> [Word32] -> [Word64] #-}
-{-# SPECIALIZE mkIW32EvenRestLstN_ :: Int -> Bool -> [Word32] -> [Word] #-}
-mkIW32EvenRestLstN_ :: (NFData a, Integral a) => Int -> Bool -> [Word32] -> [a]
-mkIW32EvenRestLstN_ len evenLen xs = integerOfNxtPairsLstN_ len (pairUpBuild xs) -- (pairUpUnfold xs) --(pairUpAcc xs) --(pairUp evenLen xs)
 
 
 --- END helpers
@@ -279,7 +166,6 @@ mkIW32EvenRestLstN_ len evenLen xs = integerOfNxtPairsLstN_ len (pairUpBuild xs)
 {-# INLINE [0] integralFromRvsrdTuple #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
-{-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Word256 -> Word256 #-}
 
 -- | Integer from a "reversed" tuple of Word32 digits
 -- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259
@@ -293,7 +179,6 @@ integralFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegr
 {-# INLINE [0] integralFromTuple #-}
 {-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Integer -> Integer #-}
 {-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
-{-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Word256 -> Word256 #-}
 integralFromTuple :: (Integral a) => (Word32, Word32) -> a -> a
 integralFromTuple (lMSB, lLSB) = integralFromRvsrdTuple (lLSB, lMSB)
 
@@ -552,20 +437,13 @@ lenRadixW32 :: (Integral a) => a -> Int
 lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1
 {-# INLINEABLE lenRadixW32 #-}
 
-foldr' :: (a -> b -> b) -> b -> [a] -> b
-foldr' f z xs = go xs
-  where
-    go [] = z
-    go (x : xs) = f x $! go xs
-{-# INLINEABLE foldr' #-}
+-- foldr' :: (a -> b -> b) -> b -> [a] -> b
+-- foldr' f z xs = go xs
+--   where
+--     go [] = z
+--     go (x : xs) = f x $! go xs
+-- {-# INLINEABLE foldr' #-}
 
--- | Compute two functions in parallel and return their results as a tuple.
-{-# INLINE computePar #-}
-computePar :: (a -> d) -> (b -> c -> e) -> a -> b -> c -> (d, e)
-computePar f1 f2 x y z =
-  let r1 = f1 x
-      r2 = f2 y z
-   in r1 `par` (r2 `pseq` (r1, r2))
 
 -- | because pred is Enum. this version blow is marginally faster
 {-# SPECIALIZE pred :: Integer -> Integer #-}
