@@ -28,11 +28,11 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 import Data.Bits (finiteBitSize)
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.Word (Word32)
-import GHC.Exts (Double (..), word32ToWord#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, Word32#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==##), (>#), (>=#), (>=##))
+import GHC.Exts (Double (..), word32ToWord#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, Word32#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==##), (>#), (>=#), (>=##), wordToWord32#)
 import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..), naturalFromInteger, naturalToInteger, quotRemNatural, timesNatural)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWordMaybe#, bigNatZero#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatToWord#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWordMaybe#, bigNatZero#)
 import GHC.Num.Integer (Integer (..), integerToBigNatClamp#, integerToNatural)
 import GHC.Num.Natural (Natural (..), naturalAdd, naturalFromBigNat#, naturalMul, naturalShiftL, naturalSub, naturalToBigNat#)
 import GHC.Word (Word64 (..))
@@ -259,6 +259,19 @@ grab2Word32BN# pow n# =
       !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
       !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
    in (# fromIntegral $ bigNatToWord digit1#, fromIntegral $ bigNatToWord digit2#, zbn# #)
+
+grab2Word32BN## :: Int -> BigNat# -> (# Word32#, Word32#, BigNat# #)
+grab2Word32BN## pow n# =
+  -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
+  -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
+  --     !power1# = naturalToBigNat# power1
+  --     !power2# = naturalToBigNat# power2
+  let !(I# predpow#) = pow - 1
+      !power2# = powBigNat# (int2Word# predpow#)
+      !power1# = bigNatShiftL# power2# 32##
+      !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
+      !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
+   in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
 
 isqrtWord :: Word -> Word
 isqrtWord n
