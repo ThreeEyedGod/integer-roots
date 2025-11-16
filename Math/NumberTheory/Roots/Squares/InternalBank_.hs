@@ -28,7 +28,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 import Data.Bits (finiteBitSize)
 import Data.Bits.Floating (nextDown, nextUp)
 import Data.Word (Word32)
-import GHC.Exts (Double (..), Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==##), (>#), (>=#), (>=##))
+import GHC.Exts (Double (..), word32ToWord#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, Word32#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==##), (>#), (>=#), (>=##))
 import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..), naturalFromInteger, naturalToInteger, quotRemNatural, timesNatural)
@@ -67,6 +67,22 @@ tni'' (!i1, !i2) (Itr'' !cl# !yCAcc_ !tA !t#) =
       Itr'' (cl# +# 1#) ycUpdated# remFinal# tcfx#
   where
     !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
+
+{-# INLINE tni #-} -- //FIXME unused and untested grab2Word32BN# also needs to be changed to work with Word32 inputs
+tni :: (# Word32#, Word32# #) -> Itr'' -> Itr''
+tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) =
+  let 
+      !(# x1, x2 #) = i1 `timesWord2#` radixW32w#
+      !x = bigNatFromWord2# x1 x2 
+      !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2
+      !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+      !(# !(NatJ# (BN# ycUpdated#)), !yTildeFinal#, !(NatJ# (BN# remFinal#)) #) = accRmdrDgt (NatJ# (BN# yCAcc_)) (NatJ# (BN# tA_)) (nxtDgtNatW64# (NatJ# (BN# tA_)) tCFx#)
+      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+   in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
+      Itr'' (cl# +# 1#) ycUpdated# remFinal# tcfx#
+  where
+    !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
+    !(W# radixW32w#) = radixW32
 
 nxtDgtNatW64# :: Natural -> FloatingX# -> Word64#
 nxtDgtNatW64# 0 !_ = 0#Word64
