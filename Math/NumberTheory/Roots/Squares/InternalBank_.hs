@@ -230,6 +230,19 @@ grab2Word32BN## 1 !n#
         !(# digit1#, yw# #) = n# `bigNatQuotRemWord#` power1#
         !(W# digit2#, W# z#) = quotrem1 (W# yw#)       -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
       in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# digit2#, bigNatFromWord# z# #)
+grab2Word32BN## 2 !n# -- //FIXME does this work correctly ? check
+    | isTrue# (bigNatSize# n# ==# 1#)
+    , a0 <- indexWordArray# n# 0#
+    =
+    let  -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##        
+        !(W# digit1#, W# yw#) = (0, W# a0) -- a0 `quotRemWord#` 18446744073709551616## -- 18446744073709551616## = 2^64 = radixW32 ^ 2
+        !(W# digit2#, W# z#) = quotremradixW32 (W# yw#)       -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
+      in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
+    | otherwise =     let       -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1
+        !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
+        !(# digit1#, yw# #) = n# `bigNatQuotRemWord#` power1#
+        !(W# digit2#, W# z#) = quotrem1 (W# yw#)       -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
+      in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# digit2#, bigNatFromWord# z# #)
 grab2Word32BN## !pow !n# =
   let !(I# predpow#) = pow - 1
       !power2# = powBigNat# (int2Word# predpow#)   -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
@@ -237,6 +250,26 @@ grab2Word32BN## !pow !n# =
       !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
       !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
    in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
+
+-- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
+goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
+goBN# !evn !n# !firstIter !p !acc
+  | p <= 0 = acc 
+  | not firstIter = -- && p >= 1 =
+      let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
+       in goBN# evn zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
+  | firstIter && not evn =
+      let !(I# pow#) = p
+          !pw# = powBigNat# (int2Word# pow#)
+          !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
+       in goBN# evn ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
+  | otherwise  = -- firstIter && evn =
+      let !(# digit1, digit2, zbn# #) = grab2Word32BN# p n#
+       in goBN# evn zbn# False (p - 2) (theFirstIter True (digit1, digit2) acc) 
+
+newappsqrt_ :: Int -> Bool -> Natural -> Natural
+newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
+newappsqrt_ l eY n@(NatJ# nbn@(BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
 
 isqrtWord :: Word -> Word
 isqrtWord n
@@ -247,24 +280,3 @@ isqrtWord n
   | otherwise = r
   where
     !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
-
--- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
-goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
-goBN# !eY !n# !firstIter !p !acc
-  | p <= 0 = acc 
-  | not firstIter = -- && p >= 1 =
-      let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
-       in goBN# eY zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
-  | firstIter && not eY =
-      let !(I# pow#) = p
-          !pw# = powBigNat# (int2Word# pow#)
-          !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
-       in goBN# eY ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
-  | firstIter && eY =
-      let !(# digit1, digit2, zbn# #) = grab2Word32BN# p n#
-       in goBN# eY zbn# False (p - 2) (theFirstIter True (digit1, digit2) acc) 
-  | otherwise = error "undefined entry in goBN#"
-
-newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
-newappsqrt_ l eY n@(NatJ# nbn@(BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
