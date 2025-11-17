@@ -221,9 +221,7 @@ grab2Word32BN## 1 !n#
     | isTrue# (bigNatSize# n# ==# 1#)
     , a0 <- indexWordArray# n# 0#
     =
-    let       
-        -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1
-        -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
+    let  -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##        
         !(W# digit1#, W# yw#) = quotremradixW32 (W# a0) 
         !(W# digit2#, W# z#) = quotrem1 (W# yw#)       -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
       in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
