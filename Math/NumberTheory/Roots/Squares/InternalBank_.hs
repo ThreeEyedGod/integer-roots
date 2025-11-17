@@ -27,7 +27,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 import Data.Bits (finiteBitSize)
 import Data.Word (Word32)
-import GHC.Exts (Double (..), (==#), indexWordArray#, word32ToWord#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, Word32#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==##), (>#), (>=#), (>=##), wordToWord32#)
+import GHC.Exts (Double (..), (==#), ltInt64#, indexWordArray#, word32ToWord#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, Word32#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==##), (>#), (>=#), (>=##), wordToWord32#)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatToWord#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWordMaybe#, bigNatZero#)
@@ -182,6 +182,16 @@ handleFirstRemBN# (# yi64#, ri_ #)
 fixRemainder :: Integer -> Integer -> Integer
 fixRemainder !newYc !rdr = rdr + double newYc + 1
 {-# INLINE fixRemainder #-}
+
+-- -- Fix remainder accompanying a 'next downed digit' see algorithm
+fixRemainder# :: Word64# -> Int64# -> Word64#
+fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` two `timesInt64#` word64ToInt64# newYc# `plusInt64#` one in if isTrue# (x `ltInt64#` zero) then 0#Word64 else int64ToWord64# x
+    where
+    !(I64# two) = 2
+    !(I64# one) = 1
+    !(I64# zero) = 0
+
+{-# INLINE fixRemainder# #-}
 
 -- | Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
 evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
