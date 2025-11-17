@@ -268,6 +268,7 @@ goWrd !eY !w# !firstIter !p !acc
 goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
 goBN# !eY !n# !firstIter !p !acc
   | p <= 0 = acc -- note the case of 0 was not taken into account before
+  -- | p == 2 = go_ eY n# False (p - 2) (theNextIters (# digit1, digit2 #) acc) -- //FIXME could offer small speedup?
   | not firstIter = -- && p >= 1 =
       let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
        in go_ eY zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
