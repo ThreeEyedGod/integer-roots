@@ -33,7 +33,7 @@ import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatToWord#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWordMaybe#, bigNatZero#)
 import GHC.Num.Integer (integerToBigNatClamp#)
 import GHC.Num.Natural (naturalMul, naturalToBigNat#)
-import GHC.Word (Word64 (..))
+import GHC.Word (Word64 (..), Word32(..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
 import Numeric.QuoteQuot
@@ -232,26 +232,13 @@ grab2Words## pow w# =
       !(# digit2#, z# #) = y# `quotRemWord#` power2#
    in (# wordToWord32# digit1#, wordToWord32# digit2#, z# #)
 
-
 grab2Word32BN# :: Int -> BigNat# -> (# Word32, Word32, BigNat# #)
-grab2Word32BN# pow n# =
-  -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
-  -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
-  --     !power1# = naturalToBigNat# power1
-  --     !power2# = naturalToBigNat# power2
-  let !(I# predpow#) = pow - 1
-      !power2# = powBigNat# (int2Word# predpow#)
-      !power1# = bigNatShiftL# power2# 32##
-      !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
-      !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
-   in (# fromIntegral $ bigNatToWord digit1#, fromIntegral $ bigNatToWord digit2#, zbn# #)
+grab2Word32BN# pow n# = let !(# w1#, w2#, bn# #) = grab2Word32BN## pow n# in (# W32# w1#, W32# w2#, bn# #)
 
 grab2Word32BN## :: Int -> BigNat# -> (# Word32#, Word32#, BigNat# #)
 grab2Word32BN## pow n# =
   -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
   -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
-  --     !power1# = naturalToBigNat# power1
-  --     !power2# = naturalToBigNat# power2
   let !(I# predpow#) = pow - 1
       !power2# = powBigNat# (int2Word# predpow#)
       !power1# = bigNatShiftL# power2# 32##
