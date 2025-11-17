@@ -26,15 +26,13 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 -- \*********** BEGIN NEW IMPORTS
 
 import Data.Bits (finiteBitSize)
-import Data.Bits.Floating (nextDown, nextUp)
 import Data.Word (Word32)
 import GHC.Exts (Double (..), word32ToWord#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, Word32#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==##), (>#), (>=#), (>=##), wordToWord32#)
-import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
-import GHC.Natural (Natural (..), naturalFromInteger, naturalToInteger, quotRemNatural, timesNatural)
+import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatToWord#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWordMaybe#, bigNatZero#)
-import GHC.Num.Integer (Integer (..), integerToBigNatClamp#, integerToNatural)
-import GHC.Num.Natural (Natural (..), naturalAdd, naturalFromBigNat#, naturalMul, naturalShiftL, naturalSub, naturalToBigNat#)
+import GHC.Num.Integer (integerToBigNatClamp#)
+import GHC.Num.Natural (naturalMul, naturalToBigNat#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
@@ -51,27 +49,10 @@ import Prelude hiding (pred)
 -- | Iteration loop data
 data Itr'' = Itr'' {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
-tfi'' :: (Bool, [Word32]) -> (# BigNat#, Word64#, BigNat# #)
-tfi'' (evenLen, dxs') = let !i# = word64From2ElemList# dxs' in rmdrFn i#
-  where
-    !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
-
 tfi :: (Bool, (Word32, Word32)) -> (# BigNat#, Word64#, BigNat# #)
 tfi (evenLen, (m, l)) = let !i# = word64FromRvsrdTuple# (l , m) 4294967296#Word64 in rmdrFn i#
   where
     !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
-
-{-# INLINE tni'' #-}
-tni'' :: (Word32, Word32) -> Itr'' -> Itr''
-tni'' (!i1, !i2) (Itr'' !cl# !yCAcc_ !tA !t#) =
-  let !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` naturalToBigNat# (fromIntegral i1 `naturalMul` radixW32) `bigNatAddWord` fromIntegral i2
-      !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# !(NatJ# (BN# ycUpdated#)), !yTildeFinal#, !(NatJ# (BN# remFinal#)) #) = accRmdrDgt (NatJ# (BN# yCAcc_)) (NatJ# (BN# tA_)) (nxtDgtNatW64# (NatJ# (BN# tA_)) tCFx#)
-      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
-   in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
-      Itr'' (cl# +# 1#) ycUpdated# remFinal# tcfx#
-  where
-    !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
 
 {-# INLINE tni #-} -- //FIXME unused and untested grab2Word32BN# also needs to be changed to work with Word32 inputs
 tni :: (# Word32#, Word32# #) -> Itr'' -> Itr''
@@ -220,7 +201,7 @@ oddFirstRmdrBN# w# =
 {-# INLINE oddFirstRmdrBN# #-}
 
 theFirstIter :: Bool -> (Word32, Word32) -> Itr'' -> Itr''
-theFirstIter evn pairdgt _ = case tfi (evn, pairdgt) of (# yVal, yWord#, rem #) -> Itr'' 1# yVal rem (unsafeword64ToFloatingX## yWord#) -- rFinalXs
+theFirstIter evn pairdgt _ = case tfi (evn, pairdgt) of (# yVal, yWord#, rem #) -> Itr'' 1# yVal rem (unsafeword64ToFloatingX## yWord#) 
 
 theNextIters :: (# Word32#, Word32# #) -> Itr'' -> Itr''
 theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)

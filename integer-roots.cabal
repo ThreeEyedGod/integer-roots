@@ -47,7 +47,6 @@ library
     Math.NumberTheory.Roots.Squares.Internal_
     Math.NumberTheory.Utils.BitMask
     Math.NumberTheory.Utils.FromIntegral
-    Math.NumberTheory.Utils.ShortCircuit_
     Math.NumberTheory.Utils.FloatingX_
     Math.NumberTheory.Utils.ArthMtic_
   default-language: Haskell2010

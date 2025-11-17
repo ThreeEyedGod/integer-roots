@@ -60,8 +60,6 @@ where
 
 import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Bits.Floating (nextDown, nextUp)
-import Data.List (unfoldr)
-import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
@@ -126,13 +124,12 @@ import GHC.Exts
     (>=##),
   )
 import GHC.Float (floorDouble)
-import GHC.Int (Int32, Int64 (I64#))
+import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
 import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
-import Math.NumberTheory.Utils.ShortCircuit_ (firstTrueOf)
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
 
@@ -153,6 +150,7 @@ bnConst# :: Int -> BigNat#
 bnConst# i = case i of
   0 -> bigNatZero# (# #)
   1 -> bigNatOne# (# #)
+  _ -> error "bnConst# : unsupported constant"
 {-# INLINE bnConst# #-}
 
 -- | Word64# from a "reversed" List of at least 1 and at most 2 Word32 digits
