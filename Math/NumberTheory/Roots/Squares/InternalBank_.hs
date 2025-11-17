@@ -214,7 +214,7 @@ quotrem1 :: Word -> (Word, Word)
 quotrem1 = $$(quoteQuotRem 1)
 
 grab2Words## :: Int -> Word# -> (# Word32#, Word32#, Word# #)
-grab2Words## 1 w# =
+grab2Words## 1 !w# =
   let -- ![W# power1#, W# power2#] = scanr1 (*) [radixW32, 1]
       !(W# digit1#, W# y#) = quotremradixW32 (W# w#)
       -- !(# digit2#, z# #) = y# `quotRemWord#` 1##
@@ -236,7 +236,7 @@ grab2Word32BN# :: Int -> BigNat# -> (# Word32, Word32, BigNat# #)
 grab2Word32BN# pow n# = let !(# w1#, w2#, bn# #) = grab2Word32BN## pow n# in (# W32# w1#, W32# w2#, bn# #)
 
 grab2Word32BN## :: Int -> BigNat# -> (# Word32#, Word32#, BigNat# #)
-grab2Word32BN## pow n# =
+grab2Word32BN## !pow !n# =
   -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
   -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
   let !(I# predpow#) = pow - 1
@@ -257,7 +257,7 @@ isqrtWord n
     !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
 
 goWrd :: Bool -> Word# -> Bool -> Int -> Itr'' -> Itr''
-goWrd eY w# !firstIter !p !acc
+goWrd !eY !w# !firstIter !p !acc
   | p > 0 =
       -- \| not firstIter && p > 0  =
       let !(# digit1, digit2, z# #) = grab2Words## p w#
@@ -266,8 +266,9 @@ goWrd eY w# !firstIter !p !acc
 
 -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
 goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
-goBN# eY n# !firstIter !p !acc
-  | not firstIter && p >= 1 =
+goBN# !eY !n# !firstIter !p !acc
+  | p <= 0 = acc -- note the case of 0 was not taken into account before
+  | not firstIter = -- && p >= 1 =
       let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
        in go_ eY zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
   | firstIter && not eY =
@@ -278,7 +279,6 @@ goBN# eY n# !firstIter !p !acc
   | firstIter && eY =
       let !(# digit1, digit2, zbn# #) = grab2Word32BN# p n#
        in go_ eY zbn# False (p - 2) (theFirstIter True (digit1, digit2) acc) 
-  | p <= 0 = acc -- note the case of 0 was not taken into account before
   | otherwise = error "undefined entry in goBN#"
 
 go_ :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
