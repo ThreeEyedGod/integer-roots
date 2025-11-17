@@ -268,18 +268,18 @@ goWrd !eY !w# !firstIter !p !acc
 goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
 goBN# !eY !n# !firstIter !p !acc
   | p <= 0 = acc -- note the case of 0 was not taken into account before
-  -- | p == 2 = go_ eY n# False (p - 2) (theNextIters (# digit1, digit2 #) acc) -- //FIXME could offer small speedup?
+  | p == 2 && not firstIter = go_ eY n# False p acc -- //FIXME could offer small speedup
   | not firstIter = -- && p >= 1 =
       let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
-       in go_ eY zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
+       in goBN# eY zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
   | firstIter && not eY =
       let !(I# pow#) = p
           !pw# = powBigNat# (int2Word# pow#)
           !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
-       in go_ eY ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
+       in goBN# eY ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
   | firstIter && eY =
       let !(# digit1, digit2, zbn# #) = grab2Word32BN# p n#
-       in go_ eY zbn# False (p - 2) (theFirstIter True (digit1, digit2) acc) 
+       in goBN# eY zbn# False (p - 2) (theFirstIter True (digit1, digit2) acc) 
   | otherwise = error "undefined entry in goBN#"
 
 go_ :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
@@ -296,4 +296,4 @@ bigNat2WrdMaybe# bn# = case bigNatToWordMaybe# bn# of
 
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
 newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
-newappsqrt_ l eY n@(NatJ# nbn@(BN# nbn#)) = NatJ# (BN# $ yaccbn $ go_ eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+newappsqrt_ l eY n@(NatJ# nbn@(BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
