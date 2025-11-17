@@ -56,6 +56,11 @@ tfi'' (evenLen, dxs') = let !i# = word64From2ElemList# dxs' in rmdrFn i#
   where
     !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
 
+tfi :: (Bool, (Word32, Word32)) -> (# BigNat#, Word64#, BigNat# #)
+tfi (evenLen, (m, l)) = let !i# = word64FromRvsrdTuple# (l , m) 4294967296#Word64 in rmdrFn i#
+  where
+    !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
+
 {-# INLINE tni'' #-}
 tni'' :: (Word32, Word32) -> Itr'' -> Itr''
 tni'' (!i1, !i2) (Itr'' !cl# !yCAcc_ !tA !t#) =
@@ -214,8 +219,8 @@ oddFirstRmdrBN# w# =
    in (# bigNatFromWord64# yT64#, yT64#, bigNatFromWord64# remIntegerW# #)
 {-# INLINE oddFirstRmdrBN# #-}
 
-theFirstIter' :: Bool -> [Word32] -> Itr'' -> Itr''
-theFirstIter' evn pairdgt _ = case tfi'' (evn, pairdgt) of (# yVal, yWord#, rem #) -> Itr'' 1# yVal rem (unsafeword64ToFloatingX## yWord#) -- rFinalXs
+theFirstIter :: Bool -> (Word32, Word32) -> Itr'' -> Itr''
+theFirstIter evn pairdgt _ = case tfi (evn, pairdgt) of (# yVal, yWord#, rem #) -> Itr'' 1# yVal rem (unsafeword64ToFloatingX## yWord#) -- rFinalXs
 
 theNextIters :: (# Word32#, Word32# #) -> Itr'' -> Itr''
 theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
@@ -234,11 +239,11 @@ grab2Words## 1 w# =
       -- !(# digit2#, z# #) = y# `quotRemWord#` 1##
       !(W# digit2#, W# z#) = quotrem1 (W# y#)
    in (# wordToWord32# digit1#, wordToWord32# digit2#, z# #)
-grab2Words## 2 w# =
-  let -- ![W# power1#, W# power2#] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
-      !(# digit1#, y# #) = w# `quotRemWord#` 18446744073709551616##
-      !(W# digit2#, W# z#) = quotremradixW32 (W# y#) -- y# `quotRemWord#` power2#
-   in (# wordToWord32# digit1#, wordToWord32# digit2#, z# #)
+-- grab2Words## 2 w# =
+--   let -- ![W# power1#, W# power2#] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
+--       !(# digit1#, y# #) = w# `quotRemWord#` 18446744073709551616## -- //FIXME 18446744073709551616## is bigger than word max
+--       !(W# digit2#, W# z#) = quotremradixW32 (W# y#) -- y# `quotRemWord#` power2#
+--    in (# wordToWord32# digit1#, wordToWord32# digit2#, z# #)
 grab2Words## pow w# =
   -- let ![W# power1#, W# power2#] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
   let ![W# power1#, W# power2#] = scanr1 mulHi [radixW32, radixW32 ^ (pow - 1)]
@@ -301,10 +306,10 @@ goBN# eY n# !firstIter !p !acc
       let !(I# pow#) = p
           !pw# = powBigNat# (int2Word# pow#)
           !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
-       in go_ eY ybn# False (p - 1) (theFirstIter' False [fromIntegral $ bigNatToWord digit#] acc)
+       in go_ eY ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
   | firstIter && eY =
       let !(# digit1, digit2, zbn# #) = grab2Word32BN# p n#
-       in go_ eY zbn# False (p - 2) (theFirstIter' True [digit1, digit2] acc) 
+       in go_ eY zbn# False (p - 2) (theFirstIter True (digit1, digit2) acc) 
   | p <= 0 = acc -- note the case of 0 was not taken into account before
   | otherwise = error "undefined entry in goBN#"
 

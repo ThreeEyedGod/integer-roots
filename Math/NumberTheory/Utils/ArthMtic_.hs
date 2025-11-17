@@ -52,6 +52,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     word64From2ElemList#,
     radixW32Squared,
     bnConst#,
+    word64FromRvsrdTuple#
   )
 where
 
@@ -71,6 +72,7 @@ import GHC.Exts
     Word (..),
     Word#,
     Word64#,
+    Word32#,
     and#,
     build,
     eqInt64#,
@@ -216,6 +218,7 @@ word64FromRvsrdTuple# (0, 0) _ = 0#Word64
 word64FromRvsrdTuple# (0, W32# lMSB#) base# = wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#
 word64FromRvsrdTuple# (W32# lLSB#, 0) _ = wordToWord64# (word32ToWord# lLSB#)
 word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#) `plusWord64#` wordToWord64# (word32ToWord# lLSB#)
+
 
 {-# INLINE doubleFromRvsrdTuple #-}
 
