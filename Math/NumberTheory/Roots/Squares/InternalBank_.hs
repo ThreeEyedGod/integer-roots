@@ -132,14 +132,16 @@ accRmdrDgt yc@(NatJ# (BN# ycbn#)) ta@(NatJ# (BN# tabn#)) yTw# =
    in (# NatJ# (BN# acc), d, NatJ# (BN# r) #)
 {-# INLINE accRmdrDgt #-}
 
-subtrahend :: BigNat# -> BigNat# -> BigNat#
-subtrahend yScaled# yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAdd` yTilde# of
-  r1# -> r1# `bigNatMul` yTilde#
-{-# INLINE subtrahend #-}
+subtrahend# :: BigNat# -> Word64# -> BigNat#
+subtrahend# yScaled# yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde# of
+  r1# -> r1# `bigNatMulWord#` wyTilde#
+  where 
+    !wyTilde# = word64ToWord# yTilde#
+{-# INLINE subtrahend# #-}
 
 rmdrDgt :: BigNat# -> Word64# -> BigNat# -> (# BigNat#, BigNat#, Word64# #)
 rmdrDgt ycScaledbn# yTilde# ta# =
-  let !sbtnd# = subtrahend ycScaledbn# (bigNatFromWord64# yTilde#)
+  let !sbtnd# = subtrahend# ycScaledbn# yTilde# 
       !reg = ta# `bigNatGe` sbtnd#
       !res# = case reg of
         True -> ta# `bigNatSubUnsafe` sbtnd#
