@@ -118,7 +118,7 @@ accRmdrDgt# :: Natural -> Natural -> Word64# -> (# BigNat#, Word64#, BigNat# #)
 accRmdrDgt# yc@(NatS# ycw#) ta@(NatS# taw#) yTw# =
   let !ycScaledBN# = case ycw# `timesWord2#` 0x100000000## of (# hi, lo #) -> bigNatFromWord2# hi lo -- 0x100000000## = 2^32 = radixW32
       !tabn# = bigNatFromWord# taw#
-      !(# acc, r, d #) = rmdrDgt ycScaledBN# yTw# tabn#
+      !(# acc, r, d #) = rmdrDgt ycScaledBN# yTw# tabn# -- //FIXME the order of rmdrDgt outputs 
    in (# acc, d, r #)
 accRmdrDgt# yc@(NatJ# (BN# ycbn#)) ta@(NatS# taw#) yTw# =
   let !ycScaledBN# = bigNatMulWord# ycbn# 0x100000000## -- 0x100000000## = 2^32 = radixW32
