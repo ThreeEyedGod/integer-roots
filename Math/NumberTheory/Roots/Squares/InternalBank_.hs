@@ -31,13 +31,11 @@ import GHC.Exts (Double (..), (==#), ltInt64#, indexWordArray#, word32ToWord#, D
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatToWord#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWordMaybe#, bigNatZero#)
-import GHC.Num.Integer (integerToBigNatClamp#)
-import GHC.Num.Natural (naturalMul, naturalToBigNat#)
+import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word64 (..), Word32(..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
 import Numeric.QuoteQuot
-import Prelude hiding (pred)
 
 -- *********** END NEW IMPORTS
 
@@ -74,7 +72,7 @@ nxtDgtNatW64# :: Natural -> FloatingX# -> Word64#
 nxtDgtNatW64# 0 !_ = 0#Word64
 nxtDgtNatW64# x@(NatJ# n@(BN# bn#)) tcfx#
   | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
-  -- \| otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
+  -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
   where
     threshold# = let !(I64# e64#) = 10 ^ 137 in FloatingX# 1.9## e64#
@@ -86,10 +84,6 @@ nxtDgtNatW64# (NatS# ta#) tcfx# = inline nxtDgtDoubleFxW64## (word2Double# ta#) 
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
-
-{-# INLINE computDouble# #-}
-computDouble# :: Double# -> Double# -> Double# -> Integer
-computDouble# !tAFX# !tCFX# !radFX# = hndlOvflwW32 $ floor (D# (coreD# tAFX# tCFX# radFX#))
 
 coreD# :: Double# -> Double# -> Double# -> Double#
 coreD# da# dc# dr# = nextUp# (nextUp# da# /## nextDown# (sqrtDouble# (nextDown# dr#) +## nextDown# dc#))
