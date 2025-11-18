@@ -30,7 +30,7 @@ import Data.Word (Word32)
 import GHC.Exts (Double (..), (==#), ltInt64#, indexWordArray#, word32ToWord#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word64#, Word32#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==##), (>#), (>=#), (>=##), wordToWord32#)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatToWord#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWordMaybe#, bigNatZero#)
+import GHC.Num.BigNat (BigNat (..), bigNatIsZero#, BigNat#, bigNatToWord#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWordMaybe#, bigNatZero#)
 import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word64 (..), Word32(..))
 import Math.NumberTheory.Utils.ArthMtic_
@@ -60,7 +60,8 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
       !x = bigNatFromWord2# x1 x2 
       !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# !(NatJ# (BN# ycUpdated#)), !yTildeFinal#, !(NatJ# (BN# remFinal#)) #) = accRmdrDgt (NatJ# (BN# yCAcc_)) (NatJ# (BN# tA_)) (nxtDgtNatW64# (NatJ# (BN# tA_)) tCFx#)
+      -- !(# !(NatJ# (BN# ycUpdated#)), !yTildeFinal#, !(NatJ# (BN# remFinal#)) #) = accRmdrDgt (NatJ# (BN# yCAcc_)) (NatJ# (BN# tA_)) (nxtDgtNatW64# (NatJ# (BN# tA_)) tCFx#)
+      !(# !(NatJ# (BN# ycUpdated#)), !yTildeFinal#, !(NatJ# (BN# remFinal#)) #) = accRmdrDgt (NatJ# (BN# yCAcc_)) (NatJ# (BN# tA_)) (nxtDgtNatW64## tA_ tCFx#)
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
    in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
       Itr'' (cl# +# 1#) ycUpdated# remFinal# tcfx#
@@ -68,19 +69,22 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
     !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
     !(W# radixW32w#) = radixW32
 
-nxtDgtNatW64# :: Natural -> FloatingX# -> Word64#
-nxtDgtNatW64# 0 !_ = 0#Word64
-nxtDgtNatW64# x@(NatJ# n@(BN# bn#)) tcfx#
-  | isTrue# ((bigNatSize# bn#) <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
+nxtDgtNatW64## :: BigNat# -> FloatingX# -> Word64#
+nxtDgtNatW64## bn# tcfx#
+  | isTrue# (bigNatIsZero# bn#) = 0#Word64
+  | isTrue# (sz# ==# 1#)
+    , a0 <- indexWordArray# bn# 0#
+    =  inline nxtDgtDoubleFxW64## (word2Double# a0) tcfx#
+  | isTrue# (sz# <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
   -- | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
   | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
   where
+    sz# = bigNatSize# bn# 
     threshold# = let !(I64# e64#) = 10 ^ 137 in FloatingX# 1.9## e64#
     -- where
     thresh# :: Int#
     thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
-nxtDgtNatW64# (NatS# ta#) tcfx# = inline nxtDgtDoubleFxW64## (word2Double# ta#) tcfx# -- chances are this branch is never taken (see how squares_. hs is structured)
-{-# INLINE nxtDgtNatW64# #-}
+{-# INLINE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
