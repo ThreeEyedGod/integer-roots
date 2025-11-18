@@ -166,22 +166,17 @@ rmdrDgt ycScaledbn# yTilde# ta# =
     !oneBigNat# = bigNatOne# (# #)
 {-# INLINE rmdrDgt #-}
 
-handleFirstRemBN# :: (# Word64#, Integer #) -> (# BigNat#, Word64#, BigNat# #)
-handleFirstRemBN# (# yi64#, ri_ #)
-  | ri_ < 0 =
+handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
+handleFirstRemBN## (# yi64#, ri_ #)
+  | isTrue# (ri_ `ltInt64#` zero) =
       let !yAdj# = yi64# `subWord64#` 1#Word64
-          !adjYc = pred ycyi
-          !rdr = fixRemainder adjYc ri_
-       in (# bigNatFromWord64# yAdj#, yAdj#, integerToBigNatClamp# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | otherwise = (# bigNatFromWord64# yi64#, yi64#, integerToBigNatClamp# ri_ #)
+          !rdr = fixRemainder# yAdj# ri_
+       in (# bigNatFromWord64# yAdj#, yAdj#, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+  | otherwise = (# bigNatFromWord64# yi64#, yi64#, bigNatFromWord64# (int64ToWord64# ri_) #)
   where
-    !ycyi = fromIntegral (W64# yi64#) -- accumulating the growing square root
-{-# INLINE handleFirstRemBN# #-}
+    !(I64# zero) = 0
 
--- -- Fix remainder accompanying a 'next downed digit' see algorithm
-fixRemainder :: Integer -> Integer -> Integer
-fixRemainder !newYc !rdr = rdr + double newYc + 1
-{-# INLINE fixRemainder #-}
+{-# INLINE handleFirstRemBN## #-}
 
 -- -- Fix remainder accompanying a 'next downed digit' see algorithm
 fixRemainder# :: Word64# -> Int64# -> Word64#
@@ -199,7 +194,7 @@ evenFirstRmdrBN# w# =
   let yT64# = hndlOvflwW32## (largestNSqLTEEven## w#)
       ysq# = yT64# `timesWord64#` yT64#
       diff# = word64ToInt64# w# `subInt64#` word64ToInt64# ysq#
-   in handleFirstRemBN# (# yT64#, fromIntegral (I64# diff#) #) -- set 0 for starting cumulative yc--fstDgtRem i
+   in handleFirstRemBN## (# yT64#, diff# #) -- set 0 for starting cumulative yc--fstDgtRem i
 {-# INLINE evenFirstRmdrBN# #-}
 
 oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
