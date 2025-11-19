@@ -52,7 +52,7 @@ tfi (evenLen, (m, l)) = let !i# = word64FromRvsrdTuple# (l , m) 4294967296#Word6
   where
     !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
 
-{-# INLINE tni #-} -- //FIXME unused and untested grab2Word32BN# also needs to be changed to work with Word32 inputs
+{-# INLINE tni #-} 
 tni :: (# Word32#, Word32# #) -> Itr'' -> Itr''
 tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) =
   let 

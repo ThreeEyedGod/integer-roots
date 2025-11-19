@@ -88,10 +88,8 @@ import GHC.Exts
   )
 import GHC.Float (divideDouble, int2Double, integerToDouble#, minusDouble, plusDouble, powerDouble, properFractionDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
-import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
-import GHC.Integer.Logarithms (wordLog2#)
+import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
-import GHC.Num.Integer (integerLog2#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord,bnToFxGtWord#,convNToDblExp,cI2D2_, fromInt64, maxDouble, maxUnsafeInteger, nextDown#, nextUp#, split, split#, sqrtOf2, updateDouble#, _evenInt64#)
 

@@ -25,8 +25,9 @@ module Math.NumberTheory.Roots.Squares_
     ) where
 
 import Data.Bits (finiteBitSize, (.&.))
-import GHC.Exts (Ptr(..))
-import Numeric.Natural (Natural)
+import GHC.Exts (Ptr(..), Word (..), Word#, isTrue#)
+import Numeric.Natural (Natural, Natural ())
+import GHC.Natural (Natural (..))
 
 import Math.NumberTheory.Roots.Squares.Internal_
 import Math.NumberTheory.Utils.BitMask (indexBitSet)
@@ -238,3 +239,8 @@ isqrtWord n
 {-# INLINE isqrtInteger #-}
 isqrtInteger :: Integer -> Integer
 isqrtInteger = fst . karatsubaSqrt
+
+{-# INLINE isqrtNatural #-}
+isqrtNatural :: Natural -> Natural
+isqrtNatural n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
+isqrtNatural n = isqrtB_ (lenRadixW32 n) n
