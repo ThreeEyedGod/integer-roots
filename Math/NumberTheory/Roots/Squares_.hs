@@ -59,7 +59,8 @@ integerSquareRoot n
 "integerSquareRoot'/Int"     integerSquareRoot' = isqrtInt'
 "integerSquareRoot'/Word"    integerSquareRoot' = isqrtWord
 "integerSquareRoot'/Integer" integerSquareRoot' = isqrtInteger
-"integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
+"integerSquareRoot'/Natural" integerSquareRoot' =  isqrtNatural
+-- "integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
   #-}
 {-# INLINE [1] integerSquareRoot' #-}
 integerSquareRoot' :: Integral a => a -> a
@@ -243,4 +244,4 @@ isqrtInteger = fst . karatsubaSqrt
 {-# INLINE isqrtNatural #-}
 isqrtNatural :: Natural -> Natural
 isqrtNatural n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
-isqrtNatural n = isqrtB_ (lenRadixW32 n) n
+isqrtNatural n@(NatJ# bn) = fromInteger . isqrtInteger . toInteger $ n
