@@ -60,7 +60,7 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
       !x = bigNatFromWord2# x1 x2 
       !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# ycUpdated#, !yTildeFinal#, remFinal# #) = accRmdrDgt# (NatJ# (BN# yCAcc_)) (NatJ# (BN# tA_)) (nxtDgtNatW64## tA_ tCFx#)
+      !(# ycUpdated#, remFinal#, !yTildeFinal# #) = rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) (nxtDgtNatW64## tA_ tCFx#) tA_  -- 0x100000000## = 2^32 = radixW32
       !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
    in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
       Itr'' (cl# +# 1#) ycUpdated# remFinal# tcfx#
@@ -113,27 +113,6 @@ preComput a# tcfx# = case unsafefx2Double## tcfx# of c# -> (# a#, c#, fmaddDoubl
 preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComputFx## #-}
-
-accRmdrDgt# :: Natural -> Natural -> Word64# -> (# BigNat#, Word64#, BigNat# #)
-accRmdrDgt# yc@(NatS# ycw#) ta@(NatS# taw#) yTw# =
-  let !ycScaledBN# = case ycw# `timesWord2#` 0x100000000## of (# hi, lo #) -> bigNatFromWord2# hi lo -- 0x100000000## = 2^32 = radixW32
-      !tabn# = bigNatFromWord# taw#
-      !(# acc, r, d #) = rmdrDgt ycScaledBN# yTw# tabn# -- //FIXME the order of rmdrDgt outputs 
-   in (# acc, d, r #)
-accRmdrDgt# yc@(NatJ# (BN# ycbn#)) ta@(NatS# taw#) yTw# =
-  let !ycScaledBN# = bigNatMulWord# ycbn# 0x100000000## -- 0x100000000## = 2^32 = radixW32
-      !tabn# = bigNatFromWord# taw#
-      !(# acc, r, d #) = rmdrDgt ycScaledBN# yTw# tabn#
-   in (# acc, d, r #)
-accRmdrDgt# yc@(NatS# ycw#) ta@(NatJ# (BN# tabn#)) yTw# =
-  let !ycScaledBN# = case ycw# `timesWord2#` 0x100000000## of (# hi, lo #) -> bigNatFromWord2# hi lo -- 0x100000000## = 2^32 = radixW32
-      !(# acc, r, d #) = rmdrDgt ycScaledBN# yTw# tabn#
-   in (# acc, d, r #)
-accRmdrDgt# yc@(NatJ# (BN# ycbn#)) ta@(NatJ# (BN# tabn#)) yTw# =
-  let !ycScaledBN# = bigNatMulWord# ycbn# 0x100000000## -- 0x100000000## = 2^32 = radixW32
-      !(# acc, r, d #) = rmdrDgt ycScaledBN# yTw# tabn#
-   in (# acc, d, r #)
-{-# INLINE accRmdrDgt# #-}
 
 subtrahend# :: BigNat# -> Word64# -> BigNat#
 subtrahend# yScaled# yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde# of
