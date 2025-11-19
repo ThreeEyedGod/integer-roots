@@ -1,3 +1,7 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
+-- {-# OPTIONS_GHC -O2 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
+
 -- |
 -- Module:      Math.NumberTheory.Roots.Squares
 -- Copyright:   (c) 2011 Daniel Fischer, 2016-2020 Andrew Lelechenko
@@ -6,31 +10,27 @@
 --
 -- Functions dealing with squares. Efficient calculation of integer square roots
 -- and efficient testing for squareness.
-
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE MagicHash    #-}
-{-# OPTIONS_GHC -O2 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
-
 module Math.NumberTheory.Roots.Squares_
-    ( -- * Square root calculation
-      integerSquareRoot
-    , integerSquareRoot'
-    , integerSquareRootRem
-    , integerSquareRootRem'
-    , exactSquareRoot
-      -- * Tests for squares
-    , isSquare
-    , isSquare'
-    , isPossibleSquare
-    ) where
+  ( -- * Square root calculation
+    integerSquareRoot,
+    integerSquareRoot',
+    integerSquareRootRem,
+    integerSquareRootRem',
+    exactSquareRoot,
+
+    -- * Tests for squares
+    isSquare,
+    isSquare',
+    isPossibleSquare,
+  )
+where
 
 import Data.Bits (finiteBitSize, (.&.))
-import GHC.Exts (Ptr(..), Word (..), Word#, isTrue#)
-import Numeric.Natural (Natural, Natural ())
+import GHC.Exts (Ptr (..), Word (..), Word#, isTrue#)
 import GHC.Natural (Natural (..))
-
 import Math.NumberTheory.Roots.Squares.Internal_
 import Math.NumberTheory.Utils.BitMask (indexBitSet)
+import Numeric.Natural (Natural ())
 
 -- | For a non-negative input \( n \)
 --   calculate its integer square root \( \lfloor \sqrt{n} \rfloor \).
@@ -42,29 +42,31 @@ import Math.NumberTheory.Utils.BitMask (indexBitSet)
 -- 10
 -- >>> integerSquareRoot 101
 -- 10
-{-# SPECIALISE integerSquareRoot :: Int -> Int,
-                                    Word -> Word,
-                                    Integer -> Integer,
-                                    Natural -> Natural
+{-# SPECIALIZE integerSquareRoot ::
+  Int -> Int,
+  Word -> Word,
+  Integer -> Integer,
+  Natural -> Natural
   #-}
-integerSquareRoot :: Integral a => a -> a
+integerSquareRoot :: (Integral a) => a -> a
 integerSquareRoot n
-  | n < 0       = error "integerSquareRoot: negative argument"
-  | otherwise   = integerSquareRoot' n
+  | n < 0 = error "integerSquareRoot: negative argument"
+  | otherwise = integerSquareRoot' n
 
 -- | Calculate the integer square root of a non-negative number @n@,
 --   that is, the largest integer @r@ with @r*r <= n@.
 --   The precondition @n >= 0@ is not checked.
 {-# RULES
-"integerSquareRoot'/Int"     integerSquareRoot' = isqrtInt'
-"integerSquareRoot'/Word"    integerSquareRoot' = isqrtWord
+"integerSquareRoot'/Int" integerSquareRoot' = isqrtInt'
+"integerSquareRoot'/Word" integerSquareRoot' = isqrtWord
 "integerSquareRoot'/Integer" integerSquareRoot' = isqrtInteger
-"integerSquareRoot'/Natural" integerSquareRoot' =  isqrtNatural
+"integerSquareRoot'/Natural" integerSquareRoot' = isqrtNatural
 -- "integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
   #-}
+
 {-# INLINE [1] integerSquareRoot' #-}
-integerSquareRoot' :: Integral a => a -> a
-integerSquareRoot' n = isqrtB_ (lenRadixW32 n) n --isqrtB n
+integerSquareRoot' :: (Integral a) => a -> a
+integerSquareRoot' n = isqrtB_ (lenRadixW32 n) n -- isqrtB n
 
 -- | For a non-negative input \( n \)
 --   calculate its integer square root \( r = \lfloor \sqrt{n} \rfloor \)
@@ -77,16 +79,16 @@ integerSquareRoot' n = isqrtB_ (lenRadixW32 n) n --isqrtB n
 -- (10,0)
 -- >>> integerSquareRootRem 101
 -- (10,1)
-{-# SPECIALISE integerSquareRootRem ::
-        Int -> (Int, Int),
-        Word -> (Word, Word),
-        Integer -> (Integer, Integer),
-        Natural -> (Natural, Natural)
+{-# SPECIALIZE integerSquareRootRem ::
+  Int -> (Int, Int),
+  Word -> (Word, Word),
+  Integer -> (Integer, Integer),
+  Natural -> (Natural, Natural)
   #-}
-integerSquareRootRem :: Integral a => a -> (a, a)
+integerSquareRootRem :: (Integral a) => a -> (a, a)
 integerSquareRootRem n
-  | n < 0       = error "integerSquareRootRem: negative argument"
-  | otherwise   = integerSquareRootRem' n
+  | n < 0 = error "integerSquareRootRem: negative argument"
+  | otherwise = integerSquareRootRem' n
 
 -- | Calculate the integer square root of a non-negative number as well as
 --   the difference of that number with the square of that root, that is if
@@ -95,8 +97,9 @@ integerSquareRootRem n
 {-# RULES
 "integerSquareRootRem'/Integer" integerSquareRootRem' = karatsubaSqrt
   #-}
+
 {-# INLINE [1] integerSquareRootRem' #-}
-integerSquareRootRem' :: Integral a => a -> (a, a)
+integerSquareRootRem' :: (Integral a) => a -> (a, a)
 integerSquareRootRem' n = (s, n - s * s)
   where
     s = integerSquareRoot' n
@@ -106,28 +109,31 @@ integerSquareRootRem' n = (s, n - s * s)
 --
 -- >>> map exactSquareRoot [-100, 99, 100, 101]
 -- [Nothing,Nothing,Just 10,Nothing]
-{-# SPECIALISE exactSquareRoot :: Int -> Maybe Int,
-                                  Word -> Maybe Word,
-                                  Integer -> Maybe Integer,
-                                  Natural -> Maybe Natural
+{-# SPECIALIZE exactSquareRoot ::
+  Int -> Maybe Int,
+  Word -> Maybe Word,
+  Integer -> Maybe Integer,
+  Natural -> Maybe Natural
   #-}
-exactSquareRoot :: Integral a => a -> Maybe a
+exactSquareRoot :: (Integral a) => a -> Maybe a
 exactSquareRoot n
-  | n >= 0
-  , isPossibleSquare n
-  , (r, 0) <- integerSquareRootRem' n = Just r
-  | otherwise                         = Nothing
+  | n >= 0,
+    isPossibleSquare n,
+    (r, 0) <- integerSquareRootRem' n =
+      Just r
+  | otherwise = Nothing
 
 -- | Test whether the argument is a perfect square.
 --
 -- >>> map isSquare [-100, 99, 100, 101]
 -- [False,False,True,False]
-{-# SPECIALISE isSquare :: Int -> Bool,
-                           Word -> Bool,
-                           Integer -> Bool,
-                           Natural -> Bool
+{-# SPECIALIZE isSquare ::
+  Int -> Bool,
+  Word -> Bool,
+  Integer -> Bool,
+  Natural -> Bool
   #-}
-isSquare :: Integral a => a -> Bool
+isSquare :: (Integral a) => a -> Bool
 isSquare n = n >= 0 && isSquare' n
 
 -- | Test whether the input (a non-negative number) @n@ is a square.
@@ -136,16 +142,18 @@ isSquare n = n >= 0 && isSquare' n
 --
 --   The precondition @n >= 0@ is not tested, passing negative
 --   arguments may cause any kind of havoc.
-{-# SPECIALISE isSquare' :: Int -> Bool,
-                            Word -> Bool,
-                            Integer -> Bool,
-                            Natural -> Bool
+{-# SPECIALIZE isSquare' ::
+  Int -> Bool,
+  Word -> Bool,
+  Integer -> Bool,
+  Natural -> Bool
   #-}
-isSquare' :: Integral a => a -> Bool
+isSquare' :: (Integral a) => a -> Bool
 isSquare' n
-    | isPossibleSquare n
-    , (_, 0) <- integerSquareRootRem' n = True
-    | otherwise                         = False
+  | isPossibleSquare n,
+    (_, 0) <- integerSquareRootRem' n =
+      True
+  | otherwise = False
 
 -- | Test whether a non-negative number may be a square.
 --   Non-negativity is not checked, passing negative arguments may
@@ -155,16 +163,17 @@ isSquare' n
 --   easily without division and eliminates about 82% of all numbers).
 --   After that, the remainders modulo 9, 25, 7, 11 and 13 are tested
 --   to eliminate altogether about 99.436% of all numbers.
-{-# SPECIALISE isPossibleSquare :: Int -> Bool,
-                                   Word -> Bool,
-                                   Integer -> Bool,
-                                   Natural -> Bool
+{-# SPECIALIZE isPossibleSquare ::
+  Int -> Bool,
+  Word -> Bool,
+  Integer -> Bool,
+  Natural -> Bool
   #-}
-isPossibleSquare :: Integral a => a -> Bool
-isPossibleSquare n'
-  =  indexBitSet mask256 (fromInteger (n .&. 255))
-  && indexBitSet mask693 (fromInteger (n `rem` 693))
-  && indexBitSet mask325 (fromInteger (n `rem` 325))
+isPossibleSquare :: (Integral a) => a -> Bool
+isPossibleSquare n' =
+  indexBitSet mask256 (fromInteger (n .&. 255))
+    && indexBitSet mask693 (fromInteger (n `rem` 693))
+    && indexBitSet mask325 (fromInteger (n `rem` 325))
   where
     n = toInteger n'
 
@@ -213,10 +222,11 @@ mask325 = Ptr "\DC3B\SOH&\144\NUL\n!%\140\STXH0\SOH\DC4BJ\b\ENQ\144@\STX(\132\14
 -- The multiplication doesn't overflow for 32 or 64 bit Ints.
 isqrtInt' :: Int -> Int
 isqrtInt' n
-    | n < r*r   = r-1
-    | otherwise = r
-      where
-        !r = (truncate :: Double -> Int) . sqrt $ fromIntegral n
+  | n < r * r = r - 1
+  | otherwise = r
+  where
+    !r = (truncate :: Double -> Int) . sqrt $ fromIntegral n
+
 -- With -O2, that should be translated to the below
 {-
 isqrtInt' n@(I# i#)
@@ -229,13 +239,13 @@ isqrtInt' n@(I# i#)
 -- Same for Word.
 isqrtWord :: Word -> Word
 isqrtWord n
-    | n < (r*r)
+  | n < (r * r)
       -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
-      || finiteBitSize (0 :: Word) == 64 && r == 4294967296
-                = r-1
-    | otherwise = r
-      where
-        !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
+      || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
+      r - 1
+  | otherwise = r
+  where
+    !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
 
 {-# INLINE isqrtInteger #-}
 isqrtInteger :: Integer -> Integer

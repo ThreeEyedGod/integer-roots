@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE OrPatterns #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -91,7 +90,7 @@ import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord,bnToFxGtWord#,convNToDblExp,cI2D2_, fromInt64, maxDouble, maxUnsafeInteger, nextDown#, nextUp#, split, split#, sqrtOf2, updateDouble#, _evenInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, maxUnsafeInteger, nextDown#, nextUp#, split, split#, sqrtOf2, updateDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 

@@ -6,7 +6,6 @@
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
 
-{-# LANGUAGE BangPatterns     #-}
 {-# LANGUAGE CPP              #-}
 {-# LANGUAGE MagicHash        #-}
 
