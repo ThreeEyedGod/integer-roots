@@ -17,9 +17,8 @@ where
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 
-import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#))
+import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#), uncheckedIShiftRA#, (*#), (-#))
 #ifdef MIN_VERSION_integer_gmp
-import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
 import GHC.Integer.GMP.Internals (Integer(..), shiftLInteger, shiftRInteger, sizeofBigNat#)
 import GHC.Integer.Logarithms (integerLog2#)
 #define IS S#

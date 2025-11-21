@@ -59,7 +59,7 @@ where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
+import Data.Bits (complement, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Numeric.Floating.IEEE (nextUp, nextDown)
 import Data.Word (Word32)
 import GHC.Exts

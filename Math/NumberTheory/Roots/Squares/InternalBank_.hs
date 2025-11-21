@@ -41,9 +41,6 @@ import Math.NumberTheory.Utils.FloatingX_
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
--- | Iteration loop data
-data Itr'' = Itr'' {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
-
 tfi :: (Bool, (Word32, Word32)) -> (# BigNat#, Word64#, BigNat# #)
 tfi (evenLen, (m, l)) = let !i# = word64FromRvsrdTuple# (l, m) 4294967296#Word64 in rmdrFn i#
   where
@@ -178,14 +175,6 @@ oddFirstRmdrBN# w# =
    in (# bigNatFromWord64# yT64#, yT64#, bigNatFromWord64# remIntegerW# #)
 {-# INLINE oddFirstRmdrBN# #-}
 
-theFirstIter :: Bool -> (Word32, Word32) -> Itr'' -> Itr''
-theFirstIter evn pairdgt _ = case tfi (evn, pairdgt) of (# yVal, yWord#, rem #) -> Itr'' 1# yVal rem (unsafeword64ToFloatingX## yWord#)
-{-# INLINE theFirstIter #-}
-
-theNextIters :: (# Word32#, Word32# #) -> Itr'' -> Itr''
-theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
-{-# INLINE theNextIters #-}
-
 grab2Word32BN## :: Int -> BigNat# -> (# Word32#, Word32#, BigNat# #) -- a more efficient version for Int = 1
 grab2Word32BN## 1 !n#
   | isTrue# (bigNatSize# n# ==# 1#),
@@ -222,6 +211,7 @@ grab2Word32BN## !pow !n# =
    in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
 {-# INLINE grab2Word32BN## #-}
 
+data Itr'' = Itr'' {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
 newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
 newappsqrt_ l eY n =
@@ -230,23 +220,30 @@ newappsqrt_ l eY n =
    in NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
   where 
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
-goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
-goBN# !evn !n# !firstIter !p !acc
-  | p <= 0 = acc
-  | not firstIter -- && p >= 1 =
-    =
-      let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
-       in goBN# evn zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
-  | firstIter && not evn =
-      let !(I# pow#) = p
-          !pw# = powBigNat# (int2Word# pow#)
-          !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
-       in goBN# evn ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
-  | otherwise -- firstIter && evn =
-    =
-      let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
-       in goBN# evn zbn# False (p - 2) (theFirstIter True (W32# digit1, W32# digit2) acc)
-{-# INLINE goBN# #-}
+  goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
+  goBN# !evn !n# !firstIter !p !acc
+    | p <= 0 = acc
+    | not firstIter -- && p >= 1 =
+      =
+        let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
+        in goBN# evn zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
+    | firstIter && not evn =
+        let !(I# pow#) = p
+            !pw# = powBigNat# (int2Word# pow#)
+            !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
+        in goBN# evn ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
+    | otherwise -- firstIter && evn =
+      =
+        let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
+        in goBN# evn zbn# False (p - 2) (theFirstIter True (W32# digit1, W32# digit2) acc)
+  {-# INLINE goBN# #-}
+  -- | Iteration loop data
+  theFirstIter :: Bool -> (Word32, Word32) -> Itr'' -> Itr''
+  theFirstIter evn pairdgt _ = case tfi (evn, pairdgt) of (# yVal, yWord#, rem #) -> Itr'' 1# yVal rem (unsafeword64ToFloatingX## yWord#)
+  {-# INLINE theFirstIter #-}
+  theNextIters :: (# Word32#, Word32# #) -> Itr'' -> Itr''
+  theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
+  {-# INLINE theNextIters #-}
 {-# INLINE newappsqrt_ #-}
 
 isqrtWord :: Word -> Word
