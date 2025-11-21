@@ -213,7 +213,17 @@ grab2Word32BN## !pow !n# =
 
 data Itr'' = Itr'' {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
+newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# where 
+  isqrtWord :: Word -> Word
+  isqrtWord n
+    | n < (r * r)
+        -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
+        || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
+        r - 1
+    | otherwise = r
+    where
+      !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
+
 newappsqrt_ l eY n =
   let -- NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
       !(NatJ# (BN# nbn#)) = n
@@ -245,13 +255,3 @@ newappsqrt_ l eY n =
   theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
   {-# INLINE theNextIters #-}
 {-# INLINE newappsqrt_ #-}
-
-isqrtWord :: Word -> Word
-isqrtWord n
-  | n < (r * r)
-      -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
-      || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
-      r - 1
-  | otherwise = r
-  where
-    !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n

@@ -35,7 +35,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     double,
     radixW32,
     hndlOvflwW32##,
-    hndlOvflwI32##,
     secndPlaceW32Radix,
     word64FromRvsrd2ElemList#,
     largestNSqLTEEven##,
@@ -259,13 +258,6 @@ hndlOvflwW32## w64# = if isTrue# (w64# `eqWord64#` maxW32#) then predmaxW32# els
   where
     !(W64# maxW32#) = radixW32
     !(W64# predmaxW32#) = predRadixW32
-
-{-# INLINE hndlOvflwI32## #-}
-hndlOvflwI32## :: Int64# -> Int64#
-hndlOvflwI32## i64# = if isTrue# (i64# `eqInt64#` maxW32#) then predmaxW32# else i64#
-  where
-    !(I64# maxW32#) = radixW32
-    !(I64# predmaxW32#) = predRadixW32
 
 {-# INLINE radixW32Length #-} -- this works
 radixW32Length :: Integer -> Word

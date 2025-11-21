@@ -21,7 +21,7 @@ module Math.NumberTheory.Roots.Squares_
     -- * Tests for squares
     isSquare,
     isSquare',
-    isPossibleSquare,
+    isPossibleSquare
   )
 where
 
