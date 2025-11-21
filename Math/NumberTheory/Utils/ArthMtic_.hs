@@ -3,6 +3,8 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
@@ -50,6 +52,8 @@ module Math.NumberTheory.Utils.ArthMtic_
     radixW32Squared,
     bnConst#,
     word64FromRvsrdTuple#,
+    quotremradixW32,
+    quotrem1
   )
 where
 
@@ -129,10 +133,20 @@ import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
+import Numeric.QuoteQuot  (quoteQuotRem)
 
 -- *********** END NEW IMPORTS
 
 -- | HELPER functions
+
+-- Equivalent to (`quot` radixw32).
+quotremradixW32 :: Word -> (Word, Word)
+quotremradixW32 = $$(quoteQuotRem 4294967296)
+{-# INLINE quotremradixW32 #-}
+
+quotrem1 :: Word -> (Word, Word)
+quotrem1 = $$(quoteQuotRem 1)
+{-# INLINE quotrem1 #-}
 
 -- powBigNat# :: Int# -> BigNat#
 -- Compute radixW32 ^ p as a BigNat# by shifting 1 << (32 * p)

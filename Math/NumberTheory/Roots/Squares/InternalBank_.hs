@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -34,7 +33,6 @@ import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
-import Numeric.QuoteQuot
 
 -- *********** END NEW IMPORTS
 
@@ -188,19 +186,6 @@ theNextIters :: (# Word32#, Word32# #) -> Itr'' -> Itr''
 theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
 {-# INLINE theNextIters #-}
 
--- Equivalent to (`quot` radixw32).
-quotremradixW32 :: Word -> (Word, Word)
-quotremradixW32 = $$(quoteQuotRem 4294967296)
-{-# INLINE quotremradixW32 #-}
-
-quotrem1 :: Word -> (Word, Word)
-quotrem1 = $$(quoteQuotRem 1)
-{-# INLINE quotrem1 #-}
-
-grab2Word32BN# :: Int -> BigNat# -> (# Word32, Word32, BigNat# #)
-grab2Word32BN# pow n# = let !(# w1#, w2#, bn# #) = grab2Word32BN## pow n# in (# W32# w1#, W32# w2#, bn# #)
-{-# INLINE grab2Word32BN# #-}
-
 grab2Word32BN## :: Int -> BigNat# -> (# Word32#, Word32#, BigNat# #) -- a more efficient version for Int = 1
 grab2Word32BN## 1 !n#
   | isTrue# (bigNatSize# n# ==# 1#),
@@ -237,7 +222,14 @@ grab2Word32BN## !pow !n# =
    in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
 {-# INLINE grab2Word32BN## #-}
 
--- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
+newappsqrt_ :: Int -> Bool -> Natural -> Natural
+newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
+newappsqrt_ l eY n =
+  let -- NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+      !(NatJ# (BN# nbn#)) = n
+   in NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+  where 
+    -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
 goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
 goBN# !evn !n# !firstIter !p !acc
   | p <= 0 = acc
@@ -252,16 +244,9 @@ goBN# !evn !n# !firstIter !p !acc
        in goBN# evn ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
   | otherwise -- firstIter && evn =
     =
-      let !(# digit1, digit2, zbn# #) = grab2Word32BN# p n#
-       in goBN# evn zbn# False (p - 2) (theFirstIter True (digit1, digit2) acc)
+      let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
+       in goBN# evn zbn# False (p - 2) (theFirstIter True (W32# digit1, W32# digit2) acc)
 {-# INLINE goBN# #-}
-
-newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
-newappsqrt_ l eY n =
-  let -- NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
-      !(NatJ# (BN# nbn#)) = n
-   in NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
 {-# INLINE newappsqrt_ #-}
 
 isqrtWord :: Word -> Word
