@@ -23,7 +23,7 @@ module Math.NumberTheory.Utils.FloatingX_ where
 -- \*********** BEGIN NEW IMPORTS
 
 import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import Data.Bits.Floating (nextDown, nextUp)
+import Numeric.Floating.IEEE (nextUp, nextDown)
 import GHC.Exts
   ( Double (..),
     Double#,

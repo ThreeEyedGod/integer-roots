@@ -24,7 +24,7 @@ source-repository head
 library
   build-depends:
     base >=4.9 && <5
-   ,floating-bits >= 0.3.1.0
+   ,fp-ieee >= 0.1.0.5
    ,ghc-prim >= 0.13.0
    ,quote-quot >= 0.2.1.0
   if impl(ghc < 9.0)
@@ -115,7 +115,7 @@ benchmark integer-roots-benchmark
                        -fproc-alignment=64 
                        -threaded
                        -rtsopts
-                       -with-rtsopts=-N6-w-H128m-A32m
+                       -with-rtsopts=-N6-w-H512m-A128m
 
 benchmark weigh
   type            : exitcode-stdio-1.0

@@ -66,21 +66,6 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
     !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
     !(W# radixW32w#) = radixW32
 
-{-# INLINE ni #-}
-ni :: (# Word32#, Word32# #) -> Int# -> BigNat# -> BigNat# -> FloatingX# -> Itr'' -- // FIXME remove itr'' and just pass parameters
-ni (# word32ToWord# -> i1, word32ToWord# -> i2 #) !cl# !yCAcc_ !tA !t# =
-  let !(# x1, x2 #) = i1 `timesWord2#` radixW32w#
-      !x = bigNatFromWord2# x1 x2
-      !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2
-      !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# ycUpdated#, remFinal#, !yTildeFinal# #) = rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) (nxtDgtNatW64## tA_ tCFx#) tA_ -- 0x100000000## = 2^32 = radixW32
-      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
-   in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
-      Itr'' (cl# +# 1#) ycUpdated# remFinal# tcfx#
-  where
-    !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
-    !(W# radixW32w#) = radixW32
-
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> Word64#
 nxtDgtNatW64## bn# tcfx#
   | isTrue# (bigNatIsZero# bn#) = 0#Word64
@@ -200,8 +185,7 @@ theFirstIter evn pairdgt _ = case tfi (evn, pairdgt) of (# yVal, yWord#, rem #) 
 {-# INLINE theFirstIter #-}
 
 theNextIters :: (# Word32#, Word32# #) -> Itr'' -> Itr''
--- theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
-theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = ni (# x1, x2 #) currlen# yCumulatedAcc0 rmndr tbfx#
+theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
 {-# INLINE theNextIters #-}
 
 -- Equivalent to (`quot` radixw32).

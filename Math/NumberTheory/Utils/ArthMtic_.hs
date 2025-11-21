@@ -32,7 +32,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     sqrtOf2,
     double,
     radixW32,
-    hndlOvflwW32,
     hndlOvflwW32##,
     hndlOvflwI32##,
     secndPlaceW32Radix,
@@ -42,7 +41,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     maxDouble,
     maxSafeInteger,
     maxUnsafeInteger,
-    pred,
     lenRadixW32,
     cI2D2_,
     convNToDblExp,
@@ -58,7 +56,7 @@ where
 -- \*********** BEGIN NEW IMPORTS
 
 import Data.Bits (complement, finiteBitSize, shiftR, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import Data.Bits.Floating (nextDown, nextUp)
+import Numeric.Floating.IEEE (nextUp, nextDown)
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
@@ -241,13 +239,6 @@ largestNSqLTEEven## w# =
       !(W64# r#) = floorDouble (nextUp (sqrt d_))
    in r#
 
--- | handle overflow
-{-# INLINE [0] hndlOvflwW32 #-} -- does delaying inlining to phase 0 make a significant difference?
-{-# SPECIALIZE hndlOvflwW32 :: Integer -> Integer #-}
-{-# SPECIALIZE hndlOvflwW32 :: Word64 -> Word64 #-}
-hndlOvflwW32 :: (Integral a) => a -> a
-hndlOvflwW32 i = if i == maxW32 then pred maxW32 else i where maxW32 = radixW32
-
 {-# INLINE hndlOvflwW32## #-}
 hndlOvflwW32## :: Word64# -> Word64#
 hndlOvflwW32## w64# = if isTrue# (w64# `eqWord64#` maxW32#) then predmaxW32# else w64#
@@ -406,15 +397,6 @@ double x = x `unsafeShiftL` 1
 lenRadixW32 :: (Integral a) => a -> Int
 lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1
 {-# INLINEABLE lenRadixW32 #-}
-
--- | because pred is Enum. this version blow is marginally faster
-{-# SPECIALIZE pred :: Integer -> Integer #-}
-{-# SPECIALIZE pred :: Word64 -> Word64 #-}
-{-# SPECIALIZE pred :: Int -> Int #-}
-{-# SPECIALIZE pred :: Int64 -> Int64 #-}
-pred :: (Integral a) => a -> a
-pred x = x + (-1)
-{-# INLINE pred #-}
 
 -- //FIXME floor seems to trigger off missing specialization and also properFractionDouble.
 
