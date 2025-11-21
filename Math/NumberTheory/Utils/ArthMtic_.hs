@@ -273,7 +273,7 @@ _odd = _even
 {-# INLINE _odd #-}
 
 _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
-_evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
+_evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #) 
 _oddInt64# = _evenInt64#
 {-# INLINE _evenInt64# #-}
 {-# INLINE _oddInt64# #-}

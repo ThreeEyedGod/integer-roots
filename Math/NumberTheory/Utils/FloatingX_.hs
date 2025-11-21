@@ -227,8 +227,8 @@ floorFX (FloatingX s e) = case fx2Double (FloatingX s e) of
 {-# INLINE addFx# #-}
 addFx# :: FloatingX# -> FloatingX# -> FloatingX#
 addFx# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
-  -- \| a == zero# = b
-  -- \| b == zero# = a
+  | a == zeroFx# = b
+  | b == zeroFx# = a
   | isTrue# (expA# `eqInt64#` expB#) = FloatingX# (sA# +## sB#) expA#
   | isTrue# (expA# `gtInt64#` expB#) = combine a b
   | otherwise = combine b a
@@ -353,11 +353,11 @@ unsafeDivFxNorm# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) =
 
 {-# INLINE unsafeDivFx# #-}
 unsafeDivFx# :: FloatingX# -> FloatingX# -> FloatingX#
-unsafeDivFx# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) =
-  -- \| d == FloatingX# 1.0## (fromInt64 0) = n
-  -- \| isTrue# (s1# ==## 0.0##) = zero#
+unsafeDivFx# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) 
+  | d == FloatingX# 1.0## (fromInt64 0) = n
+  | isTrue# (s1# ==## 0.0##) = zeroFx#
   -- \| isTrue# (s2# ==## 0.0##) = error "divide#: error divide by zero "
-  -- \| otherwise
+  | otherwise = 
   let !resExp# = e1# `subInt64#` e2#
       !resSignif# = s1# /## s2#
       -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
