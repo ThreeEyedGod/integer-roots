@@ -182,18 +182,13 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
     rmdrDgt ycScaledbn# yTilde# ta# =
       let !sbtnd# = subtrahend# ycScaledbn# yTilde#
           !reg = ta# `bigNatGe` sbtnd#
-          !res# = case reg of
-            True -> ta# `bigNatSubUnsafe` sbtnd#
-            _ -> sbtnd# `bigNatSubUnsafe` ta#
-          !ytrdr =
-            if reg
-              then
-                (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde# #)
-              else
-                let adjyt = yTilde# `subWord64#` 1#Word64
-                    adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
-                    adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
-                 in (# adjacc, adjres, adjyt #)
+          !ytrdr = case reg of
+            True -> let !res# = ta# `bigNatSubUnsafe` sbtnd# in (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde# #)
+            _ -> let !res# = sbtnd# `bigNatSubUnsafe` ta# in 
+                      let adjyt = yTilde# `subWord64#` 1#Word64
+                          adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
+                          adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
+                      in (# adjacc, adjres, adjyt #)
        in -- (# ((ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde# `bigNatSubUnsafe` oneBigNat#) `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#, yTilde# `subWord64#` 1#Word64 #) -- watch out negate does not work
           ytrdr
       where
