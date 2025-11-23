@@ -67,7 +67,7 @@ newappsqrt_ l eY n =
       | not firstIter -- && p >= 1 =
         =
           let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
-           in goBN# evn zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
+           in goBN# evn zbn# False (p - 2) (tni (# digit1, digit2 #) acc)
       | firstIter && not evn =
           let !(I# pow#) = p
               !pw# = powBigNat# (int2Word# pow#)
@@ -82,16 +82,13 @@ newappsqrt_ l eY n =
     theFirstIter :: Bool -> (Word32, Word32) -> Itr'' -> Itr''
     theFirstIter evn pairdgt _ = case tfi (evn, pairdgt) of (# yVal, yWord#, rem #) -> Itr'' 1# yVal rem (unsafeword64ToFloatingX## yWord#)
     {-# INLINE theFirstIter #-}
-    theNextIters :: (# Word32#, Word32# #) -> Itr'' -> Itr''
-    theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
-    {-# INLINE theNextIters #-}
     grab2Word32BN## :: Int -> BigNat# -> (# Word32#, Word32#, BigNat# #) -- a more efficient version for Int = 1
-    grab2Word32BN## 1 !n#
+    grab2Word32BN## 2 !n# -- //FIXME does this work correctly ? check
       | isTrue# (bigNatSize# n# ==# 1#),
         a0 <- indexWordArray# n# 0# =
           let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
-              !(W# digit1#, W# yw#) = quotremradixW32 (W# a0)
-              !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
+              !(W# digit1#, W# yw#) = (0, W# a0) -- a0 `quotRemWord#` 18446744073709551616## -- 18446744073709551616## = 2^64 = radixW32 ^ 2
+              !(W# digit2#, W# z#) = quotremradixW32 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
            in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
       | otherwise =
           let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1
@@ -99,12 +96,12 @@ newappsqrt_ l eY n =
               !(# digit1#, yw# #) = n# `bigNatQuotRemWord#` power1#
               !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
            in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# digit2#, bigNatFromWord# z# #)
-    grab2Word32BN## 2 !n# -- //FIXME does this work correctly ? check
+    grab2Word32BN## 1 !n#
       | isTrue# (bigNatSize# n# ==# 1#),
         a0 <- indexWordArray# n# 0# =
           let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
-              !(W# digit1#, W# yw#) = (0, W# a0) -- a0 `quotRemWord#` 18446744073709551616## -- 18446744073709551616## = 2^64 = radixW32 ^ 2
-              !(W# digit2#, W# z#) = quotremradixW32 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
+              !(W# digit1#, W# yw#) = quotremradixW32 (W# a0)
+              !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
            in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
       | otherwise =
           let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1
