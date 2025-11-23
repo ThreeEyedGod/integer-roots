@@ -51,7 +51,7 @@ karatsubaSqrt n
   | lgNradixW32 < 72 = -- 72 in radixw32 is ~ 2300 in base 2
       let s = isqrtB_ lgNradixW32 n in (s, n - s * s)
   | otherwise =
-      if lgN .&. 2 /= 0
+      if lgN .&. 2 /= 0 -- //FIXME check if logic needs to be updated 
         then
           karatsubaStep k (karatsubaSplit k n)
         else

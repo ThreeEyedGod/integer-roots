@@ -41,13 +41,130 @@ import Math.NumberTheory.Utils.FloatingX_
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
+data Itr'' = Itr'' {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
+
+newappsqrt_ :: Int -> Bool -> Natural -> Natural
+newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
+  where
+    isqrtWord :: Word -> Word
+    isqrtWord n
+      | n < (r * r)
+          -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
+          || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
+          r - 1
+      | otherwise = r
+      where
+        !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
+newappsqrt_ l eY n =
+  let -- NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+      !(NatJ# (BN# nbn#)) = n
+   in NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+  where
+    -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
+    goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
+    goBN# !evn !n# !firstIter !p !acc
+      | p <= 0 = acc
+      | not firstIter -- && p >= 1 =
+        =
+          let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
+           in goBN# evn zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
+      | firstIter && not evn =
+          let !(I# pow#) = p
+              !pw# = powBigNat# (int2Word# pow#)
+              !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
+           in goBN# evn ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
+      | otherwise -- firstIter && evn =
+        =
+          let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
+           in goBN# evn zbn# False (p - 2) (theFirstIter True (W32# digit1, W32# digit2) acc)
+    {-# INLINE goBN# #-}
+    -- \| Iteration loop data
+    theFirstIter :: Bool -> (Word32, Word32) -> Itr'' -> Itr''
+    theFirstIter evn pairdgt _ = case tfi (evn, pairdgt) of (# yVal, yWord#, rem #) -> Itr'' 1# yVal rem (unsafeword64ToFloatingX## yWord#)
+    {-# INLINE theFirstIter #-}
+    theNextIters :: (# Word32#, Word32# #) -> Itr'' -> Itr''
+    theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
+    {-# INLINE theNextIters #-}
+    grab2Word32BN## :: Int -> BigNat# -> (# Word32#, Word32#, BigNat# #) -- a more efficient version for Int = 1
+    grab2Word32BN## 1 !n#
+      | isTrue# (bigNatSize# n# ==# 1#),
+        a0 <- indexWordArray# n# 0# =
+          let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
+              !(W# digit1#, W# yw#) = quotremradixW32 (W# a0)
+              !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
+           in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
+      | otherwise =
+          let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1
+              !(W# power1#) = radixW32 -- bigNatShiftL# power2# 32##
+              !(# digit1#, yw# #) = n# `bigNatQuotRemWord#` power1#
+              !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
+           in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# digit2#, bigNatFromWord# z# #)
+    grab2Word32BN## 2 !n# -- //FIXME does this work correctly ? check
+      | isTrue# (bigNatSize# n# ==# 1#),
+        a0 <- indexWordArray# n# 0# =
+          let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
+              !(W# digit1#, W# yw#) = (0, W# a0) -- a0 `quotRemWord#` 18446744073709551616## -- 18446744073709551616## = 2^64 = radixW32 ^ 2
+              !(W# digit2#, W# z#) = quotremradixW32 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
+           in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
+      | otherwise =
+          let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1
+              !(W# power1#) = radixW32 -- bigNatShiftL# power2# 32##
+              !(# digit1#, yw# #) = n# `bigNatQuotRemWord#` power1#
+              !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
+           in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# digit2#, bigNatFromWord# z# #)
+    grab2Word32BN## !pow !n# =
+      let !(I# predpow#) = pow - 1
+          !power2# = powBigNat# (int2Word# predpow#) -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
+          !power1# = bigNatShiftL# power2# 32## -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
+          !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
+          !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
+       in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
+    {-# INLINE grab2Word32BN## #-}
+{-# INLINE newappsqrt_ #-}
+
 tfi :: (Bool, (Word32, Word32)) -> (# BigNat#, Word64#, BigNat# #)
 tfi (evenLen, (m, l)) = let !i# = word64FromRvsrdTuple# (l, m) 4294967296#Word64 in rmdrFn i#
   where
     !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
+    -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
+    evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
+    evenFirstRmdrBN# w# =
+      let yT64# = hndlOvflwW32## (largestNSqLTEEven## w#)
+          ysq# = yT64# `timesWord64#` yT64#
+          diff# = word64ToInt64# w# `subInt64#` word64ToInt64# ysq#
+       in handleFirstRemBN## (# yT64#, diff# #) -- set 0 for starting cumulative yc--fstDgtRem i
+    -- {-# INLINE evenFirstRmdrBN# #-}
+
+    oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
+    oddFirstRmdrBN# w# =
+      let yT64# = largestNSqLTEOdd## w#
+          ysq# = yT64# `timesWord64#` yT64#
+          remIntegerW# = w# `subWord64#` ysq# -- no chance this will be negative
+       in (# bigNatFromWord64# yT64#, yT64#, bigNatFromWord64# remIntegerW# #)
+    -- {-# INLINE oddFirstRmdrBN# #-}
+
+    handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
+    handleFirstRemBN## (# yi64#, ri_ #)
+      | isTrue# (ri_ `ltInt64#` zero) =
+          let !yAdj# = yi64# `subWord64#` 1#Word64
+              !rdr = fixRemainder# yAdj# ri_
+           in (# bigNatFromWord64# yAdj#, yAdj#, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+      | otherwise = (# bigNatFromWord64# yi64#, yi64#, bigNatFromWord64# (int64ToWord64# ri_) #)
+      where
+        !(I64# zero) = 0
+    -- {-# INLINE handleFirstRemBN## #-}
+
+    -- -- Fix remainder accompanying a 'next downed digit' see algorithm
+    fixRemainder# :: Word64# -> Int64# -> Word64#
+    fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` two `timesInt64#` word64ToInt64# newYc# `plusInt64#` one in if isTrue# (x `ltInt64#` zero) then 0#Word64 else int64ToWord64# x
+      where
+        !(I64# two) = 2
+        !(I64# one) = 1
+        !(I64# zero) = 0
+    -- {-# INLINE fixRemainder# #-}
 
 {-# INLINE tni #-}
-tni :: (# Word32#, Word32# #) -> Itr'' -> Itr'' -- // FIXME remove itr'' and just pass parameters
+tni :: (# Word32#, Word32# #) -> Itr'' -> Itr'' 
 tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) =
   let !(# x1, x2 #) = i1 `timesWord2#` radixW32w#
       !x = bigNatFromWord2# x1 x2
@@ -60,6 +177,36 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
   where
     !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
     !(W# radixW32w#) = radixW32
+
+    rmdrDgt :: BigNat# -> Word64# -> BigNat# -> (# BigNat#, BigNat#, Word64# #)
+    rmdrDgt ycScaledbn# yTilde# ta# =
+      let !sbtnd# = subtrahend# ycScaledbn# yTilde#
+          !reg = ta# `bigNatGe` sbtnd#
+          !res# = case reg of
+            True -> ta# `bigNatSubUnsafe` sbtnd#
+            _ -> sbtnd# `bigNatSubUnsafe` ta#
+          !ytrdr =
+            if reg
+              then
+                (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde# #)
+              else
+                let adjyt = yTilde# `subWord64#` 1#Word64
+                    adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
+                    adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
+                 in (# adjacc, adjres, adjyt #)
+       in -- (# ((ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde# `bigNatSubUnsafe` oneBigNat#) `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#, yTilde# `subWord64#` 1#Word64 #) -- watch out negate does not work
+          ytrdr
+      where
+        oneBigNat# :: BigNat#
+        !oneBigNat# = bigNatOne# (# #)
+    -- {-# INLINE rmdrDgt #-}
+
+    subtrahend# :: BigNat# -> Word64# -> BigNat#
+    subtrahend# yScaled# yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde# of
+      r1# -> r1# `bigNatMulWord#` wyTilde#
+      where
+        !wyTilde# = word64ToWord# yTilde#
+    -- {-# INLINE subtrahend# #-}
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> Word64#
 nxtDgtNatW64## bn# tcfx#
@@ -82,176 +229,28 @@ nxtDgtNatW64## bn# tcfx#
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
 
-coreD# :: Double# -> Double# -> Double# -> Double#
-coreD# da# dc# dr# = nextUp# (nextUp# da# /## nextDown# (sqrtDouble# (nextDown# dr#) +## nextDown# dc#))
-{-# INLINE coreD# #-}
-
-coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
-coreFx# (# tAFX#, tCFX#, radFX# #) =
-  nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))
-{-# INLINE coreFx# #-}
+preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
+preComput a# tcfx# = case unsafefx2Double## tcfx# of c# -> (# a#, c#, fmaddDouble# c# c# a# #)
+{-# INLINE preComput #-}
 
 {-# INLINE computDoubleW64# #-}
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
 computDoubleW64# !tAFX# !tCFX# !radFX# = case floor (D# (coreD# tAFX# tCFX# radFX#)) of (W64# w#) -> hndlOvflwW32## w#
+
+coreD# :: Double# -> Double# -> Double# -> Double#
+coreD# da# dc# dr# = nextUp# (nextUp# da# /## nextDown# (sqrtDouble# (nextDown# dr#) +## nextDown# dc#))
+{-# INLINE coreD# #-}
+
+preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
+preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+{-# INLINE preComputFx## #-}
 
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
 computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
 -- hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
 {-# INLINE computFxW64# #-}
 
-preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
-preComput a# tcfx# = case unsafefx2Double## tcfx# of c# -> (# a#, c#, fmaddDouble# c# c# a# #)
-{-# INLINE preComput #-}
-
-preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
-{-# INLINE preComputFx## #-}
-
-subtrahend# :: BigNat# -> Word64# -> BigNat#
-subtrahend# yScaled# yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde# of
-  r1# -> r1# `bigNatMulWord#` wyTilde#
-  where
-    !wyTilde# = word64ToWord# yTilde#
-{-# INLINE subtrahend# #-}
-
-rmdrDgt :: BigNat# -> Word64# -> BigNat# -> (# BigNat#, BigNat#, Word64# #)
-rmdrDgt ycScaledbn# yTilde# ta# =
-  let !sbtnd# = subtrahend# ycScaledbn# yTilde#
-      !reg = ta# `bigNatGe` sbtnd#
-      !res# = case reg of
-        True -> ta# `bigNatSubUnsafe` sbtnd#
-        _ -> sbtnd# `bigNatSubUnsafe` ta#
-      !ytrdr =
-        if reg
-          then
-            (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde# #)
-          else
-            let adjyt = yTilde# `subWord64#` 1#Word64
-                adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
-                adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
-             in (# adjacc, adjres, adjyt #)
-   in -- (# ((ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde# `bigNatSubUnsafe` oneBigNat#) `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#, yTilde# `subWord64#` 1#Word64 #) -- watch out negate does not work
-      ytrdr
-  where
-    oneBigNat# :: BigNat#
-    !oneBigNat# = bigNatOne# (# #)
-{-# INLINE rmdrDgt #-}
-
-handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
-handleFirstRemBN## (# yi64#, ri_ #)
-  | isTrue# (ri_ `ltInt64#` zero) =
-      let !yAdj# = yi64# `subWord64#` 1#Word64
-          !rdr = fixRemainder# yAdj# ri_
-       in (# bigNatFromWord64# yAdj#, yAdj#, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-  | otherwise = (# bigNatFromWord64# yi64#, yi64#, bigNatFromWord64# (int64ToWord64# ri_) #)
-  where
-    !(I64# zero) = 0
-{-# INLINE handleFirstRemBN## #-}
-
--- -- Fix remainder accompanying a 'next downed digit' see algorithm
-fixRemainder# :: Word64# -> Int64# -> Word64#
-fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` two `timesInt64#` word64ToInt64# newYc# `plusInt64#` one in if isTrue# (x `ltInt64#` zero) then 0#Word64 else int64ToWord64# x
-  where
-    !(I64# two) = 2
-    !(I64# one) = 1
-    !(I64# zero) = 0
-{-# INLINE fixRemainder# #-}
-
--- | Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
-evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-evenFirstRmdrBN# w# =
-  let yT64# = hndlOvflwW32## (largestNSqLTEEven## w#)
-      ysq# = yT64# `timesWord64#` yT64#
-      diff# = word64ToInt64# w# `subInt64#` word64ToInt64# ysq#
-   in handleFirstRemBN## (# yT64#, diff# #) -- set 0 for starting cumulative yc--fstDgtRem i
-{-# INLINE evenFirstRmdrBN# #-}
-
-oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-oddFirstRmdrBN# w# =
-  let yT64# = largestNSqLTEOdd## w#
-      ysq# = yT64# `timesWord64#` yT64#
-      remIntegerW# = w# `subWord64#` ysq# -- no chance this will be negative
-   in (# bigNatFromWord64# yT64#, yT64#, bigNatFromWord64# remIntegerW# #)
-{-# INLINE oddFirstRmdrBN# #-}
-
-grab2Word32BN## :: Int -> BigNat# -> (# Word32#, Word32#, BigNat# #) -- a more efficient version for Int = 1
-grab2Word32BN## 1 !n#
-  | isTrue# (bigNatSize# n# ==# 1#),
-    a0 <- indexWordArray# n# 0# =
-      let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
-          !(W# digit1#, W# yw#) = quotremradixW32 (W# a0)
-          !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
-       in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
-  | otherwise =
-      let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1
-          !(W# power1#) = radixW32 -- bigNatShiftL# power2# 32##
-          !(# digit1#, yw# #) = n# `bigNatQuotRemWord#` power1#
-          !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
-       in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# digit2#, bigNatFromWord# z# #)
-grab2Word32BN## 2 !n# -- //FIXME does this work correctly ? check
-  | isTrue# (bigNatSize# n# ==# 1#),
-    a0 <- indexWordArray# n# 0# =
-      let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
-          !(W# digit1#, W# yw#) = (0, W# a0) -- a0 `quotRemWord#` 18446744073709551616## -- 18446744073709551616## = 2^64 = radixW32 ^ 2
-          !(W# digit2#, W# z#) = quotremradixW32 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
-       in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
-  | otherwise =
-      let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1
-          !(W# power1#) = radixW32 -- bigNatShiftL# power2# 32##
-          !(# digit1#, yw# #) = n# `bigNatQuotRemWord#` power1#
-          !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
-       in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# digit2#, bigNatFromWord# z# #)
-grab2Word32BN## !pow !n# =
-  let !(I# predpow#) = pow - 1
-      !power2# = powBigNat# (int2Word# predpow#) -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
-      !power1# = bigNatShiftL# power2# 32## -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
-      !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
-      !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
-   in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
-{-# INLINE grab2Word32BN## #-}
-
-data Itr'' = Itr'' {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
-newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# where 
-  isqrtWord :: Word -> Word
-  isqrtWord n
-    | n < (r * r)
-        -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
-        || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
-        r - 1
-    | otherwise = r
-    where
-      !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
-
-newappsqrt_ l eY n =
-  let -- NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
-      !(NatJ# (BN# nbn#)) = n
-   in NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
-  where 
-    -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
-  goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
-  goBN# !evn !n# !firstIter !p !acc
-    | p <= 0 = acc
-    | not firstIter -- && p >= 1 =
-      =
-        let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
-        in goBN# evn zbn# False (p - 2) (theNextIters (# digit1, digit2 #) acc)
-    | firstIter && not evn =
-        let !(I# pow#) = p
-            !pw# = powBigNat# (int2Word# pow#)
-            !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
-        in goBN# evn ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
-    | otherwise -- firstIter && evn =
-      =
-        let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
-        in goBN# evn zbn# False (p - 2) (theFirstIter True (W32# digit1, W32# digit2) acc)
-  {-# INLINE goBN# #-}
-  -- | Iteration loop data
-  theFirstIter :: Bool -> (Word32, Word32) -> Itr'' -> Itr''
-  theFirstIter evn pairdgt _ = case tfi (evn, pairdgt) of (# yVal, yWord#, rem #) -> Itr'' 1# yVal rem (unsafeword64ToFloatingX## yWord#)
-  {-# INLINE theFirstIter #-}
-  theNextIters :: (# Word32#, Word32# #) -> Itr'' -> Itr''
-  theNextIters (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#) = tni (# x1, x2 #) (Itr'' currlen# yCumulatedAcc0 rmndr tbfx#)
-  {-# INLINE theNextIters #-}
-{-# INLINE newappsqrt_ #-}
+coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
+coreFx# (# tAFX#, tCFX#, radFX# #) =
+  nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))
+{-# INLINE coreFx# #-}

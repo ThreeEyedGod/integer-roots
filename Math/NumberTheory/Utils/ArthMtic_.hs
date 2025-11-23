@@ -2,9 +2,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE TemplateHaskell #-}
-
+{-# LANGUAGE UnboxedTuples #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
@@ -52,14 +51,13 @@ module Math.NumberTheory.Utils.ArthMtic_
     bnConst#,
     word64FromRvsrdTuple#,
     quotremradixW32,
-    quotrem1
+    quotrem1,
   )
 where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Data.Bits (complement, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import Numeric.Floating.IEEE (nextUp, nextDown)
+import Data.Bits (complement, countLeadingZeros, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
@@ -72,6 +70,8 @@ import GHC.Exts
     Word32#,
     Word64#,
     and#,
+    (-#),
+    (>#),
     build,
     eqInt64#,
     eqWord#,
@@ -130,9 +130,10 @@ import GHC.Integer.Logarithms (wordLog2#)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
 import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
+import Numeric.Floating.IEEE (nextDown, nextUp)
 import Numeric.Natural (Natural)
+import Numeric.QuoteQuot (quoteQuotRem)
 import Prelude hiding (pred)
-import Numeric.QuoteQuot  (quoteQuotRem)
 
 -- *********** END NEW IMPORTS
 
@@ -279,7 +280,7 @@ _odd = _even
 {-# INLINE _odd #-}
 
 _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
-_evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #) 
+_evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
 _oddInt64# = _evenInt64#
 {-# INLINE _evenInt64# #-}
 {-# INLINE _oddInt64# #-}
@@ -433,7 +434,8 @@ convNToDblExp n
 
 {-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> (# Double#, Int64# #)
-bnToFxGtWord# bn# = case bigNatLog2# bn# of
+bnToFxGtWord# bn# = -- g 
+  case bigNatLog2# bn# of
   --  | otherwise = case _bigNatLog2# bn# bnsz# of
   l# -> case l# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
     rawSh# ->
@@ -527,3 +529,47 @@ _bigNatLog2# a s -- s = bigNatSize# a
 {-# INLINE _bigNatLog2# #-}
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
+
+-- floorLog2 for Word64; undefined for 0 input (so guard before calling)
+floorLog2 :: Word64 -> Int
+floorLog2 w = 63 - countLeadingZeros w
+
+-- floorLog2# for Word64; undefined for 0 input (so guard before calling)
+floorLog2# :: Word# -> Int64#
+floorLog2# w# = let !(I# i#) = countLeadingZeros (W# w#) in intToInt64# (63# -# i#)
+
+-- Convert little-endian [Word64] to (mantissa :: Double, exponent :: Int)
+-- using at most two most significant limbs for performance.
+f :: [Word64] -> (Double, Int)
+f ws =
+  let n = length ws
+      -- Most significant limb (last element in little endian list)
+      !w_hi = if n > 0 then ws !! (n - 1) else 0
+      -- Second most significant limb (second last element)
+      !w_hi2 = if n > 1 then ws !! (n - 2) else 0
+      -- Approximate value using only the top two limbs
+      !d = fromIntegral w_hi + fromIntegral w_hi2 * (2 ** 64)
+   in if d == 0
+        then (0.0, 0)
+        else
+          -- Exponent = bit position of MSB limb + its shift
+          let !e = floorLog2 w_hi + (64 * (n - 1))
+              -- Normalize mantissa into [1, 2)
+              !m = d / (2 ** fromIntegral e)
+           in (m, e)
+
+g :: BigNat# -> (# Double#, Int64# #)
+g bn# =
+  let n# = bigNatSize# bn#
+      -- Most significant limb (last element in little endian list)
+      !w_hi# = if isTrue# (n# ># 0#) then bigNatIndex# bn# (n# -# 1#) else 0##
+      !w_hi2# = if isTrue# (n# ># 1#) then bigNatIndex# bn# (n# -# 2#) else 0##
+      -- Approximate value using only the top two limbs
+      !(D# d#) = fromIntegral (W# w_hi#) + fromIntegral (W# w_hi2#) * (2 ** 64)
+   in if isTrue# (d# ==## 0.0##)
+        then (# 0.0##, 0#Int64 #)
+        else
+          -- Exponent = bit position of MSB limb + its shift
+          let !e# = (64#Int64 `timesInt64#` intToInt64# (n# -# 1#Int)) `plusInt64#` floorLog2#  w_hi#
+              !(D# m#) = D# d# / (2 ** fromIntegral (I64# e#))
+        in (# m#, e# #)

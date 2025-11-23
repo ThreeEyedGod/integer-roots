@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
+
 -- {-# OPTIONS_GHC -O2 -fllvm -fexcess-precision -mfma -funbox-strict-fields -fspec-constr -fexpose-all-unfoldings -fstrictness -funbox-small-strict-fields -funfolding-use-threshold=80 -fmax-worker-args=32 #-}
 
 -- |
@@ -21,7 +22,7 @@ module Math.NumberTheory.Roots.Squares_
     -- * Tests for squares
     isSquare,
     isSquare',
-    isPossibleSquare
+    isPossibleSquare,
   )
 where
 

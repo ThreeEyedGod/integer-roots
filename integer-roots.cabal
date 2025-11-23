@@ -60,6 +60,7 @@ library
                -O2 
               --  -threaded 
                -fllvm 
+               -fstrictness
               --  -funfolding-use-threshold=50
                -mfma 
                -fproc-alignment=64
