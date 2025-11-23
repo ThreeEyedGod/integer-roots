@@ -205,14 +205,13 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> Word64#
 nxtDgtNatW64## bn# tcfx#
-  | isTrue# (bigNatIsZero# bn#) = 0#Word64
-  | isTrue# (sz# ==# 1#),
-    a0 <- indexWordArray# bn# 0# =
-      inline nxtDgtDoubleFxW64## (word2Double# a0) tcfx#
+  | isTrue# (sz# <=# 1#) = case bigNatToWord# bn# of
+      0## -> 0#Word64
+      w# -> inline nxtDgtDoubleFxW64## (word2Double# w#) tcfx#
   | isTrue# (sz# <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
-  -- \| otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
-  -- //TODO WHAT'S EXACTLY HAPPENING HERE
-  | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
+  | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
+  -- //TODO WHAT'S EXACTLY HAPPENING HERE but it works and maybe a bit faster?
+  -- | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
   where
     sz# = bigNatSize# bn#
     threshold# = let !(I64# e64#) = 10 ^ 137 in FloatingX# 1.9## e64#
@@ -243,9 +242,9 @@ preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tA
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
 computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
 -- hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
-{-# INLINE computFxW64# #-}
+{-# INLINE[1] computFxW64# #-}
 
 coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
 coreFx# (# tAFX#, tCFX#, radFX# #) =
   nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))
-{-# INLINE coreFx# #-}
+{-# INLINE[0] coreFx# #-}
