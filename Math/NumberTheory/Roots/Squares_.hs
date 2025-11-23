@@ -27,11 +27,10 @@ module Math.NumberTheory.Roots.Squares_
 where
 
 import Data.Bits (finiteBitSize, (.&.))
-import GHC.Exts (Ptr (..), Word (..), Word#, isTrue#)
+import GHC.Exts (Ptr (..), Word (..))
 import GHC.Natural (Natural (..))
 import Math.NumberTheory.Roots.Squares.Internal_
 import Math.NumberTheory.Utils.BitMask (indexBitSet)
-import Numeric.Natural (Natural ())
 
 -- | For a non-negative input \( n \)
 --   calculate its integer square root \( \lfloor \sqrt{n} \rfloor \).

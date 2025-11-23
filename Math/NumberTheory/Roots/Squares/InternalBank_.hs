@@ -133,8 +133,7 @@ tfi (evenLen, (m, l)) = let !i# = word64FromRvsrdTuple# (l, m) 4294967296#Word64
           ysq# = yT64# `timesWord64#` yT64#
           diff# = word64ToInt64# w# `subInt64#` word64ToInt64# ysq#
        in handleFirstRemBN## (# yT64#, diff# #) -- set 0 for starting cumulative yc--fstDgtRem i
-    -- {-# INLINE evenFirstRmdrBN# #-}
-
+      -- {-# INLINE evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     oddFirstRmdrBN# w# =
       let yT64# = largestNSqLTEOdd## w#
@@ -161,10 +160,11 @@ tfi (evenLen, (m, l)) = let !i# = word64FromRvsrdTuple# (l, m) 4294967296#Word64
         !(I64# two) = 2
         !(I64# one) = 1
         !(I64# zero) = 0
-    -- {-# INLINE fixRemainder# #-}
+
+-- {-# INLINE fixRemainder# #-}
 
 {-# INLINE tni #-}
-tni :: (# Word32#, Word32# #) -> Itr'' -> Itr'' 
+tni :: (# Word32#, Word32# #) -> Itr'' -> Itr''
 tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) =
   let !(# x1, x2 #) = i1 `timesWord2#` radixW32w#
       !x = bigNatFromWord2# x1 x2
@@ -184,16 +184,14 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
           !reg = ta# `bigNatGe` sbtnd#
           !ytrdr = case reg of
             True -> let !res# = ta# `bigNatSubUnsafe` sbtnd# in (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde# #)
-            _ -> let !res# = sbtnd# `bigNatSubUnsafe` ta# in 
-                      let adjyt = yTilde# `subWord64#` 1#Word64
-                          adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
-                          adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
-                      in (# adjacc, adjres, adjyt #)
-       in -- (# ((ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde# `bigNatSubUnsafe` oneBigNat#) `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#, yTilde# `subWord64#` 1#Word64 #) -- watch out negate does not work
-          ytrdr
-      where
-        oneBigNat# :: BigNat#
-        !oneBigNat# = bigNatOne# (# #)
+            _ ->
+              let !res# = sbtnd# `bigNatSubUnsafe` ta#
+               in let adjyt = yTilde# `subWord64#` 1#Word64
+                      adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
+                      oneBigNat# = bigNatOne# (# #)
+                      adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
+                   in (# adjacc, adjres, adjyt #)
+       in ytrdr
     -- {-# INLINE rmdrDgt #-}
 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
@@ -201,7 +199,8 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
       r1# -> r1# `bigNatMulWord#` wyTilde#
       where
         !wyTilde# = word64ToWord# yTilde#
-    -- {-# INLINE subtrahend# #-}
+
+-- {-# INLINE subtrahend# #-}
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> Word64#
 nxtDgtNatW64## bn# tcfx#
@@ -210,7 +209,6 @@ nxtDgtNatW64## bn# tcfx#
       w# -> inline nxtDgtDoubleFxW64## (word2Double# w#) tcfx#
   | isTrue# (sz# <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
   | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
-  -- //TODO WHAT'S EXACTLY HAPPENING HERE but it works and maybe a bit faster?
   -- | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
   where
     sz# = bigNatSize# bn#
@@ -242,9 +240,9 @@ preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tA
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
 computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
 -- hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
-{-# INLINE[1] computFxW64# #-}
+{-# INLINE [1] computFxW64# #-}
 
 coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
 coreFx# (# tAFX#, tCFX#, radFX# #) =
   nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))
-{-# INLINE[0] coreFx# #-}
+{-# INLINE [0] coreFx# #-}

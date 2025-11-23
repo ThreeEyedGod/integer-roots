@@ -57,7 +57,7 @@ where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Data.Bits (complement, countLeadingZeros, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
+import Data.Bits (complement, countLeadingZeros, unsafeShiftL, (.&.))
 import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
