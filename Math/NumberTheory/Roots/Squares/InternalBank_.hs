@@ -204,15 +204,12 @@ nxtDgtNatW64## bn# tcfx#
   | isTrue# (ln# `leWord#` 63##) = case ln# of
       0## -> 0#Word64 -- case bigNatToWord# bn# =# 0## -> 0#Word64
       w# -> inline nxtDgtDoubleFxW64## (word2Double# (bigNatToWord# bn#)) tcfx#
-  | isTrue# (ln# `ltWord#` threshW#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
+  | isTrue# (ln# `leWord#` threshW#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx# -- note the leWord
   | otherwise = inline computFxW64# (inline preComputFx## bn# ln# tcfx#)
-  -- | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
   where
-    ln# = bigNatLog2# bn#
-    threshold# = let !(I64# e64#) = 10 ^ 137 in FloatingX# 1.9## e64#
-    -- where
+    !ln# = bigNatLog2# bn#
     threshW# :: Word#
-    threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
+    !threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 {-# INLINE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
