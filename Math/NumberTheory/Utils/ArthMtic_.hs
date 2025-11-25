@@ -70,8 +70,6 @@ import GHC.Exts
     Word32#,
     Word64#,
     and#,
-    (-#),
-    (>#),
     build,
     eqInt64#,
     eqWord#,
@@ -120,6 +118,7 @@ import GHC.Exts
     (<#),
     (<##),
     (==##),
+    (>#),
     (>=#),
     (>=##),
   )
@@ -130,7 +129,6 @@ import GHC.Integer.Logarithms (wordLog2#)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
 import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
-import Numeric.Floating.IEEE (nextDown, nextUp)
 import Numeric.Natural (Natural)
 import Numeric.QuoteQuot (quoteQuotRem)
 import Prelude hiding (pred)
@@ -238,10 +236,6 @@ doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromI
 largestNSqLTEOdd :: Word64 -> Word64
 largestNSqLTEOdd i = floorDouble (sqrt (fromIntegral i) :: Double)
 
-{-# INLINE largestNSqLTEEven #-}
-largestNSqLTEEven :: Word64 -> Word64
-largestNSqLTEEven i = let d_ = nextUp (fromIntegral i :: Double) in floorDouble (nextUp (sqrt d_))
-
 {-# INLINE largestNSqLTEOdd## #-}
 largestNSqLTEOdd## :: Word64# -> Word64#
 largestNSqLTEOdd## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
@@ -249,8 +243,8 @@ largestNSqLTEOdd## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Doubl
 {-# INLINE largestNSqLTEEven## #-}
 largestNSqLTEEven## :: Word64# -> Word64#
 largestNSqLTEEven## w# =
-  let !d_ = nextUp (fromIntegral (W64# w#) :: Double)
-      !(W64# r#) = floorDouble (nextUp (sqrt d_))
+  let !d_ = (fromIntegral (W64# w#) :: Double)
+      !(W64# r#) = floorDouble (sqrt d_)
    in r#
 
 {-# INLINE hndlOvflwW32## #-}
@@ -436,15 +430,16 @@ convNToDblExp n
 
 {-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
-bnToFxGtWord# bn# lgn# = -- g 
-  case lgn# of   -- case bigNatLog2# bn# of
-  l# -> case l# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
-    !rawSh# ->
-      let !shift# = rawSh# `and#` not# 1##
-       in case bigNatShiftR# bn# shift# of
-            -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
-            --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
-            !mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
+bnToFxGtWord# bn# lgn# =
+  -- g
+  case lgn# of -- case bigNatLog2# bn# of
+    l# -> case l# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
+      !rawSh# ->
+        let !shift# = rawSh# `and#` not# 1##
+         in case bigNatShiftR# bn# shift# of
+              -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
+              --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
+              !mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
 
 {-# INLINE bnToFxGtWord #-}
 bnToFxGtWord :: BigNat -> (Double, Int64)
@@ -561,6 +556,6 @@ g bn# =
         then (# 0.0##, 0#Int64 #)
         else
           -- Exponent = bit position of MSB limb + its shift
-          let !e# = (64#Int64 `timesInt64#` intToInt64# (n# -# 1#Int)) `plusInt64#` floorLog2#  w_hi#
+          let !e# = (64#Int64 `timesInt64#` intToInt64# (n# -# 1#Int)) `plusInt64#` floorLog2# w_hi#
               !(D# m#) = D# d# / (2 ** fromIntegral (I64# e#))
-        in (# m#, e# #)
+           in (# m#, e# #)
