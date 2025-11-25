@@ -388,11 +388,13 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 -- | Floating Point nextUp/nextDown funxctions
 {-# INLINE nextUp# #-}
 nextUp# :: Double# -> Double#
-nextUp# dIn# = case nextUp (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextUp (D# dIn#) in dOut#
+-- nextUp# dIn# = case nextUp (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextUp (D# dIn#) in dOut#
+nextUp# dIn# = dIn# -- disabled for now to see if it helps performance
 
 {-# INLINE nextDown# #-}
 nextDown# :: Double# -> Double#
-nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextDown (D# dIn#) in dOut#
+-- nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextDown (D# dIn#) in dOut#
+nextDown# dIn# = dIn# -- disabled for now to see if it helps performance
 
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
@@ -437,12 +439,12 @@ bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
 bnToFxGtWord# bn# lgn# = -- g 
   case lgn# of   -- case bigNatLog2# bn# of
   l# -> case l# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
-    rawSh# ->
+    !rawSh# ->
       let !shift# = rawSh# `and#` not# 1##
        in case bigNatShiftR# bn# shift# of
             -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
             --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
-            mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
+            !mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
 
 {-# INLINE bnToFxGtWord #-}
 bnToFxGtWord :: BigNat -> (Double, Int64)

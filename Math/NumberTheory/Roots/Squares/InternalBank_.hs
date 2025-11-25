@@ -44,7 +44,7 @@ import Math.NumberTheory.Utils.FloatingX_
 data Itr'' = Itr'' {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
+newappsqrt_ l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
   where
     isqrtWord :: Word -> Word
     isqrtWord n
@@ -58,25 +58,26 @@ newappsqrt_ l eY n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
 newappsqrt_ l eY n =
   let -- NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
       !(NatJ# (BN# nbn#)) = n
-   in NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+   in NatJ# (BN# $ yaccbn $ goBN# eY nbn# True l1# (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
   where
+    !(I# l1#) = l-1
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
-    goBN# :: Bool -> BigNat# -> Bool -> Int -> Itr'' -> Itr''
-    goBN# !evn !n# !firstIter !p !acc
-      | p <= 0 = acc
+    goBN# :: Bool -> BigNat# -> Bool -> Int# -> Itr'' -> Itr''
+    goBN# !evn !n# !firstIter !pow# !acc
+      | isTrue# (pow# <=# 0#) = acc
       | not firstIter -- && p >= 1 =
         =
-          let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
-           in goBN# evn zbn# False (p - 2) (tni (# digit1, digit2 #) acc)
+          let !(# digit1, digit2, zbn# #) = grab2Word32BN## (I# pow#) n#
+           in goBN# evn zbn# False (pow# -# 2#) (tni (# digit1, digit2 #) acc)
       | firstIter && not evn =
-          let !(I# pow#) = p
+          let 
               !pw# = powBigNat# (int2Word# pow#)
               !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
-           in goBN# evn ybn# False (p - 1) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
+           in goBN# evn ybn# False (pow# -# 1#) (theFirstIter False (0, fromIntegral $ bigNatToWord digit#) acc)
       | otherwise -- firstIter && evn =
         =
-          let !(# digit1, digit2, zbn# #) = grab2Word32BN## p n#
-           in goBN# evn zbn# False (p - 2) (theFirstIter True (W32# digit1, W32# digit2) acc)
+          let !(# digit1, digit2, zbn# #) = grab2Word32BN## (I# pow#) n#
+           in goBN# evn zbn# False (pow# -# 2#) (theFirstIter True (W32# digit1, W32# digit2) acc)
     {-# INLINE goBN# #-}
     -- \| Iteration loop data
     theFirstIter :: Bool -> (Word32, Word32) -> Itr'' -> Itr''

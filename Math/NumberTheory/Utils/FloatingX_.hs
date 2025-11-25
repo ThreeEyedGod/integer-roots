@@ -555,10 +555,11 @@ nextUpFX (FloatingX s e)
 
 {-# INLINE nextUpFX# #-}
 nextUpFX# :: FloatingX# -> FloatingX#
-nextUpFX# (FloatingX# s# e#)
-  | isTrue# (s# ==## 0.0##) = minValueFx#
-  -- \| otherwise = case nextUp# s# of interimS# -> if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
-  | otherwise = case nextUp# s# of interimS# -> FloatingX# interimS# e#
+nextUpFX# = id -- disabled for now 
+-- nextUpFX# (FloatingX# s# e#)
+--   | isTrue# (s# ==## 0.0##) = minValueFx#
+--   -- \| otherwise = case nextUp# s# of interimS# -> if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
+--   | otherwise = case nextUp# s# of interimS# -> FloatingX# interimS# e#
 
 {-# INLINE nextUpFXNormalized# #-}
 nextUpFXNormalized# :: FloatingX# -> FloatingX#
@@ -575,10 +576,11 @@ nextDownFX x@(FloatingX s e)
 
 {-# INLINE nextDownFX# #-}
 nextDownFX# :: FloatingX# -> FloatingX#
-nextDownFX# x@(FloatingX# s# e#)
-  | isTrue# (s# ==## 0.0##) || x == minValueFx# = zeroFx#
-  -- \| otherwise = case nextDown# s# of interimS# -> if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#
-  | otherwise = case nextDown# s# of interimS# -> FloatingX# interimS# e#
+nextDownFX#  = id -- disabled for now 
+-- nextDownFX# x@(FloatingX# s# e#)
+--   | isTrue# (s# ==## 0.0##) || x == minValueFx# = zeroFx#
+--   -- \| otherwise = case nextDown# s# of interimS# -> if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#
+--   | otherwise = case nextDown# s# of interimS# -> FloatingX# interimS# e#
 
 {-# INLINE nextDownFXNormalized# #-}
 nextDownFXNormalized# :: FloatingX# -> FloatingX#
