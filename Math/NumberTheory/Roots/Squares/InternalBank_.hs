@@ -25,7 +25,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 import Data.Bits (finiteBitSize)
 import Data.Word (Word32)
-import GHC.Exts (Double (..), Double#, Int (..), Int#, Int64#, Word (..), Word#, Word32#, Word64#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, indexWordArray#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, ltInt64#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord32#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==#), (==##), (>#), (>=#), (>=##))
+import GHC.Exts (Double (..), Double#, Int (..), Int#, Int64#, Word (..), Word#, Word32#, Word64#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, indexWordArray#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, ltInt64#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord32#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==#), (==##), (>#), (>=#), (>=##), ltWord#)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatIsZero#, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWord#, bigNatToWordMaybe#, bigNatZero#)
@@ -201,18 +201,18 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> Word64#
 nxtDgtNatW64## bn# tcfx#
-  | isTrue# (sz# <=# 1#) = case bigNatToWord# bn# of
+  | isTrue# (ln# `leWord#` 63##) = case bigNatToWord# bn# of
       0## -> 0#Word64
       w# -> inline nxtDgtDoubleFxW64## (word2Double# w#) tcfx#
-  | isTrue# (sz# <# thresh#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
-  | otherwise = inline computFxW64# (inline preComputFx## bn# tcfx#)
+  | isTrue# (ln# `ltWord#` threshW#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
+  | otherwise = inline computFxW64# (inline preComputFx## bn# ln# tcfx#)
   -- | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
   where
-    sz# = bigNatSize# bn#
+    ln# = bigNatLog2# bn#
     threshold# = let !(I64# e64#) = 10 ^ 137 in FloatingX# 1.9## e64#
     -- where
-    thresh# :: Int#
-    thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
+    threshW# :: Word#
+    threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 {-# INLINE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
@@ -230,8 +230,8 @@ coreD# :: Double# -> Double# -> Double# -> Double#
 coreD# da# dc# dr# = nextUp# (nextUp# da# /## nextDown# (sqrtDouble# (nextDown# dr#) +## nextDown# dc#))
 {-# INLINE coreD# #-}
 
-preComputFx## :: BigNat# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComputFx## tA__bn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+preComputFx## :: BigNat# -> Word# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
+preComputFx## tA__bn# lgn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# lgn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComputFx## #-}
 
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#

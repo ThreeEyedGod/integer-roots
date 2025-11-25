@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
+
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm -ddump-to-file dumps else not
 -- removed -fexpose-all-unfoldings may not necessarily help improve max performance. See https://well-typed.com/blog/2024/04/choreographing-specialization-pt1/
@@ -27,10 +28,9 @@ import GHC.Exts
   ( Int (..),
     word2Int#,
   )
-import GHC.Num.Integer (integerLog2#, integerFromNatural)
+import GHC.Num.Integer (integerFromNatural, integerLog2#)
 import Math.NumberTheory.Roots.Squares.InternalBank_
 import Math.NumberTheory.Utils.ArthMtic_
-
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
@@ -48,10 +48,11 @@ karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
   -- \| lgN < 2300 =
   --     let s = isqrtB n in (s, n - s * s)
-  | lgNradixW32 < 72 = -- 72 in radixw32 is ~ 2300 in base 2
+  | lgNradixW32 < 72 -- 72 in radixw32 is ~ 2300 in base 2
+    =
       let s = isqrtB_ lgNradixW32 n in (s, n - s * s)
   | otherwise =
-      if lgN .&. 2 /= 0 -- //FIXME check if logic needs to be updated 
+      if lgN .&. 2 /= 0 -- //FIXME check if logic needs to be updated
         then
           karatsubaStep k (karatsubaSplit k n)
         else

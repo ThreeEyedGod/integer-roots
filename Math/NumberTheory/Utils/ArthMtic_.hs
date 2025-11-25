@@ -410,11 +410,11 @@ lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
 {-# INLINE cI2D2_ #-}
-cI2D2_ :: BigNat# -> (# Double#, Int64# #)
-cI2D2_ bn#
+cI2D2_ :: BigNat# -> Word# -> (# Double#, Int64# #)
+cI2D2_ bn# lgn#
   | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) = let d# = word2Double# (bigNatIndex# bn# 0#) in (# d#, 0#Int64 #)
   -- \| isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
-  | otherwise = bnToFxGtWord# bn#
+  | otherwise = bnToFxGtWord# bn# lgn#
 
 -- where
 --   bnsz# = bigNatSize# bn#
@@ -433,10 +433,9 @@ convNToDblExp n
                 mbn -> case fromIntegral mbn of (D# dmbn#) -> (# dmbn#, intToInt64# (word2Int# shift#) #)
 
 {-# INLINE bnToFxGtWord# #-}
-bnToFxGtWord# :: BigNat# -> (# Double#, Int64# #)
-bnToFxGtWord# bn# = -- g 
-  case bigNatLog2# bn# of
-  --  | otherwise = case _bigNatLog2# bn# bnsz# of
+bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
+bnToFxGtWord# bn# lgn# = -- g 
+  case lgn# of   -- case bigNatLog2# bn# of
   l# -> case l# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
     rawSh# ->
       let !shift# = rawSh# `and#` not# 1##
@@ -517,16 +516,6 @@ roundHalfEven m# payload# =
    in if isTrue# (m'# `eqWord#` (1## `uncheckedShiftL#` 53#))
         then (# 0##, 1## #) -- carry into exponent
         else (# m'# `and#` (1## `uncheckedShiftL#` 52# `minusWord#` 1##), 0## #)
-
--- | Base 2 logarithm a bit faster
-_bigNatLog2# :: BigNat# -> Int# -> Word#
-_bigNatLog2# a s -- s = bigNatSize# a
-  | bigNatIsZero a = 0##
-  | otherwise =
-      -- let i = int2Word# (bigNatSize# a) `minusWord#` 1##
-      let i = int2Word# s `minusWord#` 1##
-       in int2Word# (wordLog2# (bigNatIndex# a (word2Int# i))) `plusWord#` (i `uncheckedShiftL#` 6#) -- WORD_SIZE_BITS_SHIFT#)
-{-# INLINE _bigNatLog2# #-}
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
