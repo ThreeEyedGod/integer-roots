@@ -201,9 +201,9 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> Word64#
 nxtDgtNatW64## bn# tcfx#
-  | isTrue# (ln# `leWord#` 63##) = case bigNatToWord# bn# of
-      0## -> 0#Word64
-      w# -> inline nxtDgtDoubleFxW64## (word2Double# w#) tcfx#
+  | isTrue# (ln# `leWord#` 63##) = case ln# of
+      0## -> 0#Word64 -- case bigNatToWord# bn# =# 0## -> 0#Word64
+      w# -> inline nxtDgtDoubleFxW64## (word2Double# (bigNatToWord# bn#)) tcfx#
   | isTrue# (ln# `ltWord#` threshW#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#
   | otherwise = inline computFxW64# (inline preComputFx## bn# ln# tcfx#)
   -- | otherwise = case unsafeGtWordbn2Fx## bn# of tAFX# -> if tAFX# !<## threshold# then inline computFxW64# (# tAFX#, tcfx#, tcfx# !**+## tAFX# #) else hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (tcfx# !+## nextDownFX# tcfx#))))
