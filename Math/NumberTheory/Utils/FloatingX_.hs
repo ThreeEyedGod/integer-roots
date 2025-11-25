@@ -444,7 +444,8 @@ sqrtFxSplitDbl## :: FloatingX# -> (# Double#, Int64# #)
 sqrtFxSplitDbl## (FloatingX# d# e#)
   -- \| isTrue# (d# ==## 0.00##) = case minBound :: Int64 of I64# mb# -> (# 0.0##, mb# #)
   | yesEven = (# sqrtDouble# d#, quo64# #) -- even
-  | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, quo64# #) -- odd sqrt2 times sqrt d#
+  -- | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, quo64# #) -- odd sqrt2 times sqrt d#
+  | otherwise = (# sqrtDouble# 2.0## *## d#, quo64# #) -- odd sqrt2 times sqrt d# ---//FIXME what's he right thing to do here
   where
     !(# yesEven, quo64# #) = _evenInt64# e#
 {-# INLINE sqrtFxSplitDbl## #-}
