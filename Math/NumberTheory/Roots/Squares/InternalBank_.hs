@@ -215,6 +215,7 @@ nxtDgtNatW64## bn# tcfx#
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
+{-# INLINE nxtDgtDoubleFxW64## #-}
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
 preComput ax# tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDouble# c# c# ax# #)

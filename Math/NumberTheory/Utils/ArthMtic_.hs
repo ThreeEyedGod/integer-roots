@@ -298,7 +298,7 @@ fromInt64 (I64# x#) = x#
 
 {-# INLINE updateDouble# #-}
 updateDouble# :: Double# -> Int# -> Double#
-updateDouble# d# ex# = case decodeDoubleInteger d# of (# m, n# #) -> encodeDoubleInteger m (n# +# ex#)
+updateDouble# d# ex# = case decodeDoubleInteger d# of (# !m, !n# #) -> encodeDoubleInteger m (n# +# ex#)
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
