@@ -33,6 +33,7 @@ import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
+import Data.Functor.Classes (eq2)
 
 -- *********** END NEW IMPORTS
 
@@ -83,19 +84,19 @@ newappsqrt_ l eY n =
     -- \| Iteration loop data
     grab2Word32BN## :: Int# -> BigNat# -> (# Word32#, Word32#, BigNat# #) -- a more efficient version for Int = 1
     grab2Word32BN## !pow# !n#
-      | isTrue# (pow# ==# 2#) && isTrue# (sz# ==# 1#),
+      | eq2# && szEq1#,
         a0 <- indexWordArray# n# 0# =
           let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
               !(W# digit1#, W# yw#) = (0, W# a0) -- a0 `quotRemWord#` 18446744073709551616## -- 18446744073709551616## = 2^64 = radixW32 ^ 2
               !(W# digit2#, W# z#) = quotremradixW32 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
            in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
-      | isTrue# (pow# ==# 1#) && isTrue# (sz# ==# 1#),
+      | le1# && szEq1#, --isTrue# (pow# ==# 1#) && szEq1#, little tricky but should be identical
         a0 <- indexWordArray# n# 0# =
           let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
               !(W# digit1#, W# yw#) = quotremradixW32 (W# a0)
               !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
            in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
-      | isTrue# (pow# <=# 2#) =
+      | leq2# = -- isTrue# (pow# <=# 2#) = 
           let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1
               !(W# power1#) = radixW32 -- bigNatShiftL# power2# 32##
               !(# digit1#, yw# #) = n# `bigNatQuotRemWord#` power1#
@@ -109,7 +110,10 @@ newappsqrt_ l eY n =
               !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
            in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
         where
-          sz# = bigNatSize# n# -- dont be eager here (no bang) 
+          szEq1# = isTrue# (bigNatSize# n# ==# 1#) -- dont be eager here (no bang) 
+          !eq2# = isTrue# (pow# ==# 2#) -- do this eagerly, is the first guard, will always hit it
+          le1# = isTrue# (pow# <=# 1#) -- dont be eager here (no bang)
+          leq2# = eq2# || le1#-- dont be eager here (no bang)
     {-# INLINE grab2Word32BN## #-}
 {-# INLINE newappsqrt_ #-}
 
