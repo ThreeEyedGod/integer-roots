@@ -1,0 +1,3 @@
+ignore-project: False
+library-profiling: True
+executable-profiling: True
