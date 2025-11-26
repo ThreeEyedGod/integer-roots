@@ -110,10 +110,10 @@ newappsqrt_ l eY n =
               !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
            in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
         where
-          szEq1# = isTrue# (bigNatSize# n# ==# 1#) -- dont be eager here (no bang) 
           !eq2# = isTrue# (pow# ==# 2#) -- do this eagerly, is the first guard, will always hit it
-          le1# = isTrue# (pow# <=# 1#) -- dont be eager here (no bang)
-          leq2# = eq2# || le1#-- dont be eager here (no bang)
+          szEq1# = isTrue# (bigNatSize# n# ==# 1#) -- dont be eager here (no bang) - may never need to be evaluated
+          le1# = isTrue# (pow# <=# 1#) -- dont be eager here (no bang) - may never need to be evaluated
+          leq2# = eq2# || le1#-- dont be eager here (no bang) - may never need to be evaluated
     {-# INLINE grab2Word32BN## #-}
 {-# INLINE newappsqrt_ #-}
 
