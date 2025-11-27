@@ -33,6 +33,14 @@ bench_weigh:
 
 profile:
 	@echo "_____________________creating profile___________"
+	@echo "make a local cabal project file with profiling and coverage enabled"
+	@echo "profiling: True"
+	@echo "profiling-detail: toplevel-functions"
+
+	@echo "package *""
+	@echo "coverage: True"
+	@echo "library-coverage: True"
+	@echo "documentation: True"
 	@rm -rf *.tix
 	cabal run integer-roots-exe -- +RTS -p -s -N4
 

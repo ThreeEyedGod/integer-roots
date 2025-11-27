@@ -249,10 +249,11 @@ largestNSqLTEEven## w# =
 
 {-# INLINE hndlOvflwW32## #-}
 hndlOvflwW32## :: Word64# -> Word64#
-hndlOvflwW32## w64# = if isTrue# (w64# `eqWord64#` maxW32#) then predmaxW32# else w64#
-  where
-    !(W64# maxW32#) = radixW32
-    !(W64# predmaxW32#) = predRadixW32
+hndlOvflwW32## w64# = w64# -- disable for now
+  -- if isTrue# (w64# `eqWord64#` maxW32#) then predmaxW32# else w64#
+  -- where
+  --   !(W64# maxW32#) = radixW32
+  --   !(W64# predmaxW32#) = predRadixW32
 
 {-# INLINE radixW32Length #-} -- this works
 radixW32Length :: Integer -> Word
