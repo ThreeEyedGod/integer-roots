@@ -168,27 +168,34 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
       !x = bigNatFromWord2# x1 x2
       !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# ycUpdated#, remFinal#, !yTildeFinal# #) = rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) (nxtDgtNatW64## tA_ tCFx#) tA_ -- 0x100000000## = 2^32 = radixW32
-      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+      !(# ycUpdated#, remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt@(# w#, _ #) = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
+      -- !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)  else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
    in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
       Itr'' (cl# +# 1#) ycUpdated# remFinal# tcfx#
   where
     !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
     !(W# radixW32w#) = radixW32
 
-    rmdrDgt :: BigNat# -> Word64# -> BigNat# -> (# BigNat#, BigNat#, Word64# #)
-    rmdrDgt ycScaledbn# yTilde# ta# =
+    yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
+    yTildeFinalFx## (# w#, fx# #) = case fx# == zeroFx# of
+       True -> if isTrue#(w# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w#
+       _ -> fx#
+    -- {-# INLINE yTildeFinalFx## #-}
+          
+    rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
+    rmdrDgt ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
       let !sbtnd# = subtrahend# ycScaledbn# yTilde#
           !reg = ta# `bigNatGe` sbtnd#
           !ytrdr = case reg of
-            True -> let !res# = ta# `bigNatSubUnsafe` sbtnd# in (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde# #)
+            True -> let !res# = ta# `bigNatSubUnsafe` sbtnd# in (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
             _ ->
               let !res# = sbtnd# `bigNatSubUnsafe` ta#
                in let adjyt = yTilde# `subWord64#` 1#Word64
                       adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
                       oneBigNat# = bigNatOne# (# #)
                       adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
-                   in (# adjacc, adjres, adjyt #)
+                   in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
        in ytrdr
     -- {-# INLINE rmdrDgt #-}
 
@@ -200,13 +207,13 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
 
 -- {-# INLINE subtrahend# #-}
 
-nxtDgtNatW64## :: BigNat# -> FloatingX# -> Word64#
+nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## bn# tcfx#
   | isTrue# (ln# `leWord#` 63##) = case ln# of
-      0## -> 0#Word64 -- case bigNatToWord# bn# =# 0## -> 0#Word64
-      w# -> inline nxtDgtDoubleFxW64## (word2Double# (bigNatToWord# bn#)) tcfx#
-  | isTrue# (ln# `leWord#` threshW#) = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx# -- note the leWord
-  | otherwise = inline computFxW64# (inline preComputFx## bn# ln# tcfx#)
+      0## -> (# 0#Word64, zeroFx# #) -- case bigNatToWord# bn# =# 0## -> 0#Word64
+      _ -> let !w# = inline nxtDgtDoubleFxW64## (word2Double# (bigNatToWord# bn#)) tcfx# in (# w#, zeroFx# #) 
+  | isTrue# (ln# `leWord#` threshW#) = let !w# = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx# in (# w#, zeroFx# #) -- note the leWord /
+  | otherwise = let !(# w#, fx# #) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) in (# w#, fx# #)
   where
     !ln# = bigNatLog2# bn#
     threshW# :: Word#
@@ -233,9 +240,9 @@ preComputFx## :: BigNat# -> Word# -> FloatingX# -> (# FloatingX#, FloatingX#, Fl
 preComputFx## tA__bn# lgn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# lgn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComputFx## #-}
 
-computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> Word64#
-computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = hndlOvflwW32## (floorXW64## (coreFx# (# tAFX#, tCFX#, radFX# #)))
--- hndlOvflwW32## (floorXW64## (nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))))
+computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> (# Word64#, FloatingX# #)
+computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = let !w64Fx# = coreFx# (# tAFX#, tCFX#, radFX# #) in (# floorXW64## w64Fx#, w64Fx# #)
+-- computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = let !w64fx# = coreFx# (# tAFX#, tCFX#, radFX# #) in hndlOvflwW32## (floorXW64## w64fx#)
 {-# INLINE [1] computFxW64# #-}
 
 coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
