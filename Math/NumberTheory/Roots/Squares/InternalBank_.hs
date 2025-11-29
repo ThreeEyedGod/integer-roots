@@ -41,7 +41,7 @@ import Math.NumberTheory.Utils.FloatingX_
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
-data Itr'' = Itr'' {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
+data Itr = Itr {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
 newappsqrt_ l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
@@ -55,14 +55,11 @@ newappsqrt_ l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
       | otherwise = r
       where
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
-newappsqrt_ l eY n =
-  let -- NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (l - 1) (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
-      !(NatJ# (BN# nbn#)) = n
-   in NatJ# (BN# $ yaccbn $ goBN# eY nbn# True l1# (Itr'' 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True l1# (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
   where
     !(I# l1#) = l - 1
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
-    goBN# :: Bool -> BigNat# -> Bool -> Int# -> Itr'' -> Itr''
+    goBN# :: Bool -> BigNat# -> Bool -> Int# -> Itr -> Itr
     goBN# !evn !n# !firstIter !pow# !acc
       | isTrue# (pow# <=# 0#) = acc
       | not firstIter -- && p >= 1 =
@@ -116,11 +113,11 @@ newappsqrt_ l eY n =
     {-# INLINE grab2Word32BN## #-}
 {-# INLINE newappsqrt_ #-}
 
-tfi :: Bool -> (# Word32#, Word32# #) -> Itr''
+tfi :: Bool -> (# Word32#, Word32# #) -> Itr
 tfi evenLen (# m#, l# #) = let 
         !i# = word64FromRvsrdTuple# (W32# l#, W32# m#) 4294967296#Word64 
         !(# yVal, yWord#, rm #) = rmdrFn i#
-      in Itr'' 1# yVal rm (unsafeword64ToFloatingX## yWord#) 
+      in Itr 1# yVal rm (unsafeword64ToFloatingX## yWord#) 
   where
     !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
@@ -161,17 +158,18 @@ tfi evenLen (# m#, l# #) = let
 -- {-# INLINE fixRemainder# #-}
 
 {-# INLINE tni #-}
-tni :: (# Word32#, Word32# #) -> Itr'' -> Itr''
-tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) =
+tni :: (# Word32#, Word32# #) -> Itr -> Itr
+tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
   let !(# x1, x2 #) = i1 `timesWord2#` radixW32w#
       !x = bigNatFromWord2# x1 x2
       !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
       !(# ycUpdated#, remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt@(# w#, _ #) = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
-      -- !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
-      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)  else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+      !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+      -- weirdly the above is faster  
+      -- !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)  else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
    in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
-      Itr'' (cl# +# 1#) ycUpdated# remFinal# tcfx#
+      Itr (cl# +# 1#) ycUpdated# remFinal# tcfx#
   where
     !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
     !(W# radixW32w#) = radixW32
