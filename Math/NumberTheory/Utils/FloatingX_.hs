@@ -263,10 +263,7 @@ addFxNorm# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
 
 {-# INLINE mulFx# #-}
 mulFx# :: FloatingX# -> FloatingX# -> FloatingX#
-mulFx# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) =
-  let !resExp# = expA# `plusInt64#` expB#
-      !resSignif# = sA# *## sB#
-   in FloatingX# resSignif# resExp#
+mulFx# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#) = FloatingX# (sA# *## sB#) (expA# `plusInt64#` expB#)
 
 {-# INLINE mulFx_# #-}
 mulFx_# :: FloatingX# -> FloatingX# -> FloatingX#

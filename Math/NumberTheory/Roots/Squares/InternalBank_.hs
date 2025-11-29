@@ -33,7 +33,6 @@ import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
-import Data.Functor.Classes (eq2)
 
 -- *********** END NEW IMPORTS
 
@@ -127,7 +126,7 @@ tfi evenLen (# m#, l# #) = let
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     evenFirstRmdrBN# w# =
-      let yT64# = hndlOvflwW32## (largestNSqLTEEven## w#)
+      let yT64# = largestNSqLTEEven## w#
           ysq# = yT64# `timesWord64#` yT64#
           diff# = word64ToInt64# w# `subInt64#` word64ToInt64# ysq#
        in handleFirstRemBN## (# yT64#, diff# #) -- set 0 for starting cumulative yc--fstDgtRem i
@@ -181,7 +180,7 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
     yTildeFinalFx## (# w#, fx# #) = case fx# == zeroFx# of
        True -> if isTrue#(w# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w#
        _ -> fx#
-    -- {-# INLINE yTildeFinalFx## #-}
+    {-# INLINE yTildeFinalFx## #-}
           
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
     rmdrDgt ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
@@ -191,21 +190,20 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr'' !cl# !yCAcc_ !tA !t#) 
             True -> let !res# = ta# `bigNatSubUnsafe` sbtnd# in (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
             _ ->
               let !res# = sbtnd# `bigNatSubUnsafe` ta#
-               in let adjyt = yTilde# `subWord64#` 1#Word64
-                      adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
-                      oneBigNat# = bigNatOne# (# #)
-                      adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
+               in let !adjyt = yTilde# `subWord64#` 1#Word64
+                      !adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
+                      !oneBigNat# = bigNatOne# (# #)
+                      !adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
                    in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
        in ytrdr
-    -- {-# INLINE rmdrDgt #-}
+    {-# INLINE rmdrDgt #-}
 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
     subtrahend# yScaled# yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde# of
       r1# -> r1# `bigNatMulWord#` wyTilde#
       where
         !wyTilde# = word64ToWord# yTilde#
-
--- {-# INLINE subtrahend# #-}
+    {-# INLINE subtrahend# #-}
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## bn# tcfx#
@@ -230,7 +228,7 @@ preComput ax# tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDou
 
 {-# INLINE computDoubleW64# #-}
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
-computDoubleW64# !tAFX# !tCFX# !radFX# = case floor (D# (coreD# tAFX# tCFX# radFX#)) of (W64# w#) -> hndlOvflwW32## w#
+computDoubleW64# !tAFX# !tCFX# !radFX# = case floor (D# (coreD# tAFX# tCFX# radFX#)) of (W64# w#) -> w#
 
 coreD# :: Double# -> Double# -> Double# -> Double#
 coreD# da# dc# dr# = nextUp# (nextUp# da# /## nextDown# (sqrtDouble# (nextDown# dr#) +## nextDown# dc#))
@@ -243,9 +241,9 @@ preComputFx## tA__bn# lgn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# lgn# of tAFX
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> (# Word64#, FloatingX# #)
 computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = let !w64Fx# = coreFx# (# tAFX#, tCFX#, radFX# #) in (# floorXW64## w64Fx#, w64Fx# #)
 -- computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = let !w64fx# = coreFx# (# tAFX#, tCFX#, radFX# #) in hndlOvflwW32## (floorXW64## w64fx#)
-{-# INLINE [1] computFxW64# #-}
+{-# INLINE computFxW64# #-}
 
 coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
 coreFx# (# tAFX#, tCFX#, radFX# #) =
   nextUpFX# (nextUpFX# tAFX# !/## nextDownFX# (sqrtFX# (nextDownFX# radFX#) !+## nextDownFX# tCFX#))
-{-# INLINE [0] coreFx# #-}
+{-# INLINE coreFx# #-}
