@@ -25,7 +25,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 -- \*********** BEGIN NEW IMPORTS
 
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), gtWord#, Word32#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word32#, Word64#, eqWord64#, fmaddDouble#, indexWordArray#, inline, int2Word#, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord32#, (+#), (+##), (-#), (/##), (<#), (<=#), (==#))
+import GHC.Exts (Double (..), gtWord#, Word32#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word32#, Word64#, eqWord64#, fmaddDouble#, indexWordArray#, inline, int2Word#, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord32#, (+#), (+##), (-#), (/##), (<#), (<=#), (==#), eqWord#)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord#)
@@ -206,9 +206,10 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## bn# tcfx#
   | isTrue# (ln# `gtWord#` threshW#) = let !(# w#, fx# #) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) in (# w#, fx# #) -- note the gtWord /
-  | otherwise = let !w# = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx# in (# w#, zeroFx# #) -- only 8 cases land here in tests
+  | otherwise = if itsZero then (# 0#Word64, zeroFx# #) else let !w# = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx# in (# w#, zeroFx# #) -- only 8 cases land here in tests
   where
     !ln# = bigNatLog2# bn#
+    itsZero = isTrue# (ln# `eqWord#` 0##) -- lets this be lazy
     threshW# :: Word#
     !threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 {-# INLINE nxtDgtNatW64## #-}
