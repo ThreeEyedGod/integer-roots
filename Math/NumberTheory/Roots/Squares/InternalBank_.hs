@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm dumps else not
@@ -24,11 +25,10 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 -- \*********** BEGIN NEW IMPORTS
 
 import Data.Bits (finiteBitSize)
-import Data.Word (Word32)
-import GHC.Exts (Double (..), gtWord#, Word32#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word32#, Word64#, and#, build, eqInt64#, eqWord#, eqWord64#, fmaddDouble#, geInt64#, gtInt64#, iShiftRL#, indexWordArray#, inline, int2Double#, int2Word#, int64ToInt#, int64ToWord64#, intToInt64#, isTrue#, leInt64#, leWord#, ltInt64#, ltWord#, minusWord#, neWord#, not#, or#, plusInt64#, plusWord#, plusWord64#, quotInt64#, quotRemWord#, remInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord#, timesWord2#, timesWord64#, uncheckedShiftL#, uncheckedShiftRL#, word2Double#, word2Int#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord32#, wordToWord64#, (*#), (*##), (**##), (+#), (+##), (-#), (/##), (/=#), (<#), (<##), (<=#), (==#), (==##), (>#), (>=#), (>=##))
+import GHC.Exts (Double (..), gtWord#, Word32#, Double#, Int (..), Int#, Int64#, Word (..), Word#, Word32#, Word64#, eqWord64#, fmaddDouble#, indexWordArray#, inline, int2Word#, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord32#, (+#), (+##), (-#), (/##), (<#), (<=#), (==#))
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatGe, bigNatGt, bigNatIndex#, bigNatIsZero, bigNatIsZero#, bigNatLeWord, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatMul, bigNatMulWord, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord, bigNatToWord#, bigNatToWordMaybe#, bigNatZero#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord#)
 import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
@@ -44,7 +44,7 @@ import Math.NumberTheory.Utils.FloatingX_
 data Itr = Itr {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
+newappsqrt_ l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check 
   where
     isqrtWord :: Word -> Word
     isqrtWord n
@@ -183,11 +183,11 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
     rmdrDgt ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
       let !sbtnd# = subtrahend# ycScaledbn# yTilde#
-          !reg = ta# `bigNatGe` sbtnd#
-          !ytrdr = case reg of
-            True -> let !res# = ta# `bigNatSubUnsafe` sbtnd# in (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
+          !resTrial = ta# `bigNatSub` sbtnd#
+          !ytrdr = case resTrial of
+            (# | res# #) -> (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
             _ ->
-              let !res# = sbtnd# `bigNatSubUnsafe` ta#
+              let !res# = sbtnd# `bigNatSubUnsafe` ta# -- since we know resTrial < 0 and this is safe
                in let !adjyt = yTilde# `subWord64#` 1#Word64
                       !adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
                       !oneBigNat# = bigNatOne# (# #)

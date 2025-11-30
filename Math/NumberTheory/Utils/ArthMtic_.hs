@@ -64,23 +64,13 @@ import GHC.Exts
     Int64#,
     Word (..),
     Word#,
-    Word32#,
     Word64#,
     and#,
-    build,
     eqInt64#,
     eqWord#,
-    eqWord64#,
-    fmaddDouble#,
-    geInt64#,
-    gtInt64#,
-    int2Double#,
     int2Word#,
-    int64ToInt#,
-    int64ToWord64#,
     intToInt64#,
     isTrue#,
-    leInt64#,
     leWord#,
     minusWord#,
     neWord#,
@@ -92,9 +82,6 @@ import GHC.Exts
     quotInt64#,
     quotRemWord#,
     remInt64#,
-    sqrtDouble#,
-    subInt64#,
-    subWord64#,
     timesInt64#,
     timesWord#,
     timesWord64#,
@@ -103,27 +90,19 @@ import GHC.Exts
     word2Double#,
     word2Int#,
     word32ToWord#,
-    word64ToInt64#,
     wordToWord64#,
-    (*##),
-    (**##),
     (+#),
-    (+##),
     (-#),
-    (/##),
     (/=#),
-    (<#),
-    (<##),
     (==##),
     (>#),
     (>=#),
-    (>=##),
   )
 import GHC.Float (floorDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#,  bigNatLeWord#, bigNatLog2,  bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
 import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)

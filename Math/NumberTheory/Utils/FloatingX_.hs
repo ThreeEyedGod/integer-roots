@@ -27,67 +27,34 @@ import GHC.Exts
   ( Double (..),
     Double#,
     Int (..),
-    Int#,
     Int64#,
-    Word (..),
     Word#,
     Word64#,
-    and#,
-    build,
     eqInt64#,
-    eqWord#,
-    eqWord64#,
     fmaddDouble#,
     geInt64#,
     gtInt64#,
-    int2Double#,
-    int2Word#,
     int64ToInt#,
-    int64ToWord64#,
-    intToInt64#,
     isTrue#,
     leInt64#,
     ltInt64#,
-    minusWord#,
-    neWord#,
-    not#,
-    or#,
     plusInt64#,
-    plusWord#,
-    plusWord64#,
-    quotInt64#,
-    quotRemWord#,
-    remInt64#,
     sqrtDouble#,
     subInt64#,
-    subWord64#,
     timesInt64#,
-    timesWord#,
-    timesWord64#,
-    uncheckedShiftL#,
-    uncheckedShiftRL#,
-    word2Double#,
-    word2Int#,
-    word32ToWord#,
-    word64ToInt64#,
-    wordToWord64#,
     (*##),
     (**##),
     (+#),
     (+##),
-    (-#),
     (/##),
-    (/=#),
-    (<#),
     (<##),
     (==##),
-    (>=#),
     (>=##),
   )
 import GHC.Float (divideDouble, powerDouble, timesDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble,  split, split#, sqrtOf2, updateDouble#, _evenInt64#)
 
@@ -215,7 +182,10 @@ floorFX (FloatingX s e) = case fx2Double (FloatingX s e) of
 (!/##) x y = x `unsafeDivFx#` y ---- note this is the unsafest version of divide
 
 (!<##) :: FloatingX# -> FloatingX# -> Bool
-(!<##) (FloatingX# x# xe#) (FloatingX# y# ye#) = if isTrue# (xe# `eqInt64#` ye#) then isTrue# (x# <## y#) else if isTrue# (xe# `ltInt64#` ye#) then isTrue# (x# <## y#) else False
+(!<##) (FloatingX# x# xe#) (FloatingX# y# ye#)
+  | isTrue# (xe# `eqInt64#` ye#) = isTrue# (x# <## y#)
+  | isTrue# (xe# `ltInt64#` ye#) = isTrue# (x# <## y#)
+  | otherwise = False
 {-# NOINLINE (!<##) #-}
 
 {-# NOINLINE (!**+##) #-}
@@ -541,3 +511,4 @@ unsafeword64ToFx# i = double2Fx# (fromIntegral i)
 {-# INLINE unsafeword64ToFloatingX## #-}
 unsafeword64ToFloatingX## :: Word64# -> FloatingX#
 unsafeword64ToFloatingX## w# = case W64# w# of i -> unsafeword64ToFx# i
+
