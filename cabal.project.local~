@@ -1,3 +1,7 @@
-ignore-project: False
-library-profiling: True
-executable-profiling: True
+profiling: True
+profiling-detail: toplevel-functions
+
+package *
+  coverage: True
+  library-coverage: True
+  documentation: True
