@@ -24,8 +24,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     _oddInt64#,
     _even,
     _odd,
-    -- nextDown#,
-    -- nextUp#,
     updateDouble#,
     split,
     split#,
@@ -370,17 +368,6 @@ maxUnsafeInteger :: Integer
 maxUnsafeInteger = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
-
--- -- | Floating Point nextUp/nextDown funxctions
--- {-# INLINE nextUp# #-}
--- nextUp# :: Double# -> Double#
--- -- nextUp# dIn# = case nextUp (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextUp (D# dIn#) in dOut#
--- nextUp# dIn# = dIn# -- disabled for now to see if it helps performance
-
--- {-# INLINE nextDown# #-}
--- nextDown# :: Double# -> Double#
--- -- nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextDown (D# dIn#) in dOut#
--- nextDown# dIn# = dIn# -- disabled for now to see if it helps performance
 
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
