@@ -206,9 +206,6 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## bn# tcfx#
   | isTrue# (ln# `gtWord#` threshW#) = let !(# w#, fx# #) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) in (# w#, fx# #) -- note the gtWord /
-  -- | isTrue# (ln# `leWord#` 63##) = case ln# of -- this is almost redundant - nothing in the tests land here
-  --     0## -> (# 0#Word64, zeroFx# #) -- case bigNatToWord# bn# =# 0## -> 0#Word64
-  --     _ -> let !w# = inline nxtDgtDoubleFxW64## (word2Double# (bigNatToWord# bn#)) tcfx# in (# w#, zeroFx# #) 
   | otherwise = let !w# = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx# in (# w#, zeroFx# #) -- only 8 cases land here in tests
   where
     !ln# = bigNatLog2# bn#

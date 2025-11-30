@@ -124,19 +124,19 @@ minValueFx = FloatingX 1.0 0
 minValueFx# :: FloatingX#
 minValueFx# = FloatingX# 1.0## 0#Int64
 
-{-# NOINLINE [0] (!+) #-}
+{-# NOINLINE (!+) #-}
 (!+) :: FloatingX -> FloatingX -> FloatingX
 (!+) x y = x `addFx` y
 
-{-# NOINLINE [0] (!*) #-}
+{-# NOINLINE (!*) #-}
 (!*) :: FloatingX -> FloatingX -> FloatingX
 (!*) x y = x `mulFx` y
 
-{-# NOINLINE [0] (!/) #-}
+{-# NOINLINE (!/) #-}
 (!/) :: FloatingX -> FloatingX -> FloatingX
 (!/) x y = x `unsafeDivFx` y ---- note this is the unsafest version of divide
 
-{-# NOINLINE [0] (!**+) #-}
+{-# NOINLINE (!**+) #-}
 (!**+) :: FloatingX -> FloatingX -> FloatingX
 (!**+) x y = x `fsqraddFloatingX` y
 
@@ -193,8 +193,7 @@ fsqraddFloatingX (FloatingX (D# sA#) expA) (FloatingX (D# sC#) expC)
     !twoTimesExpA = 2 * expA
     !diff@(I64# diff#) = expC - twoTimesExpA
 
-{-# INLINEABLE [1] floorFX #-} -- punting inlining to the last Phase 0
--- {-# INLINE [0] floorFX #-} -- punting inlining to the last Phase 0
+{-# INLINEABLE floorFX #-} -- punting inlining to the last Phase 0
 {-# SPECIALIZE floorFX :: FloatingX -> Int #-}
 {-# SPECIALIZE floorFX :: FloatingX -> Int64 #-}
 {-# SPECIALIZE floorFX :: FloatingX -> Integer #-}
@@ -203,23 +202,23 @@ floorFX (FloatingX s e) = case fx2Double (FloatingX s e) of
   Just d -> floor d
   _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
-{-# NOINLINE [0] (!+##) #-}
+{-# NOINLINE (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!+##) x y = x `addFx#` y
 
-{-# NOINLINE [0] (!*##) #-}
+{-# NOINLINE (!*##) #-}
 (!*##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!*##) x y = x `mulFx#` y
 
-{-# NOINLINE [0] (!/##) #-}
+{-# NOINLINE (!/##) #-}
 (!/##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!/##) x y = x `unsafeDivFx#` y ---- note this is the unsafest version of divide
 
 (!<##) :: FloatingX# -> FloatingX# -> Bool
 (!<##) (FloatingX# x# xe#) (FloatingX# y# ye#) = if isTrue# (xe# `eqInt64#` ye#) then isTrue# (x# <## y#) else if isTrue# (xe# `ltInt64#` ye#) then isTrue# (x# <## y#) else False
-{-# NOINLINE [0] (!<##) #-}
+{-# NOINLINE (!<##) #-}
 
-{-# NOINLINE [0] (!**+##) #-}
+{-# NOINLINE (!**+##) #-}
 (!**+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!**+##) x y = x `fsqraddFloatingX#` y
 
@@ -387,11 +386,11 @@ fm1addFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#)
   where
     !cExcessa# = expC# `subInt64#` expA#
 
-{-# INLINE [0] sqrtFX# #-}
+{-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# fx@(FloatingX# s# e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
 
-{-# INLINE [0] floorX# #-}
+{-# INLINE floorX# #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Int #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Int64 #-}
 {-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}
@@ -474,7 +473,7 @@ unsafefx2Double (FloatingX d@(D# d#) e) =
   where
     !(# m, n# #) = decodeDoubleInteger d#
     !ex@(I# ex#) = I# n# + fromIntegral e
-{-# INLINE [2] unsafefx2Double #-}
+{-# INLINE unsafefx2Double #-}
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# d# 0#Int64) = d#
@@ -523,7 +522,7 @@ unsafeN2Fx n = case convNToDblExp n of (# s#, e_# #) -> FloatingX (D# s#) (I64# 
 unsafeGtWordbn2Fx## :: BigNat# -> Word# -> FloatingX#
 unsafeGtWordbn2Fx## ibn# lgn# = case bnToFxGtWord# ibn# lgn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
-{-# INLINE [2] unsafeGtWordbn2Fx #-}
+{-# INLINE unsafeGtWordbn2Fx #-}
 unsafeGtWordbn2Fx :: BigNat -> FloatingX
 unsafeGtWordbn2Fx ibn = case bnToFxGtWord ibn of (s, e_) -> FloatingX s e_ -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
