@@ -62,7 +62,7 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
     goBN# :: Bool -> BigNat# -> Bool -> Int# -> Itr -> Itr
     goBN# !evn !n# !firstIter !pow# !acc
       | isTrue# (pow# <=# 0#) = acc
-      | not firstIter -- && p >= 1 =
+      | not firstIter -- && p >= 1 = -- these are next iterations
         =
           let !(# digit1, digit2, zbn# #) = grab2Word32BN## pow# n#
            in goBN# evn zbn# False (pow# -# 2#) (tni (# digit1, digit2 #) acc)
@@ -71,7 +71,7 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
               !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
               !digit1# = wordToWord32# 0##
               !digit2# = wordToWord32# (bigNatToWord# digit#)
-           in goBN# evn ybn# False (pow# -# 1#) (tfi False (# digit1#, digit2# #)) -- //FIXME better way to represent 0
+           in goBN# evn ybn# False (pow# -# 1#) (tfi False (# digit1#, digit2# #)) 
       | otherwise -- firstIter && evn =
         =
           let !(# digit1, digit2, zbn# #) = grab2Word32BN## pow# n#
@@ -83,9 +83,9 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
       | eq2# && szEq1#,
         a0 <- indexWordArray# n# 0# =
           let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
-              !(W# digit1#, W# yw#) = (0, W# a0) -- a0 `quotRemWord#` 18446744073709551616## -- 18446744073709551616## = 2^64 = radixW32 ^ 2
+              !(W32# digit1#, W# yw#) = (W32# 0#Word32, W# a0) -- a0 `quotRemWord#` 18446744073709551616## -- 18446744073709551616## = 2^64 = radixW32 ^ 2
               !(W# digit2#, W# z#) = quotremradixW32 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
-           in (# wordToWord32# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
+           in (# digit1#, wordToWord32# digit2#, bigNatFromWord# z# #)
       | le1# && szEq1#, --isTrue# (pow# ==# 1#) && szEq1#, little tricky but should be identical
         a0 <- indexWordArray# n# 0# =
           let -- power2# = 1 -- radixW32 ^ (1 - 1) = radixW32 ^ 0 = 1 ; -- !(W# power1#) = radixW32 --bigNatShiftL# power2# 32##
