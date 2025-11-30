@@ -89,7 +89,7 @@ import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatIsZero, bigNatLeWord#, bigNatLog2, bigNatLog2#, bigNatShiftR, bigNatShiftR#, bigNatSize#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, nextDown#, nextUp#, split, split#, sqrtOf2, updateDouble#, _evenInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble,  split, split#, sqrtOf2, updateDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 
@@ -542,30 +542,14 @@ unsafeword64ToFx# i = double2Fx# (fromIntegral i)
 unsafeword64ToFloatingX## :: Word64# -> FloatingX#
 unsafeword64ToFloatingX## w# = case W64# w# of i -> unsafeword64ToFx# i
 
-{-# INLINE nextUpFX# #-}
-nextUpFX# :: FloatingX# -> FloatingX#
-nextUpFX# = id -- disabled for now
--- nextUpFX# (FloatingX# s# e#)
+-- {-# INLINE nextUpFXNormalized# #-}
+-- nextUpFXNormalized# :: FloatingX# -> FloatingX#
+-- nextUpFXNormalized# (FloatingX# s# e#)
 --   | isTrue# (s# ==## 0.0##) = minValueFx#
---   -- \| otherwise = case nextUp# s# of interimS# -> if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
---   | otherwise = case nextUp# s# of interimS# -> FloatingX# interimS# e#
+--   | otherwise = case nextUp# s# of interimS# -> if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
 
-{-# INLINE nextUpFXNormalized# #-}
-nextUpFXNormalized# :: FloatingX# -> FloatingX#
-nextUpFXNormalized# (FloatingX# s# e#)
-  | isTrue# (s# ==## 0.0##) = minValueFx#
-  | otherwise = case nextUp# s# of interimS# -> if isTrue# (interimS# >=## 2.0##) then FloatingX# (interimS# /## 2.00##) (e# `plusInt64#` 1#Int64) else FloatingX# interimS# e#
-
-{-# INLINE nextDownFX# #-}
-nextDownFX# :: FloatingX# -> FloatingX#
-nextDownFX# = id -- disabled for now
--- nextDownFX# x@(FloatingX# s# e#)
+-- {-# INLINE nextDownFXNormalized# #-}
+-- nextDownFXNormalized# :: FloatingX# -> FloatingX#
+-- nextDownFXNormalized# x@(FloatingX# s# e#)
 --   | isTrue# (s# ==## 0.0##) || x == minValueFx# = zeroFx#
---   -- \| otherwise = case nextDown# s# of interimS# -> if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#
---   | otherwise = case nextDown# s# of interimS# -> FloatingX# interimS# e#
-
-{-# INLINE nextDownFXNormalized# #-}
-nextDownFXNormalized# :: FloatingX# -> FloatingX#
-nextDownFXNormalized# x@(FloatingX# s# e#)
-  | isTrue# (s# ==## 0.0##) || x == minValueFx# = zeroFx#
-  | otherwise = case nextDown# s# of interimS# -> if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#
+--   | otherwise = case nextDown# s# of interimS# -> if isTrue# (interimS# <## 1.0##) then FloatingX# (interimS# *## 2.00##) (e# `subInt64#` 1#Int64) else FloatingX# interimS# e#

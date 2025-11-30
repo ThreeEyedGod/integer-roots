@@ -24,8 +24,8 @@ module Math.NumberTheory.Utils.ArthMtic_
     _oddInt64#,
     _even,
     _odd,
-    nextDown#,
-    nextUp#,
+    -- nextDown#,
+    -- nextUp#,
     updateDouble#,
     split,
     split#,
@@ -371,16 +371,16 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
--- | Floating Point nextUp/nextDown funxctions
-{-# INLINE nextUp# #-}
-nextUp# :: Double# -> Double#
--- nextUp# dIn# = case nextUp (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextUp (D# dIn#) in dOut#
-nextUp# dIn# = dIn# -- disabled for now to see if it helps performance
+-- -- | Floating Point nextUp/nextDown funxctions
+-- {-# INLINE nextUp# #-}
+-- nextUp# :: Double# -> Double#
+-- -- nextUp# dIn# = case nextUp (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextUp (D# dIn#) in dOut#
+-- nextUp# dIn# = dIn# -- disabled for now to see if it helps performance
 
-{-# INLINE nextDown# #-}
-nextDown# :: Double# -> Double#
--- nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextDown (D# dIn#) in dOut#
-nextDown# dIn# = dIn# -- disabled for now to see if it helps performance
+-- {-# INLINE nextDown# #-}
+-- nextDown# :: Double# -> Double#
+-- -- nextDown# dIn# = case nextDown (D# dIn#) of (D# dOut#) -> dOut# -- let !(D# dOut#) = nextDown (D# dIn#) in dOut#
+-- nextDown# dIn# = dIn# -- disabled for now to see if it helps performance
 
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
