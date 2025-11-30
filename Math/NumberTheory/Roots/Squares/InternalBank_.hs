@@ -123,14 +123,14 @@ tfi evenLen (# m#, l# #) = let
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     evenFirstRmdrBN# w# =
-      let yT64# = largestNSqLTEEven## w#
+      let yT64# = largestNSqLTE## w#
           ysq# = yT64# `timesWord64#` yT64#
           diff# = word64ToInt64# w# `subInt64#` word64ToInt64# ysq#
        in handleFirstRemBN## (# yT64#, diff# #) -- set 0 for starting cumulative yc--fstDgtRem i
       -- {-# INLINE evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     oddFirstRmdrBN# w# =
-      let yT64# = largestNSqLTEOdd## w#
+      let yT64# = largestNSqLTE## w#
           ysq# = yT64# `timesWord64#` yT64#
           remIntegerW# = w# `subWord64#` ysq# -- no chance this will be negative
        in (# bigNatFromWord64# yT64#, yT64#, bigNatFromWord64# remIntegerW# #)
@@ -186,7 +186,7 @@ tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
           !resTrial = ta# `bigNatSub` sbtnd#
           !ytrdr = case resTrial of
             (# | res# #) -> (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
-            _ ->
+            _ -> -- bigNat thankfully returns a zero if they are equal and it would go into above branch
               let !res# = sbtnd# `bigNatSubUnsafe` ta# -- since we know resTrial < 0 and this is safe
                in let !adjyt = yTilde# `subWord64#` 1#Word64
                       !adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt

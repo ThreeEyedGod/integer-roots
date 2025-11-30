@@ -33,8 +33,9 @@ module Math.NumberTheory.Utils.ArthMtic_
     radixW32,
     secndPlaceW32Radix,
     word64FromRvsrd2ElemList#,
-    largestNSqLTEEven##,
-    largestNSqLTEOdd##,
+    -- largestNSqLTEEven##,
+    -- largestNSqLTEOdd##,
+    largestNSqLTE##,
     maxDouble,
     maxSafeInteger,
     maxUnsafeInteger,
@@ -208,20 +209,20 @@ word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToW
 doubleFromRvsrdTuple :: (Word32, Word32) -> Integer -> Double
 doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromIntegral l1
 
-{-# INLINE largestNSqLTEOdd #-}
-largestNSqLTEOdd :: Word64 -> Word64
-largestNSqLTEOdd i = floorDouble (sqrt (fromIntegral i) :: Double)
+-- {-# INLINE largestNSqLTEOdd## #-}
+-- largestNSqLTEOdd## :: Word64# -> Word64#
+-- largestNSqLTEOdd## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
 
-{-# INLINE largestNSqLTEOdd## #-}
-largestNSqLTEOdd## :: Word64# -> Word64#
-largestNSqLTEOdd## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
+-- {-# INLINE largestNSqLTEEven## #-}
+-- largestNSqLTEEven## :: Word64# -> Word64#
+-- largestNSqLTEEven## w# =
+--   let !d_ = (fromIntegral (W64# w#) :: Double)
+--       !(W64# r#) = floorDouble (sqrt d_)
+--    in r#
 
-{-# INLINE largestNSqLTEEven## #-}
-largestNSqLTEEven## :: Word64# -> Word64#
-largestNSqLTEEven## w# =
-  let !d_ = (fromIntegral (W64# w#) :: Double)
-      !(W64# r#) = floorDouble (sqrt d_)
-   in r#
+{-# INLINE largestNSqLTE## #-}
+largestNSqLTE## :: Word64# -> Word64#
+largestNSqLTE## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
 
 {-# INLINE radixW32Length #-} -- this works
 radixW32Length :: Integer -> Word
