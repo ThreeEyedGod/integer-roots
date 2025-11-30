@@ -22,8 +22,6 @@ module Math.NumberTheory.Utils.ArthMtic_
   ( powBigNat#,
     _evenInt64#,
     _oddInt64#,
-    _even,
-    _odd,
     updateDouble#,
     split,
     split#,
@@ -33,8 +31,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     radixW32,
     secndPlaceW32Radix,
     word64FromRvsrd2ElemList#,
-    -- largestNSqLTEEven##,
-    -- largestNSqLTEOdd##,
     largestNSqLTE##,
     maxDouble,
     maxSafeInteger,
@@ -209,17 +205,6 @@ word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToW
 doubleFromRvsrdTuple :: (Word32, Word32) -> Integer -> Double
 doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromIntegral l1
 
--- {-# INLINE largestNSqLTEOdd## #-}
--- largestNSqLTEOdd## :: Word64# -> Word64#
--- largestNSqLTEOdd## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
-
--- {-# INLINE largestNSqLTEEven## #-}
--- largestNSqLTEEven## :: Word64# -> Word64#
--- largestNSqLTEEven## w# =
---   let !d_ = (fromIntegral (W64# w#) :: Double)
---       !(W64# r#) = floorDouble (sqrt d_)
---    in r#
-
 {-# INLINE largestNSqLTE## #-}
 largestNSqLTE## :: Word64# -> Word64#
 largestNSqLTE## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
@@ -235,13 +220,6 @@ radixW32Length n
 -- | Integer from a 3rd place plus a "reversed" tuple of 2 Word32 digits on base
 intgrFrom3DigitsBase32 :: Integer -> (Word32, Word32) -> Integer
 intgrFrom3DigitsBase32 i (l1, l2) = (i * secndPlaceW32Radix) + intgrFromRvsrdTuple (l1, l2) radixW32
-
--- | custom even and odd to handle what we need
-_even, _odd :: (Integral a) => a -> (Bool, a)
-_even n = let !(q, r) = n `quotRem` 2 in (r == 0, q)
-_odd = _even
-{-# INLINE _even #-}
-{-# INLINE _odd #-}
 
 _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
 _evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
