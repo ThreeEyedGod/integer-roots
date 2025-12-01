@@ -12,6 +12,8 @@
 {-# LANGUAGE CPP           #-}
 {-# LANGUAGE MagicHash     #-}
 {-# LANGUAGE ViewPatterns  #-}
+{- HLINT ignore "Use list comprehension" -}
+{- HLINT ignore "Use fewer imports" -}
 
 module Math.NumberTheory.Roots.General
     ( integerRoot

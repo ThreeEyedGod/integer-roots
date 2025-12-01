@@ -9,6 +9,7 @@
 
 {-# LANGUAGE CPP       #-}
 {-# LANGUAGE MagicHash #-}
+{- HLINT ignore "Use fewer imports" -}
 
 module Math.NumberTheory.Roots.Fourth
     ( integerFourthRoot

@@ -10,6 +10,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP          #-}
 {-# LANGUAGE MagicHash    #-}
+{- HLINT ignore "Use fewer imports" -}
 
 module Math.NumberTheory.Roots.Cubes
     ( integerCubeRoot
@@ -177,7 +178,7 @@ cubeRootWord w
     | c < w && e < w && c < e  = r+1
     | otherwise         = r
       where
-        r = truncate ((fromIntegral w) ** (1/3) :: Double)
+        r = truncate (fromIntegral w ** (1/3) :: Double)
         c = r*r*r
         d = 3*r*(r+1)
         e = c+d
@@ -207,7 +208,7 @@ appCuRt :: Integer -> Integer
 appCuRt (IS i#) = case double2Int# (int2Double# i# **## (1.0## /## 3.0##)) of
                     r# -> IS r#
 appCuRt n@(IP bn#)
-    | isTrue# ((bigNatSize# bn#) <# thresh#) =
+    | isTrue# (bigNatSize# bn# <# thresh#) =
           floor (fromInteger n ** (1.0/3.0) :: Double)
     | otherwise = case integerLog2# n of
 #ifdef MIN_VERSION_integer_gmp

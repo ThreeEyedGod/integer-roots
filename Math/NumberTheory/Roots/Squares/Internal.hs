@@ -6,9 +6,9 @@
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
 
-{-# LANGUAGE BangPatterns     #-}
 {-# LANGUAGE CPP              #-}
 {-# LANGUAGE MagicHash        #-}
+{- HLINT ignore "Use fewer imports" -}
 
 module Math.NumberTheory.Roots.Squares.Internal
   ( karatsubaSqrt
@@ -60,7 +60,7 @@ heron n a = go (step a)
 appSqrt :: Integer -> Integer
 appSqrt (IS i#) = IS (double2Int# (sqrtDouble# (int2Double# i#)))
 appSqrt n@(IP bn#)
-    | isTrue# ((bigNatSize# bn#) <# thresh#) =
+    | isTrue# (bigNatSize# bn# <# thresh#) =
           floor (sqrt $ fromInteger n :: Double)
     | otherwise = case integerLog2# n of
 #ifdef MIN_VERSION_integer_gmp
