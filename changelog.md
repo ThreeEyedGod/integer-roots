@@ -1,3 +1,7 @@
+# 1.0.4.0
+
+* Add rewrite rules for `integerSquareRoot` of `Int64` and `Word64`.
+
 # 1.0.3.0
 
 * Add a rewrite rule for `integerSquareRoot` of `Natural`.

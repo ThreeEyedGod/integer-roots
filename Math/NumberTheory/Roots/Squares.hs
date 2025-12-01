@@ -24,6 +24,8 @@ module Math.NumberTheory.Roots.Squares
     ) where
 
 import Data.Bits (finiteBitSize, (.&.))
+import Data.Int (Int64)
+import Data.Word (Word64)
 import GHC.Exts (Ptr(..))
 import Numeric.Natural (Natural)
 
@@ -42,6 +44,8 @@ import Math.NumberTheory.Utils.BitMask (indexBitSet)
 -- 10
 {-# SPECIALISE integerSquareRoot :: Int -> Int #-}
 {-# SPECIALISE integerSquareRoot :: Word -> Word #-}
+{-# SPECIALISE integerSquareRoot :: Int64 -> Int64 #-}
+{-# SPECIALISE integerSquareRoot :: Word64 -> Word64 #-}
 {-# SPECIALISE integerSquareRoot :: Integer -> Integer #-}
 {-# SPECIALISE integerSquareRoot :: Natural -> Natural #-}
 integerSquareRoot :: Integral a => a -> a
@@ -55,6 +59,8 @@ integerSquareRoot n
 {-# RULES
 "integerSquareRoot'/Int"     integerSquareRoot' = isqrtInt'
 "integerSquareRoot'/Word"    integerSquareRoot' = isqrtWord
+"integerSquareRoot'/Int64"   integerSquareRoot' = isqrtInt64'
+"integerSquareRoot'/Word64"  integerSquareRoot' = isqrtWord64
 "integerSquareRoot'/Integer" integerSquareRoot' = isqrtInteger
 "integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
   #-}
@@ -207,14 +213,13 @@ isqrtInt' n
     | otherwise = r
       where
         !r = (truncate :: Double -> Int) . sqrt $ fromIntegral n
--- With -O2, that should be translated to the below
-{-
-isqrtInt' n@(I# i#)
-    | r# *# r# ># i#            = I# (r# -# 1#)
-    | otherwise                 = I# r#
+
+isqrtInt64' :: Int64 -> Int64
+isqrtInt64' n
+    | n < r*r   = r-1
+    | otherwise = r
       where
-        !r# = double2Int# (sqrtDouble# (int2Double# i#))
--}
+        !r = (truncate :: Double -> Int64) . sqrt $ fromIntegral n
 
 -- Same for Word.
 isqrtWord :: Word -> Word
@@ -226,6 +231,16 @@ isqrtWord n
     | otherwise = r
       where
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
+
+isqrtWord64 :: Word64 -> Word64
+isqrtWord64 n
+    | n < (r*r)
+      -- Double interprets values near maxBound as 2^64
+      || r == 4294967296
+                = r-1
+    | otherwise = r
+      where
+        !r = (fromIntegral :: Int64 -> Word64) . (truncate :: Double -> Int64) . sqrt $ fromIntegral n
 
 {-# INLINE isqrtInteger #-}
 isqrtInteger :: Integer -> Integer
