@@ -116,7 +116,7 @@ quotremradixW32 = $$(quoteQuotRem 4294967296)
 {-# INLINE quotremradixW32 #-}
 
 quotrem1 :: Word -> (Word, Word)
-quotrem1 = $$(quoteQuotRem 1)
+quotrem1 x = (x,0) -- $$(quoteQuotRem 1)
 {-# INLINE quotrem1 #-}
 
 -- powBigNat# :: Int# -> BigNat#
