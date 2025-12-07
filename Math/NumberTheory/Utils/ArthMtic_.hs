@@ -52,7 +52,6 @@ where
 -- \*********** BEGIN NEW IMPORTS
 
 import Data.Bits (complement, countLeadingZeros, unsafeShiftL, (.&.))
-import Data.Word (Word32)
 import GHC.Exts
   ( Double (..),
     Double#,
@@ -62,6 +61,7 @@ import GHC.Exts
     Word (..),
     Word#,
     Word64#,
+    Word32#,
     and#,
     eqInt64#,
     eqWord#,
