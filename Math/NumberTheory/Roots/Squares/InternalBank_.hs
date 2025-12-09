@@ -24,12 +24,12 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word32#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word64ToInt64#, word64ToWord#, wordToWord32#, (+#), (+##), (/##), (<#))
+import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word64ToInt64#, word64ToWord#, (+#), (+##), (/##), (<#))
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatFromWordListUnsafe, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSub, bigNatSubUnsafe, bigNatToWordList, bigNatZero#, bigNatIsZero#)
 import GHC.Num.Natural (naturalToBigNat#)
-import GHC.Word (Word32 (..), Word64 (..))
+import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
 import Data.List (uncons)
@@ -60,7 +60,7 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
     goBN# :: Bool -> BigNat# -> Bool -> Itr -> Itr
     goBN# !evn !n# !firstIter !acc
-      | isTrue# (bigNatIsZero# n#) = acc -- //FIXME why testing for zero when pow is not zero would lessen failures?
+      | isTrue# (bigNatIsZero# n#) = acc 
       | not firstIter -- these are next iterations
         = goBN# evn zbn# False (tni (# digit1#, digit2# #) acc)
       | otherwise -- firstIter 
@@ -127,7 +127,7 @@ tni (# i1, i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
       !(# ycUpdated#, remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt@(# w#, _ #) = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
       !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
       -- weirdly the above is faster
-      -- !tcfx# = if isTrue# (cl# <# 3#) then nextDownFX# $ tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)  else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+      -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)  else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
    in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
       Itr (cl# +# 1#) ycUpdated# remFinal# tcfx#
   where
