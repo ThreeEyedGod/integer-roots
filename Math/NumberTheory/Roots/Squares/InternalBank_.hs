@@ -66,9 +66,14 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
       | otherwise -- firstIter 
         = goBN# evn zbn# False (tfi evn (# digit1#, digit2# #))
       where 
-        !(# W# limbTop64, zbn# #) = case uncons (bigNatToWordList n#) of 
-                    Just (z, ys) -> (# z, bigNatFromWordListUnsafe ys #)
-                    Nothing -> (# W# 0##, bigNatZero# (# #)  #)-- should not happen as we are subtracting
+        !xs = bigNatToWordList n# 
+        !(# W# limbTop64, zbn# #) = case xs of 
+           (x:ys) -> (# x, bigNatFromWordListUnsafe ys #)
+           [x] -> (# x, bigNatZero# (# #)  #) -- should not happen as we are subtracting
+           _ -> (# W# 0##, bigNatZero# (# #)  #) -- should not happen as we are subtracting
+        -- !(# W# limbTop64, zbn# #) = case uncons (bigNatToWordList n#) of 
+        --             Just (z, ys) -> (# z, bigNatFromWordListUnsafe ys #)
+        --             Nothing -> (# W# 0##, bigNatZero# (# #)  #)-- should not happen as we are subtracting
         !(W# digit1#, W# digit2#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
     {-# INLINE goBN# #-}
 {-# INLINE newappsqrt_ #-}
