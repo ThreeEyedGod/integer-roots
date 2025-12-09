@@ -56,7 +56,7 @@ import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble,  split, split#, sqrtOf2, updateDouble#, _evenInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, split, split#, sqrtOf2, updateDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 
@@ -410,7 +410,7 @@ sqrtFxSplitDbl## :: FloatingX# -> (# Double#, Int64# #)
 sqrtFxSplitDbl## (FloatingX# d# e#)
   -- \| isTrue# (d# ==## 0.00##) = case minBound :: Int64 of I64# mb# -> (# 0.0##, mb# #)
   | yesEven = (# sqrtDouble# d#, quo64# #) -- even
-  -- | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, quo64# #) -- odd sqrt2 times sqrt d#
+  -- \| otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, quo64# #) -- odd sqrt2 times sqrt d#
   | otherwise = (# sqrtDouble# 2.0## *## d#, quo64# #) -- odd sqrt2 times sqrt d# ---//FIXME what's he right thing to do here
   where
     !(# yesEven, quo64# #) = _evenInt64# e#
@@ -511,4 +511,3 @@ unsafeword64ToFx# i = double2Fx# (fromIntegral i)
 {-# INLINE unsafeword64ToFloatingX## #-}
 unsafeword64ToFloatingX## :: Word64# -> FloatingX#
 unsafeword64ToFloatingX## w# = case W64# w# of i -> unsafeword64ToFx# i
-

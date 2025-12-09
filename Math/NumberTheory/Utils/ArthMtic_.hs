@@ -46,7 +46,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     word64FromRvsrdTuple#,
     quotremradixW32,
     quotrem1,
-    word64FromWordRvsrdTuple##
+    word64FromWordRvsrdTuple##,
   )
 where
 
@@ -61,8 +61,8 @@ import GHC.Exts
     Int64#,
     Word (..),
     Word#,
-    Word64#,
     Word32#,
+    Word64#,
     and#,
     eqInt64#,
     eqWord#,
@@ -100,7 +100,7 @@ import GHC.Float (floorDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#,  bigNatLeWord#, bigNatLog2,  bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
 import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
@@ -117,7 +117,8 @@ quotremradixW32 = $$(quoteQuotRem 4294967296)
 {-# INLINE quotremradixW32 #-}
 
 quotrem1 :: Word -> (Word, Word)
-quotrem1 x = (x,0) -- $$(quoteQuotRem 1)
+quotrem1 x = (x, 0)
+-- \$$(quoteQuotRem 1)
 {-# INLINE quotrem1 #-}
 
 -- powBigNat# :: Int# -> BigNat#

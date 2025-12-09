@@ -2,9 +2,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OrPatterns #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE OrPatterns #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -24,15 +24,15 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
+import Data.List (uncons)
 import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word64ToInt64#, word64ToWord#, (+#), (+##), (/##), (<#))
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatFromWordListUnsafe, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSub, bigNatSubUnsafe, bigNatToWordList, bigNatZero#, bigNatIsZero#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatFromWordListUnsafe, bigNatIsZero#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSub, bigNatSubUnsafe, bigNatToWordList, bigNatZero#)
 import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
-import Data.List (uncons)
 
 -- *********** END NEW IMPORTS
 
@@ -60,20 +60,22 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
     goBN# :: Bool -> BigNat# -> Bool -> Itr -> Itr
     goBN# !evn !n# !firstIter !acc
-      | isTrue# (bigNatIsZero# n#) = acc 
+      | isTrue# (bigNatIsZero# n#) = acc
       | not firstIter -- these are next iterations
-        = goBN# evn zbn# False (tni (# digit1#, digit2# #) acc)
-      | otherwise -- firstIter 
-        = goBN# evn zbn# False (tfi evn (# digit1#, digit2# #))
-      where 
-        !xs = bigNatToWordList n# 
-        !(# W# limbTop64, zbn# #) = case xs of 
-           (x:ys) -> (# x, bigNatFromWordListUnsafe ys #)
-           [x] -> (# x, bigNatZero# (# #)  #) -- should not happen as we are subtracting
-           _ -> (# W# 0##, bigNatZero# (# #)  #) -- should not happen as we are subtracting
-        -- !(# W# limbTop64, zbn# #) = case uncons (bigNatToWordList n#) of 
-        --             Just (z, ys) -> (# z, bigNatFromWordListUnsafe ys #)
-        --             Nothing -> (# W# 0##, bigNatZero# (# #)  #)-- should not happen as we are subtracting
+        =
+          goBN# evn zbn# False (tni (# digit1#, digit2# #) acc)
+      | otherwise -- firstIter
+        =
+          goBN# evn zbn# False (tfi evn (# digit1#, digit2# #))
+      where
+        !xs = bigNatToWordList n#
+        !(# W# limbTop64, zbn# #) = case xs of
+          (x : ys) -> (# x, bigNatFromWordListUnsafe ys #)
+          [x] -> (# x, bigNatZero# (# #) #) -- should not happen as we are subtracting
+          _ -> (# W# 0##, bigNatZero# (# #) #) -- should not happen as we are subtracting
+          -- !(# W# limbTop64, zbn# #) = case uncons (bigNatToWordList n#) of
+          --             Just (z, ys) -> (# z, bigNatFromWordListUnsafe ys #)
+          --             Nothing -> (# W# 0##, bigNatZero# (# #)  #)-- should not happen as we are subtracting
         !(W# digit1#, W# digit2#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
     {-# INLINE goBN# #-}
 {-# INLINE newappsqrt_ #-}
