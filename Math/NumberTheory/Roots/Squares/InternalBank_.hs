@@ -25,15 +25,17 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.FastDigits 
-import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int (..), Int#, Int64#, Word (..), Word#, Word32#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, indexWordArray#, inline, int2Word#, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord32#, (+#), (+##), (-#), (/##), (<#), (<=#), (==#), timesWord#)
+import Data.Bits (finiteBitSize, Bits ((.&.)))
+import GHC.Exts (Double (..), (*#), Double#, Int (..), Int#, Int64#, Word (..), Word#, Word32#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, indexWordArray#, inline, int2Word#, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word32ToWord#, word64ToInt64#, word64ToWord#, wordToWord32#, (+#), (+##), (-#), (/##), (<#), (<=#), (==#), timesWord#, uncheckedShiftRL#)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatFromWordList, bigNatFromWordListUnsafe, bigNatIndex, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord#, bigNatToWordList, bigNatZero, bigNatZero#, bigNatSubWord#, bigNatMulWord, bigNatSubWordUnsafe#, bigNatFromAbsInt#, bigNatIsZero, bigNatFromWordList#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatFromWordList, bigNatFromWordListUnsafe, bigNatIndex, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatQuotRem#, bigNatQuotRemWord#, bigNatShiftL#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatToWord#, bigNatToWordList, bigNatZero, bigNatZero#, bigNatSubWord#, bigNatMulWord, bigNatSubWordUnsafe#, bigNatFromAbsInt#, bigNatIsZero, bigNatFromWordList#, bigNatIsZero#)
 import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
+import Numeric.QuoteQuot (quoteQuotRem)
+import Data.List (unsnoc, uncons)
 
 -- *********** END NEW IMPORTS
 
@@ -62,21 +64,63 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
     goBN# :: Bool -> BigNat# -> Bool -> Int# -> Itr -> Itr
     goBN# !evn !n# !firstIter !pow# !acc
-      | isTrue# (pow# <=# 0#) = acc
+      -- | isTrue# (pow# <=# 0#) || isTrue# (bigNatIsZero# n#) = acc -- //FIXME why testing for zero when pow is not zero would lessen failures?
+      | isTrue# (bigNatIsZero# n#) = acc -- //FIXME why testing for zero when pow is not zero would lessen failures?
       | not firstIter -- && p >= 1 = -- these are next iterations
         =
-          let !(# digit1, digit2, zbn# #) = grab2Word32BN## pow# n#
-           in goBN# evn zbn# False (pow# -# 2#) (tni (# digit1, digit2 #) acc)
+          let 
+              !(# W# limbTop64, zbn# #) = case uncons (bigNatToWordList n#) of 
+                          Just (z, ys) -> (# z, bigNatFromWordListUnsafe ys #)
+                          Nothing -> (# W# 0##, bigNatZero# (# #)  #)-- should not happen as we are subtracting
+              -- !msbIdx#  = bigNatSize# n# -# 1#                        -- index of MSB limb but n# can't be allowed to be zero here
+              -- !limbTop64 = bigNatIndex# n# msbIdx#
+              !(W# digit1_#, W# digit2_#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
+              -- !limbTopValue = bigNatFromWord# limbTop64 `bigNatMul` powBigNat# (int2Word# (msbIdx# *# 2#))
+              -- !ybn_# = bigNatSub n# limbTopValue -- remove MSB limb from n#
+              -- !zbn# = case ybn_# of 
+              --             (# | res# #) -> res#
+              --             _ -> bigNatZero# (# #)  -- should not happen as we are subtract
+            -- !(# digit1, digit2, zbn# #) = grab2Word32BN## pow# n#
+           in goBN# evn zbn# False (pow# -# 2#) (tni (# digit1_#, digit2_# #) acc)
       | firstIter && not evn =
-          let !pw# = powBigNat# (int2Word# pow#)
-              !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
-              !digit1# = wordToWord32# 0##
-              !digit2# = wordToWord32# (bigNatToWord# digit#)
-           in goBN# evn ybn# False (pow# -# 1#) (tfi False (# digit1#, digit2# #))
+          let 
+                !(# W# limbTop64, ybn# #) = case uncons (bigNatToWordList n#) of 
+                          Just (z, ys) -> (# z, bigNatFromWordListUnsafe ys #)
+                          Nothing -> (# W# 0##, bigNatZero# (# #)  #)-- should not happen as we are subtracting
+                !(W# digit1#, W# digit2#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
+              -- !msbIdx#  = bigNatSize# n# -# 1#                        -- index of MSB limb
+              -- !limbTop64 = bigNatIndex# n# msbIdx#
+              -- !digit1#   = wordToWord32# 0##
+              -- !digit2#    = wordToWord32# limbTop64         -- extract MSB limb (Word#)
+              -- !limbTopValue = bigNatFromWord# limbTop64 `bigNatMul` powBigNat# (int2Word# (msbIdx# *# 2#))
+              -- !ybn_# = bigNatSub n# limbTopValue -- remove MSB limb from n#
+              -- !ybn# = case ybn_# of 
+              --             (# | res# #) -> res#
+              --             _ -> bigNatZero# (# #)  -- should not happen as we are subtract
+              -- !pw# = powBigNat# (int2Word# pow#)
+              -- !(# digit#, ybn# #) = n# `bigNatQuotRem#` pw#
+              -- !digit1# = wordToWord32# 0##
+              -- !digit2# = wordToWord32# (bigNatToWord# digit#)
+           in goBN# evn ybn# False (pow# -# 1#) (tfi False (# wordToWord32# 0##, wordToWord32# digit2# #)) -- //FIXME pow - 1 correct?
       | otherwise -- firstIter && evn =
         =
-          let !(# digit1, digit2, zbn# #) = grab2Word32BN## pow# n#
-           in goBN# evn zbn# False (pow# -# 2#) (tfi True (# digit1, digit2 #))
+          let 
+                !(# W# limbTop64, ybn# #) = case uncons (bigNatToWordList n#) of 
+                          Just (z, ys) -> (# z, bigNatFromWordListUnsafe ys #)
+                          Nothing -> (# W# 0##, bigNatZero# (# #)  #)-- should not happen as we are subtracting
+                !(W# digit1#, W# digit2#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
+              -- !msbIdx#  = bigNatSize# n# -# 1#                        -- index of MSB limb
+              -- !limbTop64 = bigNatIndex# n# msbIdx#
+              -- !(W# digit1_#, W# digit2_#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
+              -- !digit1   = wordToWord32# digit1_#
+              -- !digit2    = wordToWord32# digit2_#         -- extract MSB limb (Word#)
+              -- !limbTopValue = bigNatFromWord# limbTop64 `bigNatMul` powBigNat# (int2Word# (msbIdx# *# 2#))
+              -- !ybn_# = bigNatSub n# limbTopValue -- remove MSB limb from n#
+              -- !zbn# = case ybn_# of 
+              --             (# | res# #) -> res#
+              --             _ -> bigNatZero# (# #)  -- should not happen as we are subtract
+              -- !(# digit1, digit2, zbn# #) = grab2Word32BN## pow# n#
+           in goBN# evn ybn# False (pow# -# 2#) (tfi True (# wordToWord32# digit1#, wordToWord32# digit2# #))
     {-# INLINE goBN# #-}
     -- \| Iteration loop data
     grab2Word32BN## :: Int# -> BigNat# -> (# Word32#, Word32#, BigNat# #) -- a more efficient version for Int = 1
@@ -101,17 +145,17 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
               !(W# digit2#, W# z#) = quotrem1 (W# yw#) -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRemWord#` power2#
            in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# digit2#, bigNatFromWord# z# #)
       | otherwise =
-          let -- !predpow# = pow# -# 1#
-              -- !power2# = powBigNat# (int2Word# predpow#) -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
-              -- !power1# = bigNatShiftL# power2# 32## -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
-              -- !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
-              -- !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
-              !(# lsb_#, msb_#, zbn_# #) = peelMSBLimb## pow# n#
-           in --  in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
-              (# msb_#, lsb_#, zbn_# #)
+          let 
+              !predpow# = pow# -# 1#
+              !power2# = powBigNat# (int2Word# predpow#) -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
+              !power1# = bigNatShiftL# power2# 32## -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
+              !(# digit1#, ybn# #) = n# `bigNatQuotRem#` power1#
+              !(# digit2#, zbn# #) = ybn# `bigNatQuotRem#` power2#
+           in (# wordToWord32# (bigNatToWord# digit1#), wordToWord32# (bigNatToWord# digit2#), zbn# #)
       where
+        !sz# = bigNatSize# n#
         !eq2# = isTrue# (pow# ==# 2#) -- do this eagerly, is the first guard, will always hit it
-        szEq1# = isTrue# (bigNatSize# n# ==# 1#) -- dont be eager here (no bang) - may never need to be evaluated
+        szEq1# = isTrue# (sz# ==# 1#) -- dont be eager here (no bang) - may never need to be evaluated
         le1# = isTrue# (pow# <=# 1#) -- dont be eager here (no bang) - may never need to be evaluated
         leq2# = eq2# || le1# -- dont be eager here (no bang) - may never need to be evaluated
     {-# INLINE grab2Word32BN## #-}
@@ -119,34 +163,6 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
     -- decompose it into two Word32 values (lsb, msb via quotremradixW32),
     -- and return both Word32s plus the residual BigNat# (all limbs below the MSB).
     --
-
-peelMSBLimb## :: Int# -> BigNat# -> (# Word32#, Word32#, BigNat# #)
-peelMSBLimb## pow# !n# 
- | bigNatIsZero n# = (# 0#Word32, 0#Word32, bigNatZero# (# #) #) 
- | otherwise =
-  let 
-      -- !sz#      = bigNatSize# n#                  -- number of 64-bit limbs
-      -- !msbIdx#  = sz# -# 1#                        -- index of MSB limb
-      -- !msbW#    = bigNatIndex# n# msbIdx#         -- extract MSB limb (Word#)
-      -- ![W# lsb#, W# msb#] = case digitsUnsigned radixW32 (fromIntegral (W# msbW#)*(2^64)^I# msbIdx#) of 
-      --                       [l, m] -> [l, m]
-      --                       [x]    -> [x,0]
-      --                       _      -> error "peelMSBLimb##: impossible!"
-      -- !residual# = bigNatSubUnsafe n# $ naturalToBigNat# (fromIntegral (W# msbW#) * (2^64)^I# msbIdx#) -- remove MSB limb from n#                      
-  --  in (# wordToWord32# lsb#, wordToWord32# msb#, residual# #)
-      !predpow# = pow# -# 1#
-      !power2# = powBigNat# (int2Word# predpow#) -- let ![power1, power2] = scanr1 (*) [radixW32, radixW32 ^ (pow - 1)]
-      !power1# = bigNatShiftL# power2# 32## -- let ![power1, power2] = let !x  = radixW32 ^ (pow - 1) in [naturalShiftL x 32, x]
-      !(# msb#, ybn# #) = n# `bigNatQuotRem#` power1#
-      !(# lsb#, zbn# #) = ybn# `bigNatQuotRem#` power2#
-      !residual# = case bigNatToWordList n# of
-                   [];[_] -> bigNatZero# (# #) 
-                   (x:xs) -> bigNatFromWordListUnsafe xs  
-   in (# wordToWord32# (bigNatToWord# lsb#), wordToWord32# (bigNatToWord# msb#), zbn# #)
-  where
-    wordsz :: Int
-    wordsz = finiteBitSize (0 :: Word)
-{-# INLINE peelMSBLimb## #-}
 {-# INLINE newappsqrt_ #-}
 
 tfi :: Bool -> (# Word32#, Word32# #) -> Itr
@@ -194,8 +210,8 @@ tfi evenLen (# m#, l# #) =
 -- {-# INLINE fixRemainder# #-}
 
 {-# INLINE tni #-}
-tni :: (# Word32#, Word32# #) -> Itr -> Itr
-tni (# word32ToWord# -> i1, word32ToWord# -> i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
+tni :: (# Word#, Word# #) -> Itr -> Itr
+tni (# i1, i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
   let !(# x1, x2 #) = i1 `timesWord2#` radixW32w#
       !x = bigNatFromWord2# x1 x2
       !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2
