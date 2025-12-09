@@ -46,6 +46,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     word64FromRvsrdTuple#,
     quotremradixW32,
     quotrem1,
+    word64FromWordRvsrdTuple##
   )
 where
 
@@ -198,6 +199,15 @@ word64FromRvsrdTuple# (0, 0) _ = 0#Word64
 word64FromRvsrdTuple# (0, W32# lMSB#) base# = wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#
 word64FromRvsrdTuple# (W32# lLSB#, 0) _ = wordToWord64# (word32ToWord# lLSB#)
 word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#) `plusWord64#` wordToWord64# (word32ToWord# lLSB#)
+
+{-# INLINE word64FromWordRvsrdTuple## #-}
+
+-- | Word64# from a "reversed" tuple of Word32 digits
+word64FromWordRvsrdTuple## :: (# Word#, Word# #) -> Word64# -> Word64#
+word64FromWordRvsrdTuple## (# 0##, 0## #) _ = 0#Word64
+word64FromWordRvsrdTuple## (# 0##, lMSB# #) base# = wordToWord64# lMSB# `timesWord64#` base#
+word64FromWordRvsrdTuple## (# lLSB#, 0## #) _ = wordToWord64# lLSB#
+word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) base# = (wordToWord64# lMSB# `timesWord64#` base#) `plusWord64#` wordToWord64# lLSB#
 
 {-# INLINE doubleFromRvsrdTuple #-}
 
