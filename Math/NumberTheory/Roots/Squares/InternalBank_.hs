@@ -33,6 +33,7 @@ import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
+import Control.Applicative (Alternative(empty))
 
 -- *********** END NEW IMPORTS
 
@@ -55,7 +56,8 @@ newappsqrt_ l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# --
       | otherwise = r
       where
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
-newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+-- newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBNWList eY (bigNatToWordList nbn#) True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
   where
     -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
     goBN# :: Bool -> BigNat# -> Bool -> Itr -> Itr
@@ -78,6 +80,22 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBN# eY nbn# True
           --             Nothing -> (# W# 0##, bigNatZero# (# #)  #)-- should not happen as we are subtracting
         !(W# digit1#, W# digit2#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
     {-# INLINE goBN# #-}
+    goBNWList :: Bool -> [Word] -> Bool -> Itr -> Itr
+    goBNWList !evn !nxs !firstIter !acc
+      | null nxs = acc
+      | not firstIter -- these are next iterations
+        =
+          goBNWList evn zxs False (tni (# digit1#, digit2# #) acc)
+      | otherwise -- firstIter
+        =
+          goBNWList evn zxs False (tfi evn (# digit1#, digit2# #))
+      where
+        !(W# limbTop64, zxs) = case nxs of
+          (x : ys) -> (x, ys )
+          [x] -> (x, empty) -- should not happen as we are subtracting
+          _ -> (W# 0##, empty) -- should not happen as we are subtracting
+        !(W# digit1#, W# digit2#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
+    {-# INLINE goBNWList #-}
 {-# INLINE newappsqrt_ #-}
 
 tfi :: Bool -> (# Word#, Word# #) -> Itr
