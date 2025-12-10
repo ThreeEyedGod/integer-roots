@@ -90,11 +90,10 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBNWList eY (bigN
         =
           goBNWList evn zxs False (tfi evn (# digit1#, digit2# #))
       where
-        !(W# limbTop64, zxs) = case nxs of
-          (x : ys) -> (x, ys )
-          [x] -> (x, empty) -- should not happen as we are subtracting
-          _ -> (W# 0##, empty) -- should not happen as we are subtracting
-        !(W# digit1#, W# digit2#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
+        !(limbTop64, zxs) = case nxs of
+          (x : ys) -> (x, ys) -- ys could come back empty that's ok
+          _ -> (W# 0##, empty) -- catch all
+        !(W# digit1#, W# digit2#) = quotremradixW32 limbTop64 -- extract MSB limb (Word#)
     {-# INLINE goBNWList #-}
 {-# INLINE newappsqrt_ #-}
 
