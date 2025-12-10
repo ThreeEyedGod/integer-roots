@@ -80,21 +80,14 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBNWList eY (bigN
           --             Nothing -> (# W# 0##, bigNatZero# (# #)  #)-- should not happen as we are subtracting
         !(W# digit1#, W# digit2#) = quotremradixW32 (W# limbTop64) -- extract MSB limb (Word#)
     {-# INLINE goBN# #-}
-    goBNWList :: Bool -> [Word] -> Bool -> Itr -> Itr
-    goBNWList !evn !nxs !firstIter !acc
-      | null nxs = acc
-      | not firstIter -- these are next iterations
-        =
-          goBNWList evn zxs False (tni (# digit1#, digit2# #) acc)
-      | otherwise -- firstIter
-        =
-          goBNWList evn zxs False (tfi evn (# digit1#, digit2# #))
-      where
-        !(limbTop64, zxs) = case nxs of
-          (x : ys) -> (x, ys) -- ys could come back empty that's ok
-          _ -> (W# 0##, empty) -- catch all
-        !(W# digit1#, W# digit2#) = quotremradixW32 limbTop64 -- extract MSB limb (Word#)
-    {-# INLINE goBNWList #-}
+goBNWList :: Bool -> [Word] -> Bool -> Itr -> Itr
+goBNWList !evn [] !firstIter !acc = acc
+goBNWList !evn (limbTop64 : zxs) !firstIter !acc
+  | not firstIter = goBNWList evn zxs False (tni (# digit1#, digit2# #) acc)
+  | otherwise = goBNWList evn zxs False (tfi evn (# digit1#, digit2# #))
+  where
+    !(W# digit1#, W# digit2#) = quotremradixW32 limbTop64
+{-# INLINE goBNWList #-}
 {-# INLINE newappsqrt_ #-}
 
 tfi :: Bool -> (# Word#, Word# #) -> Itr
