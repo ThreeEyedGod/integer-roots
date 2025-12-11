@@ -24,7 +24,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#), quotRemWord#)
+import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotRemWord#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#))
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSize#, bigNatSub, bigNatSubUnsafe)
@@ -63,12 +63,12 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) =
     goBNWList !_ _ 0# !_ !acc = acc -- exit when no limbs left
     goBNWList !evn !bn# !sz# !firstIter !acc =
       let !idx# = sz# -# 1#
-          !w# = bigNatIndex# bn# idx# -- Word# for the limb (bigNat is little-endian)
-          !(# msb#, lsb# #) = w# `quotRemWord#` 4294967296#Word -- quotremradixW32 limbTop64
+          !w# = bigNatIndex# bn# idx# -- Word# for the limb (bigNat is little-endian, 64-bit)
+          !msbLsbTple = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
           !nextSz# = idx#
-       in if firstIter
-            then goBNWList evn bn# nextSz# False (tfi evn (# msb#, lsb# #))
-            else goBNWList evn bn# nextSz# False (tni (# msb#, lsb# #) acc)
+       in if not firstIter
+            then goBNWList evn bn# nextSz# False (tni msbLsbTple acc)
+            else goBNWList evn bn# nextSz# False (tfi evn msbLsbTple)
     {-# INLINE goBNWList #-}
 {-# INLINE newappsqrt_ #-}
 

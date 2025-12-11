@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -61,7 +60,6 @@ import GHC.Exts
     Int64#,
     Word (..),
     Word#,
-    Word32#,
     Word64#,
     and#,
     eqInt64#,
@@ -100,26 +98,15 @@ import GHC.Float (floorDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatSizeInBase# , bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#, bigNatSizeInBase#)
 import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
--- import Numeric.QuoteQuot (quoteQuotRem)
 import Prelude hiding (pred)
 
 -- *********** END NEW IMPORTS
 
 -- | HELPER functions
-
--- -- Equivalent to (`quot` radixw32).
--- quotremradixW32 :: Word -> (Word, Word)
--- quotremradixW32 = $$(quoteQuotRem 4294967296)
--- {-# INLINE quotremradixW32 #-}
-
--- quotrem1 :: Word -> (Word, Word)
--- quotrem1 x = (x, 0)
--- -- \$$(quoteQuotRem 1)
--- {-# INLINE quotrem1 #-}
 
 -- powBigNat# :: Int# -> BigNat#
 -- Compute radixW32 ^ p as a BigNat# by shifting 1 << (32 * p)
@@ -347,6 +334,10 @@ double x = x `unsafeShiftL` 1
 {-# SPECIALIZE lenRadixW32 :: Natural -> Int #-}
 lenRadixW32 :: (Integral a) => a -> Int
 lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1 -- //FIXME SEE IF BIGNATSIZEINBASE# WORKS HERE
+-- lenRadixW32 n = let 
+--    !(W# radixW32#) = radixW32
+--    !(BN# bn#) =  fromIntegral n
+--   in I# $ word2Int# (bigNatSizeInBase# radixW32# bn#) -- //FIXME SEE IF BIGNATSIZEINBASE# WORKS HERE
 {-# INLINEABLE lenRadixW32 #-}
 
 -- //FIXME floor seems to trigger off missing specialization and also properFractionDouble.
