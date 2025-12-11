@@ -2,7 +2,7 @@
   "files.autoSave": "afterDelay",
   "files.autoSaveDelay": 500,
 
-  "editor.hover.enabled": true,
+  "editor.hover.enabled": "on",
   "editor.formatOnSave": true,
 
   "haskell.manageHLS": "PATH",
@@ -19,6 +19,6 @@
   "[haskell]": {
     "editor.defaultFormatter": "sjurmillidahl.ormolu-vscode",
     "editor.formatOnSave": true,
-    "editor.hover.enabled": true
+    "editor.hover.enabled": "on"
   }
 }

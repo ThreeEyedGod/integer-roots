@@ -164,9 +164,9 @@ tni (# i1, i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## bn# tcfx#
-  | isTrue# (ln# `gtWord#` threshW#) = let !(# w#, fx# #) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) in (# w#, fx# #) -- note the gtWord
+  | isTrue# (ln# `gtWord#` threshW#) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) -- note the gtWord
   | itsZero = (# 0#Word64, zeroFx# #)
-  | otherwise = let !w# = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx# in (# w#, zeroFx# #) -- only 8 cases land here in tests
+  | otherwise = (# inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#, zeroFx# #) -- only 8 cases land here in tests
   where
     !ln# = bigNatLog2# bn#
     itsZero = isTrue# (ln# `eqWord#` 0##) -- lets this be lazy
