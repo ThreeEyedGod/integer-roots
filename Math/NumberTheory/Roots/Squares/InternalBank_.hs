@@ -24,10 +24,10 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word64ToInt64#, word64ToWord#, (+#), (+##), (/##), (<#))
+import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#))
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSub, bigNatSubUnsafe, bigNatToWordList)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSize#, bigNatSub, bigNatSubUnsafe)
 import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
@@ -54,17 +54,23 @@ newappsqrt_ l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# --
       | otherwise = r
       where
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
-newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = NatJ# (BN# $ yaccbn $ goBNWList eY (bigNatToWordList nbn#) True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+newappsqrt_ l eY n@(NatJ# (BN# nbn#)) =
+  NatJ# (BN# $ yaccbn $ goBNWList eY nbn# (bigNatSize# nbn#) True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
   where
-    -- Extract digits from most significant to least significant and process them as they emerge 2 at a time in nextIterations
-  goBNWList :: Bool -> [Word] -> Bool -> Itr -> Itr
-  goBNWList !evn [] !firstIter !acc = acc -- exit 
-  goBNWList !evn (limbTop64 : zxs) !firstIter !acc
-    | not firstIter = goBNWList evn zxs False (tni (# msb#, lsb# #) acc) -- next iterations
-    | otherwise = goBNWList evn zxs False (tfi evn (# msb#, lsb# #)) -- first iteration
-    where
-      !(W# msb#, W# lsb#) = quotremradixW32 limbTop64
-  {-# INLINE goBNWList #-}
+    -- Iterate BigNat# limbs from most-significant to least-significant
+    -- Params: even-flag, BigNat#, remaining-size (Int#), isFirstIter, accumulator
+    goBNWList :: Bool -> BigNat# -> Int# -> Bool -> Itr -> Itr
+    goBNWList !_ _ 0# !_ !acc = acc -- exit when no limbs left
+    goBNWList !evn !bn# !sz# !firstIter !acc =
+      let !idx# = sz# -# 1#
+          !w# = bigNatIndex# bn# idx# -- Word# for the limb (bigNat is little-endian)
+          !limbTop64 = W# w#
+          !(W# msb#, W# lsb#) = quotremradixW32 limbTop64
+          !nextSz# = idx#
+       in if firstIter
+            then goBNWList evn bn# nextSz# False (tfi evn (# msb#, lsb# #))
+            else goBNWList evn bn# nextSz# False (tni (# msb#, lsb# #) acc)
+    {-# INLINE goBNWList #-}
 {-# INLINE newappsqrt_ #-}
 
 tfi :: Bool -> (# Word#, Word# #) -> Itr
@@ -160,7 +166,7 @@ tni (# i1, i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## bn# tcfx#
-  | isTrue# (ln# `gtWord#` threshW#) = let !(# w#, fx# #) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) in (# w#, fx# #) -- note the gtWord 
+  | isTrue# (ln# `gtWord#` threshW#) = let !(# w#, fx# #) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) in (# w#, fx# #) -- note the gtWord
   | itsZero = (# 0#Word64, zeroFx# #)
   | otherwise = let !w# = inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx# in (# w#, zeroFx# #) -- only 8 cases land here in tests
   where

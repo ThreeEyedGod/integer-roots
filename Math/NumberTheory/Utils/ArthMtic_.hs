@@ -346,7 +346,7 @@ double x = x `unsafeShiftL` 1
 {-# SPECIALIZE lenRadixW32 :: Word64 -> Int #-}
 {-# SPECIALIZE lenRadixW32 :: Natural -> Int #-}
 lenRadixW32 :: (Integral a) => a -> Int
-lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1
+lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1 -- //FIXME SEE IF BIGNATSIZEINBASE# WORKS HERE
 {-# INLINEABLE lenRadixW32 #-}
 
 -- //FIXME floor seems to trigger off missing specialization and also properFractionDouble.
