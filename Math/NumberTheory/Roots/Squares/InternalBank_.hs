@@ -64,11 +64,10 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) =
     goBNWList !evn !bn# !sz# !firstIter !acc =
       let !idx# = sz# -# 1#
           !w# = bigNatIndex# bn# idx# -- Word# for the limb (bigNat is little-endian, 64-bit)
-          !msbLsbTple = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
-          !nextSz# = idx#
+          !msbLsbPair = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
        in if not firstIter
-            then goBNWList evn bn# nextSz# False (tni msbLsbTple acc)
-            else goBNWList evn bn# nextSz# False (tfi evn msbLsbTple)
+            then goBNWList evn bn# idx# False (tni msbLsbPair acc)
+            else goBNWList evn bn# idx# False (tfi evn msbLsbPair)
     {-# INLINE goBNWList #-}
 {-# INLINE newappsqrt_ #-}
 
