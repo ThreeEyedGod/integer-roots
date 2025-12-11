@@ -24,7 +24,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#))
+import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#), quotRemWord#)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSize#, bigNatSub, bigNatSubUnsafe)
@@ -64,8 +64,7 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) =
     goBNWList !evn !bn# !sz# !firstIter !acc =
       let !idx# = sz# -# 1#
           !w# = bigNatIndex# bn# idx# -- Word# for the limb (bigNat is little-endian)
-          !limbTop64 = W# w#
-          !(W# msb#, W# lsb#) = quotremradixW32 limbTop64
+          !(# msb#, lsb# #) = w# `quotRemWord#` 4294967296#Word -- quotremradixW32 limbTop64
           !nextSz# = idx#
        in if firstIter
             then goBNWList evn bn# nextSz# False (tfi evn (# msb#, lsb# #))

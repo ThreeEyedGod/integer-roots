@@ -25,7 +25,7 @@ library
   build-depends:
     base >=4.9 && <5
    ,ghc-prim >= 0.13.0
-   ,quote-quot >= 0.2.1.0
+  --  ,quote-quot >= 0.2.1.0
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
   else

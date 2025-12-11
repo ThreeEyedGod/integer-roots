@@ -44,8 +44,8 @@ module Math.NumberTheory.Utils.ArthMtic_
     radixW32Squared,
     bnConst#,
     word64FromRvsrdTuple#,
-    quotremradixW32,
-    quotrem1,
+    -- quotremradixW32,
+    -- quotrem1,
     word64FromWordRvsrdTuple##,
   )
 where
@@ -104,22 +104,22 @@ import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, 
 import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
-import Numeric.QuoteQuot (quoteQuotRem)
+-- import Numeric.QuoteQuot (quoteQuotRem)
 import Prelude hiding (pred)
 
 -- *********** END NEW IMPORTS
 
 -- | HELPER functions
 
--- Equivalent to (`quot` radixw32).
-quotremradixW32 :: Word -> (Word, Word)
-quotremradixW32 = $$(quoteQuotRem 4294967296)
-{-# INLINE quotremradixW32 #-}
+-- -- Equivalent to (`quot` radixw32).
+-- quotremradixW32 :: Word -> (Word, Word)
+-- quotremradixW32 = $$(quoteQuotRem 4294967296)
+-- {-# INLINE quotremradixW32 #-}
 
-quotrem1 :: Word -> (Word, Word)
-quotrem1 x = (x, 0)
--- \$$(quoteQuotRem 1)
-{-# INLINE quotrem1 #-}
+-- quotrem1 :: Word -> (Word, Word)
+-- quotrem1 x = (x, 0)
+-- -- \$$(quoteQuotRem 1)
+-- {-# INLINE quotrem1 #-}
 
 -- powBigNat# :: Int# -> BigNat#
 -- Compute radixW32 ^ p as a BigNat# by shifting 1 << (32 * p)
