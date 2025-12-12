@@ -56,7 +56,7 @@ import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, split, split#, sqrtOf2, updateDouble#, _evenInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, split, split#, sqrtOf2, upLiftDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 
@@ -155,7 +155,7 @@ unsafeDivFx n@(FloatingX s1 e1) d@(FloatingX s2 e2) =
 fsqraddFloatingX :: FloatingX -> FloatingX -> FloatingX
 fsqraddFloatingX (FloatingX (D# sA#) expA) (FloatingX (D# sC#) expC)
   | diff == 0 = FloatingX (D# (fmaddDouble# sA# sA# sC#)) expC
-  | otherwise = case updateDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX (D# (fmaddDouble# sA# sA# sC_#)) twoTimesExpA -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+  | otherwise = case upLiftDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX (D# (fmaddDouble# sA# sA# sC_#)) twoTimesExpA -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
   where
     !twoTimesExpA = 2 * expA
     !diff@(I64# diff#) = expC - twoTimesExpA
@@ -343,7 +343,7 @@ unsafestDivFx# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#) = FloatingX# (s1# /
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fsqraddFloatingX# (FloatingX# sA# expA#) (FloatingX# sC# expC#)
   | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
-  | otherwise = case updateDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+  | otherwise = case upLiftDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
   where
     !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
     !diff# = expC# `subInt64#` twoTimesExpA#

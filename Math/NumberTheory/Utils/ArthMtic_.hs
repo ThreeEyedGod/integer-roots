@@ -21,7 +21,7 @@ module Math.NumberTheory.Utils.ArthMtic_
   ( powBigNat#,
     _evenInt64#,
     _oddInt64#,
-    updateDouble#,
+    upLiftDouble#,
     split,
     split#,
     fromInt64,
@@ -238,9 +238,9 @@ fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
 {-# INLINE fromInt64 #-}
 
-{-# INLINE updateDouble# #-}
-updateDouble# :: Double# -> Int# -> Double#
-updateDouble# d# ex# = case decodeDoubleInteger d# of (# !m, !n# #) -> encodeDoubleInteger m (n# +# ex#)
+{-# INLINE upLiftDouble# #-}
+upLiftDouble# :: Double# -> Int# -> Double#
+upLiftDouble# d# ex# = case decodeDoubleInteger d# of (# !m, !n# #) -> encodeDoubleInteger m (n# +# ex#)
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
