@@ -24,7 +24,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotRemWord#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#))
+import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#))
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSize#, bigNatSub, bigNatSubUnsafe)
@@ -43,17 +43,17 @@ import Math.NumberTheory.Utils.FloatingX_
 data Itr = Itr {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check
+newappsqrt_ !l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check
   where
     isqrtWord :: Word -> Word
-    isqrtWord n
-      | n < (r * r)
+    isqrtWord x
+      | x < (r * r)
           -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
           || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
           r - 1
       | otherwise = r
       where
-        !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
+        !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
 newappsqrt_ l eY n@(NatJ# (BN# nbn#)) =
   NatJ# (BN# $ yaccbn $ goBNWList eY nbn# (bigNatSize# nbn#) True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
   where
@@ -72,7 +72,7 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) =
 {-# INLINE newappsqrt_ #-}
 
 tfi :: Bool -> (# Word#, Word# #) -> Itr
-tfi evenLen (# m#, l# #) =
+tfi !evenLen (# m#, l# #) =
   let !i# = word64FromWordRvsrdTuple## (# l#, m# #) 4294967296#Word64
       !(# yVal, yWord#, rm #) = rmdrFn i#
    in Itr 1# yVal rm (unsafeword64ToFloatingX## yWord#)
@@ -80,14 +80,14 @@ tfi evenLen (# m#, l# #) =
     !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-    evenFirstRmdrBN# w# =
+    evenFirstRmdrBN# !w# =
       let yT64# = largestNSqLTE## w#
           ysq# = yT64# `timesWord64#` yT64#
           diff# = word64ToInt64# w# `subInt64#` word64ToInt64# ysq#
        in handleFirstRemBN## (# yT64#, diff# #) -- set 0 for starting cumulative yc--fstDgtRem i
       -- {-# INLINE evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-    oddFirstRmdrBN# w# =
+    oddFirstRmdrBN# !w# =
       let yT64# = largestNSqLTE## w#
           ysq# = yT64# `timesWord64#` yT64#
           remIntegerW# = w# `subWord64#` ysq# -- no chance this will be negative
@@ -139,7 +139,7 @@ tni (# i1, i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
     {-# INLINE yTildeFinalFx## #-}
 
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
-    rmdrDgt ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
+    rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
       let !sbtnd# = subtrahend# ycScaledbn# yTilde#
           !resTrial = ta# `bigNatSub` sbtnd#
           !ytrdr = case resTrial of
@@ -156,30 +156,29 @@ tni (# i1, i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
     {-# INLINE rmdrDgt #-}
 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
-    subtrahend# yScaled# yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde# of
+    subtrahend# !yScaled# !yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde# of
       r1# -> r1# `bigNatMulWord#` wyTilde#
       where
         !wyTilde# = word64ToWord# yTilde#
     {-# INLINE subtrahend# #-}
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
-nxtDgtNatW64## bn# tcfx#
+nxtDgtNatW64## !bn# !tcfx#
   | isTrue# (ln# `gtWord#` threshW#) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) -- note the gtWord
   | itsZero = (# 0#Word64, zeroFx# #)
   | otherwise = (# inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#, zeroFx# #) -- only 8 cases land here in tests
   where
     !ln# = bigNatLog2# bn#
     itsZero = isTrue# (ln# `eqWord#` 0##) -- lets this be lazy
-    threshW# :: Word#
     !threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 {-# INLINE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
-nxtDgtDoubleFxW64## pa# tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
+nxtDgtDoubleFxW64## !pa# !tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
 {-# INLINE nxtDgtDoubleFxW64## #-}
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
-preComput ax# tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDouble# c# c# ax# #)
+preComput !ax# !tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDouble# c# c# ax# #)
 {-# INLINE preComput #-}
 
 {-# INLINE computDoubleW64# #-}
@@ -187,11 +186,11 @@ computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
 computDoubleW64# !tAFX# !tCFX# !radFX# = case floor (D# (coreD# tAFX# tCFX# radFX#)) of (W64# w#) -> w#
 
 coreD# :: Double# -> Double# -> Double# -> Double#
-coreD# da# dc# dr# = da# /## (sqrtDouble# dr# +## dc#)
+coreD# !da# !dc# !dr# = da# /## (sqrtDouble# dr# +## dc#)
 {-# INLINE coreD# #-}
 
 preComputFx## :: BigNat# -> Word# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
-preComputFx## tA__bn# lgn# tCFX# = case unsafeGtWordbn2Fx## tA__bn# lgn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+preComputFx## !tA__bn# !lgn# !tCFX# = case unsafeGtWordbn2Fx## tA__bn# lgn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
 {-# INLINE preComputFx## #-}
 
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> (# Word64#, FloatingX# #)

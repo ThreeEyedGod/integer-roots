@@ -1,21 +1,17 @@
 {
   "files.autoSave": "afterDelay",
   "files.autoSaveDelay": 500,
-
   "editor.hover.enabled": "on",
   "editor.formatOnSave": true,
-
-  "haskell.manageHLS": "PATH",
-  "haskell.ghcupExecutablePath": "/Users/mandeburung/.ghcup/bin/ghcup",
-  "haskell.serverExecutablePath": "/Users/mandeburung/.ghcup/hls/2.11.0.0/bin/haskell-language-server-wrapper",
+  "haskell.manageHLS": "GHCup",
+  "haskell.ghcupExecutablePath": "/Users/mandeburung/.ghcup/hls/2.12.0.0/lib/haskell-language-server-2.12.0.0/bin/haskell-language-server-wrapper",
+  "haskell.serverExecutablePath": "/Users/mandeburung/.ghcup/hls/2.12.0.0/bin/haskell-language-server-wrapper",
   "haskell.trace.server": "verbose",
-
   "haskell.formattingProvider": "ormolu",
   "ormolu.path": "/opt/homebrew/bin/ormolu",
   "ormolu.args": [
     "--no-cabal"
   ],
-
   "[haskell]": {
     "editor.defaultFormatter": "sjurmillidahl.ormolu-vscode",
     "editor.formatOnSave": true,
