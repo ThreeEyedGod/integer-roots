@@ -43,7 +43,7 @@ import Math.NumberTheory.Utils.FloatingX_
 data Itr = Itr {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ !l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check
+newappsqrt_ !l _ !n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check
   where
     isqrtWord :: Word -> Word
     isqrtWord x
@@ -54,21 +54,21 @@ newappsqrt_ !l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -
       | otherwise = r
       where
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
-newappsqrt_ l eY n@(NatJ# (BN# nbn#)) =
-  NatJ# (BN# $ yaccbn $ goBNWList eY nbn# (bigNatSize# nbn#) True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word package
+  NatJ# (BN# $ yaccbn $ go eY nbn# (bigNatSize# nbn#) True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
   where
     -- Iterate BigNat# limbs from most-significant to least-significant
     -- Params: even-flag, BigNat#, remaining-size (Int#), isFirstIter, accumulator
-    goBNWList :: Bool -> BigNat# -> Int# -> Bool -> Itr -> Itr
-    goBNWList !_ _ 0# !_ !acc = acc -- exit when no limbs left
-    goBNWList !evn !bn# !sz# !firstIter !acc =
+    go :: Bool -> BigNat# -> Int# -> Bool -> Itr -> Itr
+    go !_ _ 0# !_ !acc = acc -- exit when no limbs left
+    go !evn !bn# !sz# !firstIter !acc =
       let !idx# = sz# -# 1#
           !w# = bigNatIndex# bn# idx# -- Word# for the limb (bigNat is little-endian, 64-bit)
           !msbLsbPair = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
        in if not firstIter
-            then goBNWList evn bn# idx# False (tni msbLsbPair acc)
-            else goBNWList evn bn# idx# False (tfi evn msbLsbPair)
-    {-# INLINE goBNWList #-}
+            then go evn bn# idx# False (tni msbLsbPair acc)
+            else go evn bn# idx# False (tfi evn msbLsbPair)
+    {-# INLINE go #-}
 {-# INLINE newappsqrt_ #-}
 
 tfi :: Bool -> (# Word#, Word# #) -> Itr
