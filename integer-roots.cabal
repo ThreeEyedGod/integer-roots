@@ -48,6 +48,7 @@ library
     Math.NumberTheory.Utils.FloatingX_
     Math.NumberTheory.Utils.ArthMtic_
   default-language: Haskell2010
+  -- default-extensions: StrictData or use ! and ~ manually
   ghc-options:  -Wall 
                -Widentities 
                -Wcompat 

@@ -60,7 +60,7 @@ newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word packag
     -- Iterate BigNat# limbs from most-significant to least-significant
     -- Params: even-flag, BigNat#, remaining-size (Int#), isFirstIter, accumulator
     go :: Bool -> BigNat# -> Int# -> Bool -> Itr -> Itr
-    go !_ _ 0# !_ !acc = acc -- exit when no limbs left
+    go !_ !_ 0# !_ !acc = acc -- exit when no limbs left
     go !evn !bn# !sz# !firstIter !acc =
       let !idx# = sz# -# 1#
           !w# = bigNatIndex# bn# idx# -- Word# for the limb (bigNat is little-endian, 64-bit)
