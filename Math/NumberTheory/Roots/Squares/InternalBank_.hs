@@ -134,9 +134,9 @@ tni (# i1, i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
     !(W# radixW32w#) = radixW32
 
     yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
-    yTildeFinalFx## (# w#, fx# #) = case fx# == zeroFx# of
+    yTildeFinalFx## (# !w#, !fx# #) = case fx# == zeroFx# of
       True -> if isTrue# (w# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w#
-      _ -> fx#
+      !_ -> fx#
     {-# INLINE yTildeFinalFx## #-}
 
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
@@ -158,7 +158,7 @@ tni (# i1, i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
     subtrahend# !yScaled# !yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde# of
-      r1# -> r1# `bigNatMulWord#` wyTilde#
+      !r1# -> r1# `bigNatMulWord#` wyTilde#
       where
         !wyTilde# = word64ToWord# yTilde#
     {-# INLINE subtrahend# #-}
