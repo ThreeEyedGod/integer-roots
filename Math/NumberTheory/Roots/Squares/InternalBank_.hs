@@ -24,7 +24,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#))
+import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#), Int (I#), (*#), quotInt#)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSize#, bigNatSub, bigNatSubUnsafe)
@@ -43,7 +43,7 @@ import Math.NumberTheory.Utils.FloatingX_
 data Itr = Itr {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
 newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ !l _ !n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check
+newappsqrt_ !l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check
   where
     isqrtWord :: Word -> Word
     isqrtWord x
@@ -54,9 +54,10 @@ newappsqrt_ !l _ !n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# 
       | otherwise = r
       where
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
-newappsqrt_ l eY n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word package
-  NatJ# (BN# $ yaccbn $ go eY nbn# (bigNatSize# nbn#) True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+newappsqrt_ l@(I# l#) eY n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word package
+  NatJ# (BN# $ yaccbn $ go eY nbn# szBN#True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
   where
+    szBN# = if eY then l# `quotInt#` 2# else (l# +# 1#) `quotInt#` 2# -- size of BigNat# in limbs == (bigNatSize# nbn#)
     -- Iterate BigNat# limbs from most-significant to least-significant
     -- Params: even-flag, BigNat#, remaining-size (Int#), isFirstIter, accumulator
     go :: Bool -> BigNat# -> Int# -> Bool -> Itr -> Itr
