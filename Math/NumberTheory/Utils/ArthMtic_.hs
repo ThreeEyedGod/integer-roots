@@ -43,22 +43,19 @@ module Math.NumberTheory.Utils.ArthMtic_
     radixW32Squared,
     bnConst#,
     word64FromRvsrdTuple#,
-    -- quotremradixW32,
-    -- quotrem1,
     word64FromWordRvsrdTuple##,
   )
 where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Data.Bits (complement, countLeadingZeros, unsafeShiftL, (.&.))
+import Data.Bits (complement, unsafeShiftL, (.&.))
 import GHC.Exts
   ( Double (..),
     Double#,
     Int (..),
     Int#,
     Int64#,
-    Word (..),
     Word#,
     Word64#,
     and#,
@@ -140,7 +137,7 @@ word64From2ElemList# (_ : _ : _) = error "word64From2ElemList# : more than 2 ele
 --- BEGIN Core numeric helper functions
 --- ***********************************
 
-{-# INLINE [0] integralFromRvsrdTuple #-}
+{-# INLINE integralFromRvsrdTuple #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
 
@@ -152,7 +149,7 @@ integralFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
 integralFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
 integralFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
-{-# INLINE [0] integralFromTuple #-}
+{-# INLINE integralFromTuple #-}
 {-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Integer -> Integer #-}
 {-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
 integralFromTuple :: (Integral a) => (Word32, Word32) -> a -> a
@@ -334,7 +331,7 @@ lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1 -
 --    !(W# radixW32#) = radixW32
 --    !(BN# bn#) =  fromIntegral n
 --   in I# $ word2Int# (bigNatSizeInBase# radixW32# bn#)
-{-# INLINEABLE lenRadixW32 #-}
+{-# INLINE lenRadixW32 #-}
 
 -- //FIXME floor seems to trigger off missing specialization and also properFractionDouble.
 
@@ -447,11 +444,3 @@ roundHalfEven m# payload# =
         else (# m'# `and#` (1## `uncheckedShiftL#` 52# `minusWord#` 1##), 0## #)
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
-
--- floorLog2 for Word64; undefined for 0 input (so guard before calling)
-floorLog2 :: Word64 -> Int
-floorLog2 w = 63 - countLeadingZeros w
-
--- floorLog2# for Word64; undefined for 0 input (so guard before calling)
-floorLog2# :: Word# -> Int64#
-floorLog2# w# = let !(I# i#) = countLeadingZeros (W# w#) in intToInt64# (63# -# i#)
