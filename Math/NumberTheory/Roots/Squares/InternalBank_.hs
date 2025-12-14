@@ -55,7 +55,7 @@ newappsqrt_ !l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -
       where
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
 newappsqrt_ l@(I# l#) eY n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word package
-  NatJ# (BN# $ yaccbn $ go eY nbn# szBN#True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+  NatJ# (BN# $ yaccbn $ go eY nbn# szBN# True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
   where
     szBN# = if eY then l# `quotInt#` 2# else (l# +# 1#) `quotInt#` 2# -- size of BigNat# in limbs == (bigNatSize# nbn#)
     -- Iterate BigNat# limbs from most-significant to least-significant
@@ -123,7 +123,7 @@ tni (# i1, i2 #) (Itr !cl# !yCAcc_ !tA !t#) =
       !x = bigNatFromWord2# x1 x2
       !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# ycUpdated#, remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
+      !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
       !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
       -- weirdly the above is faster
       -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)  else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
