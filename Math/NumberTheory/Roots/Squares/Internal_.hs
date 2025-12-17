@@ -37,10 +37,10 @@ import Math.NumberTheory.Utils.ArthMtic_
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
-{-# SPECIALIZE isqrtB_ :: Int -> Integer -> Integer #-}
-isqrtB_ :: (Integral a) => Int -> a -> a
-isqrtB_ _ 0 = 0
-isqrtB_ l n = fromInteger . integerFromNatural . newappsqrt_ l (even l) . fromIntegral $ n
+{-# SPECIALIZE isqrtB_ :: Integer -> Integer #-}
+isqrtB_ :: (Integral a) => a -> a
+isqrtB_ 0 = 0
+isqrtB_ n = fromInteger . integerFromNatural . newappsqrt_ . fromIntegral $ n
 {-# INLINEABLE isqrtB_ #-}
 
 karatsubaSqrt :: Integer -> (Integer, Integer)
@@ -50,7 +50,7 @@ karatsubaSqrt n
   --     let s = isqrtB n in (s, n - s * s)
   | lgNradixW32 < 72 -- 72 in radixw32 is ~ 2300 in base 2
     =
-      let s = isqrtB_ lgNradixW32 n in (s, n - s * s)
+      let s = isqrtB_ n in (s, n - s * s)
   | otherwise =
       if lgN .&. 2 /= 0 -- //FIXME check if logic needs to be updated
         then

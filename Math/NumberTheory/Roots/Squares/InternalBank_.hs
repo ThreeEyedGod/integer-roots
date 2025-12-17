@@ -24,7 +24,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#), Int (I#), (*#), quotInt#)
+import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#), Int (I#), (*#), quotInt#, (==#))
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSize#, bigNatSub, bigNatSubUnsafe)
@@ -32,6 +32,8 @@ import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
+import GHC.Num.Primitives (Bool#)
+import Foreign (fromBool)
 
 -- *********** END NEW IMPORTS
 
@@ -41,9 +43,10 @@ import Math.NumberTheory.Utils.FloatingX_
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
 data Itr = Itr {a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
+data Init = Init {inbn# :: BigNat#, evenLen# :: Bool#, szBN# :: Int#, fi# :: Bool#}
 
-newappsqrt_ :: Int -> Bool -> Natural -> Natural
-newappsqrt_ !l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check
+newappsqrt_ ::  Natural -> Natural
+newappsqrt_ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check
   where
     isqrtWord :: Word -> Word
     isqrtWord x
@@ -54,31 +57,35 @@ newappsqrt_ !l _ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -
       | otherwise = r
       where
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
-newappsqrt_ l@(I# l#) eY n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word package
-  NatJ# (BN# $ yaccbn $ go eY nbn# szBN# True (Itr 1# (bnConst# 0) (bnConst# 0) zeroFx#))
+newappsqrt_ n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word package
+  let 
+    !l@(I# l#) = lenRadixW32 n 
+    evnLen# = if even l then 1# else 0#
+    szF# = if isTrue# (evnLen# ==# 1#) then l# `quotInt#` 2# else (l# +# 1#) `quotInt#` 2# -- size of BigNat# in limbs == (bigNatSize# nbn#)
+    initVal = Init nbn# evnLen# szF# 1# -- firstIter is True 
+    initItr = Itr 0# (bnConst# 0) (bnConst# 0) zeroFx#
+    in
+    NatJ# (BN# $ yaccbn $ go initVal initItr)
   where
-    szBN# = if eY then l# `quotInt#` 2# else (l# +# 1#) `quotInt#` 2# -- size of BigNat# in limbs == (bigNatSize# nbn#)
-    -- Iterate BigNat# limbs from most-significant to least-significant
-    -- Params: even-flag, BigNat#, remaining-size (Int#), isFirstIter, accumulator
-    go :: Bool -> BigNat# -> Int# -> Bool -> Itr -> Itr
-    go !_ !_ 0# !_ !acc = acc -- exit when no limbs left
-    go !evn !bn# !sz# !firstIter !acc =
-      let !idx# = sz# -# 1#
+    go :: Init -> Itr -> Itr
+    go (Init !_ !_ 0# !_) !acc = acc -- exit when no limbs left
+    go (Init bn# !evn !szF# !firstIter) !acc =
+      let !idx# = szF# -# 1#
           !w# = bigNatIndex# bn# idx# -- Word# for the limb (bigNat is little-endian, 64-bit)
           !msbLsbPair = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
-       in if not firstIter
-            then go evn bn# idx# False (tni msbLsbPair acc)
-            else go evn bn# idx# False (tfi evn msbLsbPair)
+       in if isTrue# (firstIter ==# 0#)
+            then go (Init { inbn# = bn#, evenLen# = evn, szBN# = idx#, fi# = 0# })  (tni msbLsbPair acc)
+            else go (Init bn# evn idx# 0#)  (tfi evn msbLsbPair)
     {-# INLINE go #-}
 {-# INLINE newappsqrt_ #-}
 
-tfi :: Bool -> (# Word#, Word# #) -> Itr
-tfi !evenLen (# m#, l# #) =
+tfi :: Bool# -> (# Word#, Word# #) -> Itr
+tfi !evnLen# (# m#, l# #) =
   let !i# = word64FromWordRvsrdTuple## (# l#, m# #) 4294967296#Word64
       !(# yVal, yWord#, rm #) = rmdrFn i#
    in Itr 1# yVal rm (unsafeword64ToFloatingX## yWord#)
   where
-    !rmdrFn = if evenLen then evenFirstRmdrBN# else oddFirstRmdrBN#
+    !rmdrFn = if isTrue# (evnLen# ==# 1#) then evenFirstRmdrBN# else oddFirstRmdrBN#
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     evenFirstRmdrBN# !w# =
