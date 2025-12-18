@@ -57,10 +57,8 @@ newappsqrt_ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //F
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
 newappsqrt_ n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word package
   let 
-      -- szT# = bigNatSizeInBase# 4294967296#Word nbn#
-      -- !(# evnLen#, szF# #) = if odd (W# szT#) then (# 1#, 1# +# word2Int# szT# #) else (# 0#, word2Int# szT# #)     
-      !l@(I# l#) = lenRadixW32 n
-      !(# evnLen#, szF# #) = if even l then (# 1#, l# `quotInt#` 2# #) else (# 0#, (l# +# 1#) `quotInt#` 2# #)
+      !szT# = bigNatSizeInBase# 4294967296#Word nbn#
+      !(# evnLen#, szF# #) = if even (W# szT#) then (# 1#, word2Int# szT# `quotInt#` 2#  #) else (# 0#, 1# +# word2Int# szT# `quotInt#` 2# #)     
     in tni (tfi evnLen# nbn# (szF# -# 1#)) 
 {-# INLINE newappsqrt_ #-}
 
