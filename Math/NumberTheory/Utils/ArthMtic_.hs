@@ -42,6 +42,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     word64From2ElemList#,
     radixW32Squared,
     bnConst#,
+    bnConst##,
     word64FromRvsrdTuple#,
     word64FromWordRvsrdTuple##,
   )
@@ -109,6 +110,13 @@ powBigNat# p#
   | isTrue# (p# `leWord#` 0##) = bnConst# 1
   | otherwise = bigNatShiftL# (bnConst# 1) (p# `timesWord#` 32##)
 {-# INLINE powBigNat# #-}
+
+bnConst## :: Int# -> BigNat#
+bnConst## i# = case i# of
+  0# -> bigNatZero# (# #)
+  1# -> bigNatOne# (# #)
+  _ -> error "bnConst# : unsupported constant"
+{-# INLINE bnConst## #-}
 
 bnConst# :: Int -> BigNat#
 bnConst# i = case i of
