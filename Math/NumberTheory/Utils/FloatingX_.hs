@@ -381,9 +381,9 @@ scaleByPower2 :: Int64 -> FloatingX -> FloatingX
 scaleByPower2 n (FloatingX s e) = if s == 0 then zeroFx else FloatingX s (e + n) -- normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
 {-# INLINE scaleByPower2 #-}
 
+{-# NOINLINE scaleByPower2# #-} -- CAF friendly 
 scaleByPower2# :: Int64# -> FloatingX# -> FloatingX#
 scaleByPower2# n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zeroFx# else FloatingX# s# (e# `plusInt64#` n#) -- normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
-{-# INLINE scaleByPower2# #-}
 
 {-# INLINE sqrtFx #-}
 sqrtFx :: FloatingX -> FloatingX

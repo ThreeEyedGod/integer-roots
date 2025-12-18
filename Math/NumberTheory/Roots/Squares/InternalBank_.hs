@@ -195,5 +195,5 @@ computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = let !w64Fx# = coreFx# (# tAFX#, tCF
 {-# INLINE computFxW64# #-}
 
 coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
-coreFx# (# tAFX#, tCFX#, radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
+coreFx# (# !tAFX#, !tCFX#, !radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
 {-# INLINE coreFx# #-}
