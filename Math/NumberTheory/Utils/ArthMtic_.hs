@@ -34,7 +34,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     maxDouble,
     maxSafeInteger,
     maxUnsafeInteger,
-    lenRadixW32,
     cI2D2_,
     convNToDblExp,
     bnToFxGtWord,
@@ -329,17 +328,6 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
 {-# INLINE double #-}
-
-{-# SPECIALIZE lenRadixW32 :: Integer -> Int #-}
-{-# SPECIALIZE lenRadixW32 :: Word64 -> Int #-}
-{-# SPECIALIZE lenRadixW32 :: Natural -> Int #-}
-lenRadixW32 :: (Integral a) => a -> Int
-lenRadixW32 n = I# (word2Int# (integerLogBase# radixW32 (fromIntegral n))) + 1 -- //FIXME SEE IF BIGNATSIZEINBASE# WORKS HERE
--- lenRadixW32 n = let
---    !(W# radixW32#) = radixW32
---    !(BN# bn#) =  fromIntegral n
---   in I# $ word2Int# (bigNatSizeInBase# radixW32# bn#)
-{-# INLINE lenRadixW32 #-}
 
 -- //FIXME floor seems to trigger off missing specialization and also properFractionDouble.
 

@@ -66,7 +66,7 @@ integerSquareRoot n
 
 {-# INLINE [1] integerSquareRoot' #-}
 integerSquareRoot' :: (Integral a) => a -> a
-integerSquareRoot' = isqrtB_ 
+integerSquareRoot' = isqrtB_
 
 -- | For a non-negative input \( n \)
 --   calculate its integer square root \( r = \lfloor \sqrt{n} \rfloor \)

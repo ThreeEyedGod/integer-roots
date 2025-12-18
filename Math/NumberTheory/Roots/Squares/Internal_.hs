@@ -19,7 +19,6 @@
 module Math.NumberTheory.Roots.Squares.Internal_
   ( karatsubaSqrt,
     isqrtB_,
-    lenRadixW32,
   )
 where
 
@@ -46,11 +45,11 @@ isqrtB_ n = fromInteger . integerFromNatural . newappsqrt_ . fromIntegral $ n
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
-  -- \| lgN < 2300 =
-  --     let s = isqrtB n in (s, n - s * s)
-  | lgNradixW32 < 72 -- 72 in radixw32 is ~ 2300 in base 2
-    =
+  | lgN < 2300 =
       let s = isqrtB_ n in (s, n - s * s)
+  -- \| lgNradixW32 < 72 -- 72 in radixw32 is ~ 2300 in base 2
+  --   =
+  --     let s = isqrtB_ n in (s, n - s * s)
   | otherwise =
       if lgN .&. 2 /= 0 -- //FIXME check if logic needs to be updated
         then
@@ -68,7 +67,8 @@ karatsubaSqrt n
   where
     k = lgN `unsafeShiftR` 2 + 1
     lgN = I# (word2Int# (integerLog2# n))
-    !lgNradixW32 = lenRadixW32 n
+
+-- !lgNradixW32 = lenRadixW32 n
 
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)

@@ -24,10 +24,10 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int (I#), Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotInt#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word64ToInt64#, word64ToWord#, (*#), (+#), (+##), (-#), (/##), (<#), (==#), word2Int#)
+import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotInt#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, (*#), (+#), (+##), (-#), (/##), (<#), (==#))
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatZero#, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSize#, bigNatSub, bigNatSubUnsafe, bigNatZero#, bigNatSizeInBase#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe)
 import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Num.Primitives (Bool#)
 import GHC.Word (Word64 (..))
@@ -55,18 +55,17 @@ newappsqrt_ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //F
       | otherwise = r
       where
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
-newappsqrt_ n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word package
-  let 
-      !szT# = bigNatSizeInBase# 4294967296#Word nbn#
-      !(# evnLen#, szF# #) = if even (W# szT#) then (# 1#, word2Int# szT# `quotInt#` 2#  #) else (# 0#, 1# +# word2Int# szT# `quotInt#` 2# #)     
-    in tni (tfi evnLen# nbn# (szF# -# 1#)) 
+newappsqrt_ n@(NatJ# (BN# nbn#)) =
+  -- //FIXME check to use wide-word package
+  let !szT# = bigNatSizeInBase# 4294967296#Word nbn#
+      !(# evnLen#, szF# #) = if even (W# szT#) then (# 1#, word2Int# szT# `quotInt#` 2# #) else (# 0#, 1# +# word2Int# szT# `quotInt#` 2# #)
+   in tni (tfi evnLen# nbn# (szF# -# 1#))
 {-# INLINE newappsqrt_ #-}
 
 {-# INLINE tfi #-}
 tfi :: Bool# -> BigNat# -> Int# -> Itr
-tfi !evnLen# bn# iidx#  =
-  let
-      !w# = bigNatIndex# bn# iidx# -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
+tfi !evnLen# bn# iidx# =
+  let !w# = bigNatIndex# bn# iidx# -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
       !(# m#, l# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
       !i# = word64FromWordRvsrdTuple## (# l#, m# #) 4294967296#Word64
       !(# yVal, yWord#, rm #) = rmdrFn i#
@@ -111,11 +110,10 @@ tfi !evnLen# bn# iidx#  =
 -- {-# INLINE fixRemainder# #-}
 
 {-# INLINE tni #-}
-tni :: Itr -> Natural 
+tni :: Itr -> Natural
 tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
-tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) = 
-  let 
-      !w# = bigNatIndex# bn# (idxx# -# 1#)-- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
+tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
+  let !w# = bigNatIndex# bn# (idxx# -# 1#) -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
       !(# i1#, i2# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
       !(# x1, x2 #) = i1# `timesWord2#` radixW32w#
       !x = bigNatFromWord2# x1 x2
