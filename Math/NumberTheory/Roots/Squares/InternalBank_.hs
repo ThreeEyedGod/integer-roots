@@ -57,16 +57,13 @@ newappsqrt_ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //F
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
 newappsqrt_ n@(NatJ# (BN# nbn#)) = -- //FIXME check to use wide-word package
   let !l@(I# l#) = lenRadixW32 n
-      !(# evnLen#, szF# #)  = if even l then (# 1#, l# `quotInt#` 2# #) else (# 0#, (l# +# 1#) `quotInt#` 2# #)
-      !initItr = Itr nbn# (szF# -# 1#) 0# zeroBN# zeroBN# zeroFx#
-    in tni (tfi evnLen# initItr) 
-  where 
-      !zeroBN# = bnConst## 0#
+      !(# evnLen#, szF# #) = if even l then (# 1#, l# `quotInt#` 2# #) else (# 0#, (l# +# 1#) `quotInt#` 2# #)
+    in tni (tfi evnLen# nbn# (szF# -# 1#)) 
 {-# INLINE newappsqrt_ #-}
 
 {-# INLINE tfi #-}
-tfi :: Bool# -> Itr -> Itr
-tfi !evnLen# (Itr bn# iidx# x# _ _ _ ) =
+tfi :: Bool# -> BigNat# -> Int# -> Itr
+tfi !evnLen# bn# iidx#  =
   let
       !w# = bigNatIndex# bn# iidx# -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
       !(# m#, l# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
