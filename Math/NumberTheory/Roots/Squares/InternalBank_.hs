@@ -20,7 +20,7 @@
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
-module Math.NumberTheory.Roots.Squares.InternalBank_ where
+module Math.NumberTheory.Roots.Squares.InternalBank_ (newappsqrt_) where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
@@ -60,9 +60,9 @@ newappsqrt_ n@(NatJ# (BN# nbn#)) =
   let !szT# = bigNatSizeInBase# 4294967296#Word nbn#
       !(# evnLen#, szF# #) = if even (W# szT#) then (# 1#, word2Int# szT# `quotInt#` 2# #) else (# 0#, 1# +# word2Int# szT# `quotInt#` 2# #)
    in tni (tfi evnLen# nbn# (szF# -# 1#))
-{-# INLINE newappsqrt_ #-}
+{-# NOINLINE newappsqrt_ #-}
 
-{-# INLINE tfi #-}
+{-# NOINLINE tfi #-}
 tfi :: Bool# -> BigNat# -> Int# -> Itr
 tfi !evnLen# bn# iidx# =
   let !w# = bigNatIndex# bn# iidx# -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
@@ -109,7 +109,7 @@ tfi !evnLen# bn# iidx# =
 
 -- {-# INLINE fixRemainder# #-}
 
-{-# INLINE tni #-}
+{-# NOINLINE tni #-}
 tni :: Itr -> Natural
 tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
 tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =

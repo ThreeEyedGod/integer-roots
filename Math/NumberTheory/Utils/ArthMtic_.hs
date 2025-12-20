@@ -53,7 +53,6 @@ import Data.Bits (complement, unsafeShiftL, (.&.))
 import GHC.Exts
   ( Double (..),
     Double#,
-    Int (..),
     Int#,
     Int64#,
     Word#,
@@ -92,7 +91,7 @@ import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSizeInBase#, bigNatZero#)
-import GHC.Num.Integer (integerLog2#, integerLogBase#, integerLogBaseWord)
+import GHC.Num.Integer (integerLog2#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
