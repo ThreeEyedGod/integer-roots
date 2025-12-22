@@ -57,7 +57,7 @@ library
                -Wno-unused-matches
                -Wno-missed-specialisations 
                -O2 
-               -threaded 
+              --  -threaded 
                -- turn threaded off for weigh 
                -fllvm 
                -fstrictness

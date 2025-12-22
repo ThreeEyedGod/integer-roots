@@ -6,6 +6,8 @@
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+-- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump-simpl or ddump-asm dumps else not
@@ -19,7 +21,7 @@
 -- Maintainer:  Andrew Lelechenko <andrew.lelechenko@gmail.com>
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
--- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
+
 module Math.NumberTheory.Roots.Squares.InternalBank_ (newappsqrt_) where
 
 -- \*********** BEGIN NEW IMPORTS
@@ -74,20 +76,20 @@ tfi !evnLen# bn# iidx# =
     !rmdrFn = if isTrue# (evnLen# ==# 1#) then evenFirstRmdrBN# else oddFirstRmdrBN#
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-    evenFirstRmdrBN# !w# =
-      let yT64# = largestNSqLTE## w#
-          ysq# = yT64# `timesWord64#` yT64#
-          diff# = word64ToInt64# w# `subInt64#` word64ToInt64# ysq#
-       in handleFirstRemBN## (# yT64#, diff# #) -- set 0 for starting cumulative yc--fstDgtRem i
+    evenFirstRmdrBN# !w# = let qr w = let 
+                                        y = largestNSqLTE## w
+                                        ysq = y `timesWord64#` y
+                                        diff = word64ToInt64# w `subInt64#` word64ToInt64# ysq
+                                    in (# y, diff #)
+                              in handleFirstRemBN## (qr w#)
       -- {-# INLINE evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-    oddFirstRmdrBN# !w# =
-      let yT64# = largestNSqLTE## w#
-          ysq# = yT64# `timesWord64#` yT64#
-          remIntegerW# = w# `subWord64#` ysq# -- no chance this will be negative
-       in (# bigNatFromWord64# yT64#, yT64#, bigNatFromWord64# remIntegerW# #)
-    -- {-# INLINE oddFirstRmdrBN# #-}
-
+    oddFirstRmdrBN# !w# = let qr w = let 
+                                      y = largestNSqLTE## w
+                                      ysq = y `timesWord64#` y
+                                      diff = w `subWord64#` ysq -- no chance this will be negative
+                                  in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
+                            in qr w#
     handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
     handleFirstRemBN## (# yi64#, ri_ #)
       | isTrue# (ri_ `ltInt64#` zero) =
