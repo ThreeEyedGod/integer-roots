@@ -91,14 +91,17 @@ tfi !evnLen# bn# iidx# =
                                   in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
                             in qr w#
     handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
-    handleFirstRemBN## (# yi64#, ri_ #)
-      | isTrue# (ri_ `ltInt64#` zero) =
-          let !yAdj# = yi64# `subWord64#` 1#Word64
-              !rdr = fixRemainder# yAdj# ri_
-           in (# bigNatFromWord64# yAdj#, yAdj#, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
-      | otherwise = (# bigNatFromWord64# yi64#, yi64#, bigNatFromWord64# (int64ToWord64# ri_) #)
-      where
-        !(I64# zero) = 0
+    handleFirstRemBN## (# yi64#, ri_ #) = let 
+          qr y r 
+            | isTrue# (r `ltInt64#` zero) = 
+                  let
+                    !y_ = y `subWord64#` 1#Word64
+                    !rdr = fixRemainder# y_ r
+                   in (# bigNatFromWord64# y_, y_, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+            | otherwise = (# bigNatFromWord64# y, y, bigNatFromWord64# (int64ToWord64# r) #)
+            where
+              !(I64# zero) = 0
+      in qr yi64# ri_
     -- {-# INLINE handleFirstRemBN## #-}
 
     -- -- Fix remainder accompanying a 'next downed digit' see algorithm
