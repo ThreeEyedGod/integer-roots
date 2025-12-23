@@ -26,9 +26,9 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ (newappsqrt_) where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotInt#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#), (==#))
+import GHC.Exts (Double (..), Double#, Int#, ltInt8#, Int8#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotInt#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#), (==#), Int8#, plusInt8#)
 import GHC.Float.RealFracMethods (floorDoubleInteger)
-import GHC.Int (Int64 (I64#))
+import GHC.Int (Int64 (I64#), Int8 (I8#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe)
 import GHC.Num.Natural (naturalToBigNat#)
@@ -44,7 +44,7 @@ import Math.NumberTheory.Utils.FloatingX_
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
-data Itr = Itr {bnn# :: {-# UNPACK #-} !BigNat#, idx# :: {-# UNPACK #-} !Int#, a# :: {-# UNPACK #-} !Int#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
+data Itr = Itr {bnn# :: {-# UNPACK #-} !BigNat#, idx# :: {-# UNPACK #-} !Int#, a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
 newappsqrt_ :: Natural -> Natural
 newappsqrt_ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check
@@ -72,8 +72,9 @@ tfi !evnLen# bn# iidx# =
       !(# m#, l# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
       !i# = word64FromWordRvsrdTuple## (# l#, m# #) 4294967296#Word64
       !(# yVal, yWord#, rm #) = rmdrFn i#
-   in Itr bn# iidx# 1# yVal rm (unsafeword64ToFloatingX## yWord#)
+   in Itr bn# iidx# oneInt8# yVal rm (unsafeword64ToFloatingX## yWord#)
   where
+    !(I8# oneInt8#) = 1
     !rmdrFn = if isTrue# (evnLen# ==# 1#) then evenFirstRmdrBN# else oddFirstRmdrBN#
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
@@ -129,10 +130,11 @@ tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
       !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
       -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
       -- weirdly the above and below are both about the same
-      !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)  else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
-   in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
-      tni (Itr bn# (idxx# -# 1#) (cl# +# 1#) ycUpdated# remFinal# tcfx#)
+      !itr_ = if isTrue# (cl# `ltInt8#` threeInt8#) then Itr bn# (idxx# -# 1#) (cl# `plusInt8#` oneInt8#) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)) else Itr bn# (idxx# -# 1#) cl# ycUpdated# remFinal# tCFx#  -- tcfx is already scaled by 32. Do not use normalize here
+   in tni itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
   where
+    !(I8# oneInt8#) = 1
+    !(I8# threeInt8#) = 3
     !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
     !(W# radixW32w#) = radixW32
 
