@@ -7,7 +7,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
-{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 -- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)

@@ -330,6 +330,7 @@ int64ToFx# !i
 
 {-# INLINE unsafeword64ToFx# #-}
 {-# SPECIALIZE unsafeword64ToFx# :: Integer -> FloatingX# #-}
+{-# SPECIALIZE unsafeword64ToFx# :: Word64 -> FloatingX# #-}
 unsafeword64ToFx# :: (Integral a) => a -> FloatingX#
 unsafeword64ToFx# !i = double2Fx# (fromIntegral i)
 
