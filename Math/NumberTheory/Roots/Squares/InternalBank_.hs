@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 -- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
 
@@ -21,12 +22,12 @@
 -- Maintainer:  Andrew Lelechenko <andrew.lelechenko@gmail.com>
 --
 -- Internal functions dealing with square roots. End-users should not import this module.
-
 module Math.NumberTheory.Roots.Squares.InternalBank_ (newappsqrt_) where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
 import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotInt#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, (*#), (+#), (+##), (-#), (/##), (<#), (==#))
+import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatOne#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe)
@@ -35,7 +36,6 @@ import GHC.Num.Primitives (Bool#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
-import GHC.Float.RealFracMethods (floorDoubleInteger)
 
 -- *********** END NEW IMPORTS
 
@@ -77,32 +77,33 @@ tfi !evnLen# bn# iidx# =
     !rmdrFn = if isTrue# (evnLen# ==# 1#) then evenFirstRmdrBN# else oddFirstRmdrBN#
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-    evenFirstRmdrBN# !w# = let qr w = let 
-                                        y = largestNSqLTE## w
-                                        ysq = y `timesWord64#` y
-                                        diff = word64ToInt64# w `subInt64#` word64ToInt64# ysq
-                                    in (# y, diff #)
-                              in handleFirstRemBN## (qr w#)
-      -- {-# INLINE evenFirstRmdrBN# #-}
+    evenFirstRmdrBN# !w# =
+      let qr w =
+            let y = largestNSqLTE## w
+                ysq = y `timesWord64#` y
+                diff = word64ToInt64# w `subInt64#` word64ToInt64# ysq
+             in (# y, diff #)
+       in handleFirstRemBN## (qr w#)
+    -- {-# INLINE evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-    oddFirstRmdrBN# !w# = let qr w = let 
-                                      y = largestNSqLTE## w
-                                      ysq = y `timesWord64#` y
-                                      diff = w `subWord64#` ysq -- no chance this will be negative
-                                  in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
-                            in qr w#
+    oddFirstRmdrBN# !w# =
+      let qr w =
+            let y = largestNSqLTE## w
+                ysq = y `timesWord64#` y
+                diff = w `subWord64#` ysq -- no chance this will be negative
+             in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
+       in qr w#
     handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
-    handleFirstRemBN## (# yi64#, ri_ #) = let 
-          qr y r 
-            | isTrue# (r `ltInt64#` zero) = 
-                  let
-                    !y_ = y `subWord64#` 1#Word64
+    handleFirstRemBN## (# yi64#, ri_ #) =
+      let qr y r
+            | isTrue# (r `ltInt64#` zero) =
+                let !y_ = y `subWord64#` 1#Word64
                     !rdr = fixRemainder# y_ r
-                   in (# bigNatFromWord64# y_, y_, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+                 in (# bigNatFromWord64# y_, y_, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
             | otherwise = (# bigNatFromWord64# y, y, bigNatFromWord64# (int64ToWord64# r) #)
             where
               !(I64# zero) = 0
-      in qr yi64# ri_
+       in qr yi64# ri_
     -- {-# INLINE handleFirstRemBN## #-}
 
     -- -- Fix remainder accompanying a 'next downed digit' see algorithm

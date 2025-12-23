@@ -3,6 +3,7 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -19,8 +20,7 @@
 -- Internal functions dealing with square roots. End-users should not import this module.
 -- {-# OPTIONS -ddump-simpl -ddump-to-file #-}
 module Math.NumberTheory.Utils.ArthMtic_
-  ( powBigNat#,
-    _evenInt64#,
+  ( _evenInt64#,
     _oddInt64#,
     upLiftDouble#,
     split,
@@ -40,8 +40,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     bnToFxGtWord,
     bnToFxGtWord#,
     word64From2ElemList#,
-    radixW32Squared,
-    bnConst#,
     bnConst##,
     word64FromRvsrdTuple#,
     word64FromWordRvsrdTuple##,
@@ -64,7 +62,6 @@ import GHC.Exts
     int2Word#,
     intToInt64#,
     isTrue#,
-    leWord#,
     minusWord#,
     neWord#,
     not#,
@@ -74,7 +71,6 @@ import GHC.Exts
     quotInt64#,
     quotRemWord#,
     remInt64#,
-    timesWord#,
     timesWord64#,
     uncheckedShiftL#,
     uncheckedShiftRL#,
@@ -87,42 +83,28 @@ import GHC.Exts
     (/=#),
     (>=#),
   )
+import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftL#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatSizeInBase#, bigNatZero#)
-import GHC.Num.Integer (integerLog2#, integerLogBaseWord)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
+import GHC.Num.Integer (integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
-import GHC.Float.RealFracMethods (floorDoubleInteger)
+
+-- // Fixed floor missing specialization leading to not inlining of properFractionDouble
+-- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
 
 -- *********** END NEW IMPORTS
 
 -- | HELPER functions
-
--- powBigNat# :: Int# -> BigNat#
--- Compute radixW32 ^ p as a BigNat# by shifting 1 << (32 * p)
--- Requires `bigNatShiftL#` and GHC.Prim primops like (*#), (<=#), isTrue# in scope.
-powBigNat# :: Word# -> BigNat#
-powBigNat# p#
-  | isTrue# (p# `leWord#` 0##) = bnConst# 1
-  | otherwise = bigNatShiftL# (bnConst# 1) (p# `timesWord#` 32##)
-{-# INLINE powBigNat# #-}
-
 bnConst## :: Int# -> BigNat#
 bnConst## i# = case i# of
   0# -> bigNatZero# (# #)
   1# -> bigNatOne# (# #)
   _ -> error "bnConst# : unsupported constant"
 {-# INLINE bnConst## #-}
-
-bnConst# :: Int -> BigNat#
-bnConst# i = case i of
-  0 -> bigNatZero# (# #)
-  1 -> bigNatOne# (# #)
-  _ -> error "bnConst# : unsupported constant"
-{-# INLINE bnConst# #-}
 
 -- | Word64# from a "reversed" List of at least 1 and at most 2 Word32 digits
 word64FromRvsrd2ElemList# :: [Word32] -> Word64#
@@ -197,27 +179,9 @@ word64FromWordRvsrdTuple## (# 0##, lMSB# #) base# = wordToWord64# lMSB# `timesWo
 word64FromWordRvsrdTuple## (# lLSB#, 0## #) _ = wordToWord64# lLSB#
 word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) base# = (wordToWord64# lMSB# `timesWord64#` base#) `plusWord64#` wordToWord64# lLSB#
 
-{-# INLINE doubleFromRvsrdTuple #-}
-
--- | double from a "reversed" tuple of Word32 digits
-doubleFromRvsrdTuple :: (Word32, Word32) -> Integer -> Double
-doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromIntegral l1
-
 {-# INLINE largestNSqLTE## #-}
 largestNSqLTE## :: Word64# -> Word64#
 largestNSqLTE## w# = case floorDoubleInteger (sqrt (fromIntegral (W64# w#)) :: Double) of iI -> case fromInteger iI of (W64# r#) -> r#
-
-{-# INLINE radixW32Length #-} -- this works
-radixW32Length :: Integer -> Word
-radixW32Length n
-  | n == 0 = 1
-  | otherwise = integerLogBaseWord radixW32 n + 1
-
-{-# INLINE intgrFrom3DigitsBase32 #-}
-
--- | Integer from a 3rd place plus a "reversed" tuple of 2 Word32 digits on base
-intgrFrom3DigitsBase32 :: Integer -> (Word32, Word32) -> Integer
-intgrFrom3DigitsBase32 i (l1, l2) = (i * secndPlaceW32Radix) + intgrFromRvsrdTuple (l1, l2) radixW32
 
 _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
 _evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
@@ -286,17 +250,6 @@ secndPlaceW32Radix :: (Integral a) => a
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 {-# INLINE secndPlaceW32Radix #-}
 
-{-# SPECIALIZE radixW32Squared :: Word #-}
-{-# SPECIALIZE radixW32Squared :: Natural #-}
-{-# SPECIALIZE radixW32Squared :: Integer #-}
-{-# SPECIALIZE radixW32Squared :: Word64 #-}
-{-# SPECIALIZE radixW32Squared :: Int64 #-}
-radixW32Squared :: (Integral a) => a
-radixW32Squared = 18446744073709551616 -- secndPlaceRadix
-
-radixW32Cubed :: Integer
-radixW32Cubed = 79228162514264337593543950336 -- secndPlaceRadix * radixW32
-
 sqrtOf2 :: Double
 sqrtOf2 = 1.4142135623730950488016887242097
 {-# INLINE sqrtOf2 #-}
@@ -306,15 +259,6 @@ maxDouble = 1.7976931348623157e308
 
 minDouble :: Double
 minDouble = 4.9406564584124654e-324 -- Minimum positive normalized value for Double as per IEEE 754
-
-doublePrecisionBinary :: Int
-doublePrecisionBinary = 53
-
-doublePrecisionDecimal :: Int
-doublePrecisionDecimal = 308
-
-doublePrecisionRadix32 :: Int
-doublePrecisionRadix32 = 32
 
 maxSafeInteger :: Integer
 maxSafeInteger = 9007199254740991 -- 2^53 -1 this is the max integer that can be represented without losing precision
@@ -328,9 +272,6 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
 {-# INLINE double #-}
-
--- // Fixed floor missing specialization leading to not inlining of properFractionDouble
--- floor only gets you to Integer or Int, not Word. Hence if Floor to Integer and then to Word solves this
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger

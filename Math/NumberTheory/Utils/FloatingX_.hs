@@ -3,6 +3,7 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
@@ -24,17 +25,14 @@ module Math.NumberTheory.Utils.FloatingX_ where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Data.Bits (shiftR)
 import GHC.Exts
   ( Double (..),
     Double#,
-    Int (..),
     Int64#,
     Word#,
     Word64#,
     eqInt64#,
     fmaddDouble#,
-    geInt64#,
     gtInt64#,
     int64ToInt#,
     isTrue#,
@@ -53,13 +51,12 @@ import GHC.Exts
     (==##),
     (>=##),
   )
-import GHC.Float (divideDouble, powerDouble, timesDouble)
+import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
+import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, split, split#, sqrtOf2, upLiftDouble#, _evenInt64#)
-import GHC.Float.RealFracMethods (floorDoubleInteger)
+import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, split, split#, upLiftDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 
@@ -68,9 +65,6 @@ import GHC.Float.RealFracMethods (floorDoubleInteger)
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
--- | Custom Double Type and its arithmetic
-data FloatingX = FloatingX !Double !Int64 deriving (Eq) -- ! for strict data type
-
 -- | Custom double "unboxed" and its arithmetic
 data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-# UNPACK #-} !Int64#} deriving (Eq) -- ! for strict data type
 
@@ -78,99 +72,13 @@ data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-#
 zeroFx# :: FloatingX#
 zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 
-{-# INLINE zeroFx #-}
-zeroFx :: FloatingX
-zeroFx = let !mb = minBound :: Int64 in FloatingX 0.00 mb
-
 {-# INLINE oneFx# #-}
 oneFx# :: FloatingX#
 oneFx# = FloatingX# 1.0## 0#Int64
 
-{-# INLINE minValueFx #-}
-minValueFx :: FloatingX
-minValueFx = FloatingX 1.0 0
-
 {-# INLINE minValueFx# #-}
 minValueFx# :: FloatingX#
 minValueFx# = FloatingX# 1.0## 0#Int64
-
-{-# INLINE (!+) #-}
-(!+) :: FloatingX -> FloatingX -> FloatingX
-(!+) x y = x `addFx` y
-
-{-# INLINE (!*) #-}
-(!*) :: FloatingX -> FloatingX -> FloatingX
-(!*) x y = x `mulFx` y
-
-{-# INLINE (!/) #-}
-(!/) :: FloatingX -> FloatingX -> FloatingX
-(!/) x y = x `unsafeDivFx` y ---- note this is the unsafest version of divide
-
-{-# INLINE (!**+) #-}
-(!**+) :: FloatingX -> FloatingX -> FloatingX
-(!**+) x y = x `fsqraddFloatingX` y
-
-{-# INLINE addFx #-}
-addFx :: FloatingX -> FloatingX -> FloatingX
-addFx a@(FloatingX sA expA) b@(FloatingX sB expB)
-  -- \| a == zero# = b
-  -- \| b == zero# = a
-  | expA == expB = FloatingX (sA + sB) expA
-  | expA > expB = combine a b
-  | otherwise = combine b a
-  where
-    -- \| otherwise = FloatingX# (sA# +## sB#) expA# -- FloatingX (signifA + signifB) expA
-
-    combine big@(FloatingX sBig expBig) little@(FloatingX sLittle expLittle) =
-      let !scale = expLittle - expBig
-          !scaleD@(D# scaleD#) = fromIntegral scale
-          !scaledLittle = sLittle `timesDouble` powerDouble 2.00 scaleD
-          !resSignif = sBig + scaledLittle
-       in FloatingX resSignif expBig
-
-{-# INLINE mulFx #-}
-mulFx :: FloatingX -> FloatingX -> FloatingX
-mulFx a@(FloatingX sA expA) b@(FloatingX sB expB) =
-  let !resExp = expA + expB
-      !resSignif = sA * sB
-   in FloatingX resSignif resExp
-
-{-# INLINE unsafeDivFx #-}
-unsafeDivFx :: FloatingX -> FloatingX -> FloatingX
-unsafeDivFx n@(FloatingX s1 e1) d@(FloatingX s2 e2) =
-  -- \| d == FloatingX# 1.0## (fromInt64 0) = n
-  -- \| isTrue# (s1# ==## 0.0##) = zero#
-  -- \| isTrue# (s2# ==## 0.0##) = error "divide#: error divide by zero "
-  -- \| otherwise
-  let !resExp = e1 - e2
-      !resSignif = s1 / s2
-      -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
-      -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
-      !(finalSignif, finalExp) = (resSignif, resExp)
-   in -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
-      -- //TODO fix this next line
-      -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
-      if finalSignif < 1.0 && finalExp <= 0
-        then zeroFx
-        else FloatingX finalSignif finalExp
-
-{-# INLINE fsqraddFloatingX #-}
-fsqraddFloatingX :: FloatingX -> FloatingX -> FloatingX
-fsqraddFloatingX (FloatingX (D# sA#) expA) (FloatingX (D# sC#) expC)
-  | diff == 0 = FloatingX (D# (fmaddDouble# sA# sA# sC#)) expC
-  | otherwise = case upLiftDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX (D# (fmaddDouble# sA# sA# sC_#)) twoTimesExpA -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
-  where
-    !twoTimesExpA = 2 * expA
-    !diff@(I64# diff#) = expC - twoTimesExpA
-
-{-# INLINEABLE floorFX #-} -- punting inlining to the last Phase 0
-{-# SPECIALIZE floorFX :: FloatingX -> Int #-}
-{-# SPECIALIZE floorFX :: FloatingX -> Int64 #-}
-{-# SPECIALIZE floorFX :: FloatingX -> Integer #-}
-floorFX :: (Integral a) => FloatingX -> a
-floorFX (FloatingX s e) = case fx2Double (FloatingX s e) of
-  Just d -> floor (d :: Double)
-  _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
@@ -263,18 +171,6 @@ mulFxNorm# a@(FloatingX# sA# expA#) b@(FloatingX# sB# expB#)
             then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# resExp#
 
-{-# INLINE sqr# #-}
-sqr# :: FloatingX# -> FloatingX#
-sqr# a@(FloatingX# sA# expA#)
-  | isTrue# (sA# ==## 0.00##) = zeroFx#
-  | isTrue# (sA# ==## 1.00##) && isTrue# (expA# `eqInt64#` 0#Int64) = a
-  | otherwise =
-      let !resExp# = expA# `plusInt64#` expA#
-          !resSignif# = sA# *## sA#
-       in if isTrue# (resSignif# >=## 2.0##)
-            then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
-            else FloatingX# resSignif# resExp#
-
 {-# INLINE divFxNorm# #-}
 divFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
 divFxNorm# n@(FloatingX# s1# e1#) d@(FloatingX# s2# e2#)
@@ -351,53 +247,17 @@ fsqraddFloatingX# (FloatingX# sA# expA#) (FloatingX# sC# expC#)
     !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
     !diff# = expC# `subInt64#` twoTimesExpA#
 
-{-# INLINE fm1addFloatingX# #-}
-fm1addFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
-fm1addFloatingX# a@(FloatingX# sA# expA#) c@(FloatingX# sC# expC#)
-  | isTrue# (cExcessa# `geInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# 1.00## sC#) cExcessa#
-  | otherwise = a !*## oneFx# !+## c -- default custom mult and add
-  where
-    !cExcessa# = expC# `subInt64#` expA#
-
 {-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# fx@(FloatingX# s# e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
-
-{-# INLINE floorX# #-}
-{-# SPECIALIZE floorX# :: FloatingX# -> Int #-}
-{-# SPECIALIZE floorX# :: FloatingX# -> Int64 #-}
-{-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}
-floorX# :: (Integral a) => FloatingX# -> a
-floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
-  Just d -> floor (d :: Double)
-  _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE floorXW64## #-}
 floorXW64## :: FloatingX# -> Word64#
 floorXW64## f@(FloatingX# s# e#) = case floorDoubleInteger (D# $ unsafefx2Double## f) of iIntger -> case fromInteger iIntger of (W64# w#) -> w#
 
-{-# INLINE floorXI64## #-}
-floorXI64## :: FloatingX# -> Int64#
-floorXI64## f@(FloatingX# s# e#) = case floor (D# $ unsafefx2Double## f) of (I64# i#) -> i#
-
-scaleByPower2 :: Int64 -> FloatingX -> FloatingX
-scaleByPower2 n (FloatingX s e) = if s == 0 then zeroFx else FloatingX s (e + n) -- normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
-{-# INLINE scaleByPower2 #-}
-
-{-# NOINLINE scaleByPower2# #-} -- CAF friendly 
+{-# NOINLINE scaleByPower2# #-} -- CAF friendly
 scaleByPower2# :: Int64# -> FloatingX# -> FloatingX#
 scaleByPower2# n# (FloatingX# s# e#) = if isTrue# (s# ==## 0.00##) then zeroFx# else FloatingX# s# (e# `plusInt64#` n#) -- normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
-
-{-# INLINE sqrtFx #-}
-sqrtFx :: FloatingX -> FloatingX
-sqrtFx fx@(FloatingX s e) = case sqrtFxSplitDbl fx of (sX, eX) -> FloatingX sX eX -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
-
--- | actual sqrt call to the hardware for custom type happens here
-sqrtFxSplitDbl :: FloatingX -> (Double, Int64)
-sqrtFxSplitDbl (FloatingX d e) -- //FIXME FOR zero case
-  | even e = (sqrt d, shiftR e 1) -- even
-  | otherwise = (sqrtOf2 * sqrt d, shiftR (e - 1) 1) -- odd
-{-# INLINE sqrtFxSplitDbl #-}
 
 -- -- | actual sqrt call to the hardware for custom type happens here
 -- sqrtSplitDbl# :: FloatingX# -> (# Double#, Int64# #)
@@ -418,35 +278,6 @@ sqrtFxSplitDbl## (FloatingX# d# e#)
   where
     !(# yesEven, quo64# #) = _evenInt64# e#
 {-# INLINE sqrtFxSplitDbl## #-}
-
-fx2Double# :: FloatingX# -> Maybe Double
-fx2Double# x@(FloatingX# s# e#) = fx2Double $ FloatingX (D# s#) (I64# e#) -- fromIntegral (I# $ int64ToInt# e#) in fx2Double $ FloatingX (D# s#) ei64
-{-# INLINE fx2Double# #-}
-
-fx2Double :: FloatingX -> Maybe Double
-fx2Double (FloatingX d@(D# d#) e)
-  | isNaN d = Nothing -- error "Input is NaN"
-  | isInfinite d = Nothing -- error "Input is Infinity"
-  | ex < 0 = Just $ fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary
-  | otherwise =
-      let !(I# ex#) = ex
-          result# = encodeDoubleInteger m ex#
-          !result = D# result#
-       in if isInfinite result || isNaN result then Nothing else Just result
-  where
-    !(# m, n# #) = decodeDoubleInteger d#
-    !ex = I# n# + fromIntegral e
-{-# INLINE fx2Double #-}
-
-unsafefx2Double :: FloatingX -> Double
-unsafefx2Double (FloatingX d@(D# d#) e) =
-  -- \| ex < 0 = fromIntegral m `divideDouble` (2 ^ (-ex)) -- this is necessary
-  -- \| otherwise
-  D# (encodeDoubleInteger m ex#)
-  where
-    !(# m, n# #) = decodeDoubleInteger d#
-    !ex@(I# ex#) = I# n# + fromIntegral e
-{-# INLINE unsafefx2Double #-}
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# d# 0#Int64) = d#
@@ -486,18 +317,9 @@ unsafebigNat2FloatingX## ibn# = case cI2D2_ ibn# (bigNatLog2# ibn#) of (# s#, e_
 unsafeN2Fx# :: Integer -> FloatingX#
 unsafeN2Fx# n = case convNToDblExp n of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
--- | untested. questionable. seems to not work
-{-# INLINE unsafeN2Fx #-}
-unsafeN2Fx :: Integer -> FloatingX
-unsafeN2Fx n = case convNToDblExp n of (# s#, e_# #) -> FloatingX (D# s#) (I64# e_#) -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-
 {-# INLINE unsafeGtWordbn2Fx## #-}
 unsafeGtWordbn2Fx## :: BigNat# -> Word# -> FloatingX#
 unsafeGtWordbn2Fx## ibn# lgn# = case bnToFxGtWord# ibn# lgn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-
-{-# INLINE unsafeGtWordbn2Fx #-}
-unsafeGtWordbn2Fx :: BigNat -> FloatingX
-unsafeGtWordbn2Fx ibn = case bnToFxGtWord ibn of (s, e_) -> FloatingX s e_ -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
 {-# INLINE int64ToFx# #-}
 int64ToFx# :: Int64 -> FloatingX#
