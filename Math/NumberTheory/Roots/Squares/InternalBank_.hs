@@ -7,7 +7,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
--- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 -- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -26,7 +26,7 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ (newappsqrt_) where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotInt#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, (*#), (+#), (+##), (-#), (/##), (<#), (==#))
+import GHC.Exts (Double (..), Double#, Int#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotInt#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (<#), (==#))
 import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
 import GHC.Natural (Natural (..))
@@ -127,9 +127,9 @@ tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
       !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2#
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
       !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
-      !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
-      -- weirdly the above is faster
-      -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)  else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+      -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+      -- weirdly the above and below are both about the same
+      !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)  else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
    in -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0
       tni (Itr bn# (idxx# -# 1#) (cl# +# 1#) ycUpdated# remFinal# tcfx#)
   where

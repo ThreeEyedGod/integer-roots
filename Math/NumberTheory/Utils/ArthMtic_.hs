@@ -208,7 +208,7 @@ fromInt64 (I64# x#) = x#
 
 {-# INLINE upLiftDouble# #-}
 upLiftDouble# :: Double# -> Int# -> Double#
-upLiftDouble# d# ex# = case decodeDoubleInteger d# of (# !m, !n# #) -> encodeDoubleInteger m (n# +# ex#)
+upLiftDouble# d# ex# = case decodeDoubleInteger d# of (# !m, !n# #) -> encodeDoubleInteger m (n# +# ex#) -- // FIXME encode is not getting inlined
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
