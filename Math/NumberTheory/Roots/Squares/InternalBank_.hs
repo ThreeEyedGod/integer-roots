@@ -35,6 +35,7 @@ import GHC.Num.Primitives (Bool#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
+import GHC.Float.RealFracMethods (floorDoubleInteger)
 
 -- *********** END NEW IMPORTS
 
@@ -185,7 +186,7 @@ preComput !ax# !tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddD
 
 {-# INLINE computDoubleW64# #-}
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
-computDoubleW64# !tAFX# !tCFX# !radFX# = case floor (D# (coreD# tAFX# tCFX# radFX#)) of (W64# w#) -> w#
+computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDoubleInteger (D# (coreD# tAFX# tCFX# radFX#)) of iI -> case fromInteger iI of (W64# w#) -> w#
 
 coreD# :: Double# -> Double# -> Double# -> Double#
 coreD# !da# !dc# !dr# = da# /## (sqrtDouble# dr# +## dc#)

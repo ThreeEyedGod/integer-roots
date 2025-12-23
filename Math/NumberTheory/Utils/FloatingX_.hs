@@ -3,6 +3,8 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
@@ -57,6 +59,7 @@ import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord, bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, split, split#, sqrtOf2, upLiftDouble#, _evenInt64#)
+import GHC.Float.RealFracMethods (floorDoubleInteger)
 
 -- *********** END NEW IMPORTS
 
@@ -166,7 +169,7 @@ fsqraddFloatingX (FloatingX (D# sA#) expA) (FloatingX (D# sC#) expC)
 {-# SPECIALIZE floorFX :: FloatingX -> Integer #-}
 floorFX :: (Integral a) => FloatingX -> a
 floorFX (FloatingX s e) = case fx2Double (FloatingX s e) of
-  Just d -> floor d
+  Just d -> floor (d :: Double)
   _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE (!+##) #-}
@@ -366,12 +369,12 @@ sqrtFX# fx@(FloatingX# s# e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> Fl
 {-# SPECIALIZE floorX# :: FloatingX# -> Integer #-}
 floorX# :: (Integral a) => FloatingX# -> a
 floorX# (FloatingX# s# e#) = case fx2Double (FloatingX (D# s#) (I64# e#)) of
-  Just d -> floor d
+  Just d -> floor (d :: Double)
   _ -> error "floorX#: fx2Double resulted in Nothing  " -- fromIntegral $ toLong (D# s#) (fromIntegral e)
 
 {-# INLINE floorXW64## #-}
 floorXW64## :: FloatingX# -> Word64#
-floorXW64## f@(FloatingX# s# e#) = case floor (D# $ unsafefx2Double## f) of (W64# w#) -> w#
+floorXW64## f@(FloatingX# s# e#) = case floorDoubleInteger (D# $ unsafefx2Double## f) of iIntger -> case fromInteger iIntger of (W64# w#) -> w#
 
 {-# INLINE floorXI64## #-}
 floorXI64## :: FloatingX# -> Int64#

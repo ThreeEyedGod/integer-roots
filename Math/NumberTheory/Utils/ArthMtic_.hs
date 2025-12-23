@@ -87,7 +87,6 @@ import GHC.Exts
     (/=#),
     (>=#),
   )
-import GHC.Float (floorDouble)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
@@ -96,6 +95,7 @@ import GHC.Num.Integer (integerLog2#, integerLogBaseWord)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
+import GHC.Float.RealFracMethods (floorDoubleInteger)
 
 -- *********** END NEW IMPORTS
 
@@ -205,7 +205,7 @@ doubleFromRvsrdTuple (l1, l2) base = fromIntegral l2 * fromIntegral base + fromI
 
 {-# INLINE largestNSqLTE## #-}
 largestNSqLTE## :: Word64# -> Word64#
-largestNSqLTE## w# = case floorDouble (sqrt (fromIntegral (W64# w#)) :: Double) of (W64# r#) -> r#
+largestNSqLTE## w# = case floorDoubleInteger (sqrt (fromIntegral (W64# w#)) :: Double) of iI -> case fromInteger iI of (W64# r#) -> r#
 
 {-# INLINE radixW32Length #-} -- this works
 radixW32Length :: Integer -> Word
@@ -329,7 +329,8 @@ double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
 {-# INLINE double #-}
 
--- //FIXME floor seems to trigger off missing specialization and also properFractionDouble.
+-- // Fixed floor missing specialization leading to not inlining of properFractionDouble
+-- floor only gets you to Integer or Int, not Word. Hence if Floor to Integer and then to Word solves this
 
 -- The maximum integral value that can be unambiguously represented as a
 -- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger

@@ -57,11 +57,11 @@ library
                -Wno-unused-matches
                -Wno-missed-specialisations 
                -O2 
-              --  -threaded 
-               -- turn threaded off for weigh 
+               -- turn threaded off when using weigh 
+               -threaded 
                -fllvm 
                -fstrictness
-              --  -funfolding-use-threshold=50
+               -funfolding-use-threshold=50
                -mfma 
                -fproc-alignment=64
                -funbox-strict-fields
