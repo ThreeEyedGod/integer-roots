@@ -147,8 +147,7 @@ tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
     rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
       let !sbtnd# = subtrahend# ycScaledbn# yTilde#
-          !resTrial = ta# `bigNatSub` sbtnd#
-          !ytrdr = case resTrial of
+          !ytrdr = case ta# `bigNatSub` sbtnd# of
             (# | res# #) -> (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
             _ ->
               -- bigNat thankfully returns a zero if they are equal and it would go into above branch
@@ -161,10 +160,7 @@ tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
     {-# INLINE rmdrDgt #-}
 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
-    subtrahend# !yScaled# !yTilde# = case (yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde# of
-      !r1# -> r1# `bigNatMulWord#` wyTilde#
-      where
-        !wyTilde# = word64ToWord# yTilde#
+    subtrahend# !yScaled# !yTilde# = let !wyTilde# = word64ToWord# yTilde# in ((yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde#) `bigNatMulWord#` wyTilde#
     {-# INLINE subtrahend# #-}
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
