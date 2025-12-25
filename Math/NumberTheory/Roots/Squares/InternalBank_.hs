@@ -121,11 +121,9 @@ tfi !evnLen# bn# iidx# =
 tni :: Itr -> Natural
 tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
 tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
-  let !w# = bigNatIndex# bn# (idxx# -# 1#) -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
-      !(# i1#, i2# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
-      !(# x1, x2 #) = i1# `timesWord2#` radixW32w#
-      !x = bigNatFromWord2# x1 x2
-      !tA_ = (tA `bigNatMul` bnsp) `bigNatAdd` x `bigNatAddWord#` i2#
+  let  -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
+      !(# i1#, i2# #) = let !w# = bigNatIndex# bn# (idxx# -# 1#) in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
+      !tA_ = let !(# x1, x2 #) = i1# `timesWord2#` radixW32w# in (tA `bigNatMul` bnsp) `bigNatAdd` bigNatFromWord2# x1 x2 `bigNatAddWord#` i2#
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
       !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
       -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
