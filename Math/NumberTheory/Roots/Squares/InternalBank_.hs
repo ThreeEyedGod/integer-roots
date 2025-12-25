@@ -155,8 +155,7 @@ tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
               let !res# = sbtnd# `bigNatSubUnsafe` ta# -- since we know resTrial < 0 and this is safe
                in let !adjyt = yTilde# `subWord64#` 1#Word64
                       !adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
-                      !oneBigNat# = bigNatOne# (# #)
-                      !adjres = (adjacc `bigNatMulWord#` 2## `bigNatAdd` oneBigNat#) `bigNatSubUnsafe` res#
+                      !adjres = (adjacc `bigNatMulWord#` 2## `bigNatAddWord#` 1##) `bigNatSubUnsafe` res#
                    in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
        in ytrdr
     {-# INLINE rmdrDgt #-}
