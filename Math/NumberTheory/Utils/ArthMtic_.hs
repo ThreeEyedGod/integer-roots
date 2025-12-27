@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
--- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
+{-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
@@ -57,6 +57,7 @@ import GHC.Exts
     Word#,
     Word64#,
     and#,
+    decodeDouble_Int64#,
     eqInt64#,
     eqWord#,
     int2Word#,
@@ -81,17 +82,20 @@ import GHC.Exts
     (+#),
     (-#),
     (/=#),
-    (>=#),
+    (>=#), inline, int64ToInt#,
   )
 import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
 import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#, bigNatIsZero)
 import GHC.Num.Integer (integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
+import GHC.Num.Primitives (intEncodeDouble#)
+import GHC.Num.Backend.Selected (bignat_encode_double)
+import GHC.Natural (Natural(NatJ#))
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -208,7 +212,7 @@ fromInt64 (I64# x#) = x#
 
 {-# INLINE upLiftDouble# #-}
 upLiftDouble# :: Double# -> Int# -> Double#
-upLiftDouble# d# ex# = case decodeDoubleInteger d# of (# !m, !n# #) -> encodeDoubleInteger m (n# +# ex#) -- // FIXME encode is not getting inlined
+upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> intEncodeDouble# (int64ToInt# m) (n# +# ex#) 
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
@@ -373,3 +377,4 @@ roundHalfEven m# payload# =
         else (# m'# `and#` (1## `uncheckedShiftL#` 52# `minusWord#` 1##), 0## #)
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
+
