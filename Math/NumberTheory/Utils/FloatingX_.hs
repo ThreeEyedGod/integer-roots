@@ -70,10 +70,6 @@ data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-#
 zeroFx# :: FloatingX#
 zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 
-{-# INLINE oneFx# #-}
-oneFx# :: FloatingX#
-oneFx# = FloatingX# 1.0## 0#Int64
-
 {-# INLINE (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!+##) !x !y = x `addFx#` y

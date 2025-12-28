@@ -178,10 +178,6 @@ _oddInt64# = _evenInt64#
 {-# INLINE _evenInt64# #-}
 {-# INLINE _oddInt64# #-}
 
-unsafesqrtDX :: Double -> Double
-unsafesqrtDX !d = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
-{-# INLINE unsafesqrtDX #-}
-
 fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
 {-# INLINE fromInt64 #-}
