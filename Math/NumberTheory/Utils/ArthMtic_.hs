@@ -80,7 +80,7 @@ import GHC.Exts
     (+#),
     (-#),
     (/=#),
-    (>=#), int64ToInt#,
+    (>=#), int64ToInt#, (<#),
   )
 import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
@@ -270,16 +270,11 @@ double x = x `unsafeShiftL` 1
 cI2D2_ :: BigNat# -> Word# -> (# Double#, Int64# #)
 cI2D2_ bn# lgn# = case bigNatToWordMaybe# bn# of
   (# | w# #) -> (# word2Double# w#, 0#Int64 #)
-  _ -> bnToFxGtWord# bn# lgn#
-  -- where
-  -- | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) = let d# = word2Double# (bigNatIndex# bn# 0#) in (# d#, 0#Int64 #) -- //FIXME CHECK THIS LOGIC
-  -- -- \| isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
-  -- | otherwise = bnToFxGtWord# bn# lgn#
-
--- where
---   bnsz# = bigNatSize# bn#
---   thresh# :: Int#
---   !thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
+  _ -> if isTrue# (bnsz# <# thresh#) then (# bigNatEncodeDouble# bn# 0#, 0#Int64 #) else bnToFxGtWord# bn# lgn# -- // FIXME REVIEW
+  where
+    bnsz# = bigNatSize# bn#
+    thresh# :: Int#
+    !thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
 
 {-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
