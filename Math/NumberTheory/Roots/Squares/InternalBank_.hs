@@ -164,11 +164,9 @@ tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## !bn# !tcfx#
   | isTrue# (ln# `gtWord#` threshW#) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) -- note the gtWord
-  -- | itsZero = (# 0#Word64, zeroFx# #) -- bigNatEncodeDouble# has a trap for zero. So this case is not needed
   | otherwise = (# inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#, zeroFx# #) -- only 8 cases land here in tests
   where
-    !ln# = bigNatLog2# bn#
-    itsZero = isTrue# (ln# `eqWord#` 0##) -- lets this be lazy
+    !ln# = bigNatLog2# bn# -- //FIXME is this necessayr and can it be used in the other branch too
     !threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 {-# INLINE nxtDgtNatW64## #-}
 

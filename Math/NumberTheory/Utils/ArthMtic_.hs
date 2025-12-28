@@ -37,7 +37,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     maxUnsafeInteger,
     bnToFxGtWord#,
     word64From2ElemList#,
-    bnConst##,
     word64FromRvsrdTuple#,
     word64FromWordRvsrdTuple##,
   )
@@ -45,7 +44,7 @@ where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Data.Bits (complement, unsafeShiftL, (.&.))
+import Data.Bits (unsafeShiftL)
 import GHC.Exts
   ( Double (..),
     Double#,
@@ -83,10 +82,7 @@ import GHC.Exts
   )
 import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
-import GHC.Integer (shiftRInteger)
-import GHC.Integer.Logarithms (wordLog2#)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#, bigNatToWordMaybe#)
-import GHC.Num.Integer (integerLog2#)
+import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatOne#, bigNatShiftR#, bigNatZero#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
@@ -98,12 +94,6 @@ import GHC.Num.Primitives (intEncodeDouble#)
 -- *********** END NEW IMPORTS
 
 -- | HELPER functions
-bnConst## :: Int# -> BigNat#
-bnConst## i# = case i# of
-  0# -> bigNatZero# (# #)
-  1# -> bigNatOne# (# #)
-  _ -> error "bnConst# : unsupported constant"
-{-# INLINE bnConst## #-}
 
 -- | Word64# from a "reversed" List of at least 1 and at most 2 Word32 digits
 word64FromRvsrd2ElemList# :: [Word32] -> Word64#
@@ -188,15 +178,6 @@ _oddInt64# = _evenInt64#
 {-# INLINE _evenInt64# #-}
 {-# INLINE _oddInt64# #-}
 
-sqrtDX :: Double -> Double
-sqrtDX d
-  | d == 0 = 0
-  | isNaN d = 0
-  | isInfinite d = maxDouble
-  | d == 1 = 1
-  | otherwise = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
-{-# INLINE sqrtDX #-}
-
 unsafesqrtDX :: Double -> Double
 unsafesqrtDX !d = sqrt d -- actual call to "the floating point square root" {sqrt_fsqrt, sqrt, sqrtC, sqrtLibBF, sqrthpmfr or other }
 {-# INLINE unsafesqrtDX #-}
@@ -273,6 +254,4 @@ bnToFxGtWord# !bn# !lgn# =
             -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
             --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
             !mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
-
--- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 

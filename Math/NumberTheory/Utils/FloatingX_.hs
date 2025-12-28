@@ -52,9 +52,9 @@ import GHC.Exts
   )
 import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
+import GHC.Num.BigNat (BigNat#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, fromInt64, maxDouble, split, split#, upLiftDouble#, _evenInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, fromInt64, split, split#, upLiftDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 
@@ -73,10 +73,6 @@ zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 {-# INLINE oneFx# #-}
 oneFx# :: FloatingX#
 oneFx# = FloatingX# 1.0## 0#Int64
-
-{-# INLINE minValueFx# #-}
-minValueFx# :: FloatingX#
-minValueFx# = FloatingX# 1.0## 0#Int64
 
 {-# INLINE (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
@@ -301,17 +297,8 @@ double2Fx## !d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 unsafeGtWordbn2Fx## :: BigNat# -> Word# -> FloatingX#
 unsafeGtWordbn2Fx## !ibn# !lgn# = case bnToFxGtWord# ibn# lgn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
-{-# INLINE int64ToFx# #-}
-int64ToFx# :: Int64 -> FloatingX#
-int64ToFx# !i
-  | i == 0 = zeroFx#
-  | i < 0 = error "int64ToFx# : invalid negative argument"
-  | otherwise = double2Fx# (fromIntegral i)
-
 {-# INLINE unsafeword64ToFx# #-}
-{-# SPECIALIZE unsafeword64ToFx# :: Integer -> FloatingX# #-}
-{-# SPECIALIZE unsafeword64ToFx# :: Word64 -> FloatingX# #-}
-unsafeword64ToFx# :: (Integral a) => a -> FloatingX#
+unsafeword64ToFx# :: Word64 -> FloatingX#
 unsafeword64ToFx# !i = double2Fx# (fromIntegral i)
 
 {-# INLINE unsafeword64ToFloatingX## #-}
