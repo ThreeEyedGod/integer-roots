@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-{-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
@@ -82,7 +82,7 @@ import GHC.Exts
   )
 import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatOne#, bigNatShiftR#, bigNatZero#)
+import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatShiftR#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
