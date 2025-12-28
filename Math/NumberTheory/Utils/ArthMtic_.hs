@@ -35,7 +35,6 @@ module Math.NumberTheory.Utils.ArthMtic_
     maxDouble,
     maxSafeInteger,
     maxUnsafeInteger,
-    cI2D2_,
     bnToFxGtWord#,
     word64From2ElemList#,
     bnConst##,
@@ -264,21 +263,9 @@ double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
 {-# INLINE double #-}
 
--- The maximum integral value that can be unambiguously represented as a
--- Double. Equal to 9,007,199,254,740,991 = maxsafeinteger
-{-# INLINE cI2D2_ #-}
-cI2D2_ :: BigNat# -> Word# -> (# Double#, Int64# #)
-cI2D2_ bn# lgn# = case bigNatToWordMaybe# bn# of
-  (# | w# #) -> (# word2Double# w#, 0#Int64 #)
-  _ -> if isTrue# (bnsz# <# thresh#) then (# bigNatEncodeDouble# bn# 0#, 0#Int64 #) else bnToFxGtWord# bn# lgn# -- // FIXME REVIEW
-  where
-    bnsz# = bigNatSize# bn#
-    thresh# :: Int#
-    !thresh# = 9# -- if finiteBitSize (0 :: Word) == 64 then 9# else 14# -- aligned to the other similar usage and it workd
-
 {-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
-bnToFxGtWord# bn# lgn# =
+bnToFxGtWord# !bn# !lgn# =
   case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
     !rawSh# ->
       let !shift# = rawSh# `and#` not# 1##

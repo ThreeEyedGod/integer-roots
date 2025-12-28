@@ -54,7 +54,7 @@ import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, cI2D2_, fromInt64, maxDouble, split, split#, upLiftDouble#, _evenInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, fromInt64, maxDouble, split, split#, upLiftDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 
@@ -296,10 +296,6 @@ double2Fx# !d = case split d of (D# s#, I64# e#) -> FloatingX# s# e# -- let !(D#
 {-# INLINE double2Fx## #-}
 double2Fx## :: Double# -> FloatingX#
 double2Fx## !d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
-
-{-# INLINE unsafebigNat2FloatingX## #-}
-unsafebigNat2FloatingX## :: BigNat# -> FloatingX#
-unsafebigNat2FloatingX## !ibn# = case cI2D2_ ibn# (bigNatLog2# ibn#) of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
 {-# INLINE unsafeGtWordbn2Fx## #-}
 unsafeGtWordbn2Fx## :: BigNat# -> Word# -> FloatingX#
