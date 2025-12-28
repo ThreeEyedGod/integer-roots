@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -44,7 +44,6 @@ import GHC.Exts
     timesInt64#,
     (*##),
     (**##),
-    (+#),
     (+##),
     (/##),
     (<##),
@@ -53,7 +52,6 @@ import GHC.Exts
   )
 import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
-import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger)
 import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, split, split#, upLiftDouble#, _evenInt64#)
@@ -281,14 +279,15 @@ sqrtFxSplitDbl## (FloatingX# !d# !e#)
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# !d# 0#Int64) = d#
-unsafefx2Double## (FloatingX# !d# !e#) =
-  -- \| isTrue# (ex# <# 0#) = case fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) of (D# do#) -> do# -- this is necessary
-  -- \| otherwise
-  encodeDoubleInteger m ex#
-  where
-    !(# m, n# #) = decodeDoubleInteger d#
-    !ex# = n# +# int64ToInt# e#
+unsafefx2Double## (FloatingX# !d# !e#) = upLiftDouble# d# (int64ToInt# e#)
+  -- -- \| isTrue# (ex# <# 0#) = case fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) of (D# do#) -> do# -- this is necessary
+  -- -- \| otherwise
+  -- encodeDoubleInteger m ex# -- //FIXME can replace with inline version for speed
+  -- where
+  --   !(# m, n# #) = decodeDoubleInteger d# -- //FIXME can replace with inline version for speed
+  --   !ex# = n# +# int64ToInt# e#
 {-# INLINE unsafefx2Double## #-}
+
 
 {-# INLINE double2Fx# #-}
 double2Fx# :: Double -> FloatingX#
@@ -301,12 +300,12 @@ double2Fx## !d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 {-# INLINE bigNat2FloatingX## #-}
 bigNat2FloatingX## :: BigNat# -> FloatingX#
 bigNat2FloatingX## !ibn#
-  | bigNatIsZero ibn# = zeroFx#
-  | itsOKtoUsePlainDoubleCalc = double2Fx## iDouble#
-  | otherwise = unsafebigNat2FloatingX## ibn#
+  -- | bigNatIsZero ibn# = zeroFx#
+  | itsOKtoUsePlainDoubleCalc = double2Fx## iDouble# -- //FIXME CHECK THIS LOGIC
+  | otherwise = unsafebigNat2FloatingX## ibn# -- //FIXME can we do better seems captures redundant logic
   where
     !(D# maxDouble#) = maxDouble
-    !iDouble# = bigNatEncodeDouble# ibn# 0#
+    !iDouble# = bigNatEncodeDouble# ibn# 0# -- bigNatEncodeDouble has internally a case for zero and then word2double for 0 bignats
     !itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
 
 {-# INLINE unsafebigNat2FloatingX## #-}

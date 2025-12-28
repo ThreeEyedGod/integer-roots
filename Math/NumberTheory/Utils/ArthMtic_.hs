@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-{-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
@@ -82,20 +82,18 @@ import GHC.Exts
     (+#),
     (-#),
     (/=#),
-    (>=#), inline, int64ToInt#,
+    (>=#), int64ToInt#,
   )
 import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
-import GHC.Integer (decodeDoubleInteger, encodeDoubleInteger, shiftRInteger)
+import GHC.Integer (shiftRInteger)
 import GHC.Integer.Logarithms (wordLog2#)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#, bigNatIsZero)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatEncodeDouble#, bigNatIndex#, bigNatLeWord#, bigNatLog2, bigNatOne#, bigNatShiftR, bigNatShiftR#, bigNatSize#, bigNatZero#)
 import GHC.Num.Integer (integerLog2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
 import GHC.Num.Primitives (intEncodeDouble#)
-import GHC.Num.Backend.Selected (bignat_encode_double)
-import GHC.Natural (Natural(NatJ#))
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -221,8 +219,8 @@ split (D# d#) = case split# d# of (# s#, ex# #) -> (D# s#, I64# ex#) -- let !(# 
 {-# INLINE split# #-}
 split# :: Double# -> (# Double#, Int64# #)
 split# d# =
-  let !(# s, expInt# #) = decodeDoubleInteger d#
-      !(D# s#) = fromIntegral s
+  let !(# s64, expInt# #) = decodeDouble_Int64# d#
+      !(D# s#) = fromIntegral (I64# s64)
       !ex# = intToInt64# expInt#
    in (# s#, ex# #)
 
@@ -273,7 +271,7 @@ double x = x `unsafeShiftL` 1
 {-# INLINE cI2D2_ #-}
 cI2D2_ :: BigNat# -> Word# -> (# Double#, Int64# #)
 cI2D2_ bn# lgn#
-  | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) = let d# = word2Double# (bigNatIndex# bn# 0#) in (# d#, 0#Int64 #)
+  | isTrue# (bigNatLeWord# bn# 0x1fffffffffffff##) = let d# = word2Double# (bigNatIndex# bn# 0#) in (# d#, 0#Int64 #) -- //FIXME CHECK THIS LOGIC
   -- \| isTrue# (bnsz# <# thresh#) = (# bigNatEncodeDouble# bn# 0#, 0#Int64 #)
   | otherwise = bnToFxGtWord# bn# lgn#
 
