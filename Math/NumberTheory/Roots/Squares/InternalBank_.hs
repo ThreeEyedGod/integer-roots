@@ -7,7 +7,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
--- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 -- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -164,7 +164,7 @@ tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## !bn# !tcfx#
   | isTrue# (ln# `gtWord#` threshW#) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) -- note the gtWord
-  | itsZero = (# 0#Word64, zeroFx# #)
+  -- | itsZero = (# 0#Word64, zeroFx# #) -- bigNatEncodeDouble# has a trap for zero. So this case is not needed
   | otherwise = (# inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#, zeroFx# #) -- only 8 cases land here in tests
   where
     !ln# = bigNatLog2# bn#

@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
--- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -54,7 +54,7 @@ import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatIsZero, bigNatLog2#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, cI2D2_, convNToDblExp, fromInt64, maxDouble, split, split#, upLiftDouble#, _evenInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, cI2D2_, fromInt64, maxDouble, split, split#, upLiftDouble#, _evenInt64#)
 
 -- *********** END NEW IMPORTS
 
@@ -297,24 +297,9 @@ double2Fx# !d = case split d of (D# s#, I64# e#) -> FloatingX# s# e# -- let !(D#
 double2Fx## :: Double# -> FloatingX#
 double2Fx## !d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 
-{-# INLINE bigNat2FloatingX## #-}
-bigNat2FloatingX## :: BigNat# -> FloatingX#
-bigNat2FloatingX## !ibn#
-  -- | bigNatIsZero ibn# = zeroFx#
-  | itsOKtoUsePlainDoubleCalc = double2Fx## iDouble# -- //FIXME CHECK THIS LOGIC
-  | otherwise = unsafebigNat2FloatingX## ibn# -- //FIXME can we do better seems captures redundant logic
-  where
-    !(D# maxDouble#) = maxDouble
-    !iDouble# = bigNatEncodeDouble# ibn# 0# -- bigNatEncodeDouble has internally a case for zero and then word2double for 0 bignats
-    !itsOKtoUsePlainDoubleCalc = isTrue# (iDouble# <## (fudgeFactor## *## maxDouble#)) where fudgeFactor## = 1.00## -- for safety it has to land within maxDouble (1.7*10^308) i.e. tC ^ 2 + tA <= maxSafeInteger
-
 {-# INLINE unsafebigNat2FloatingX## #-}
 unsafebigNat2FloatingX## :: BigNat# -> FloatingX#
 unsafebigNat2FloatingX## !ibn# = case cI2D2_ ibn# (bigNatLog2# ibn#) of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
-
-{-# INLINE unsafeN2Fx# #-}
-unsafeN2Fx# :: Integer -> FloatingX#
-unsafeN2Fx# !n = case convNToDblExp n of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
 {-# INLINE unsafeGtWordbn2Fx## #-}
 unsafeGtWordbn2Fx## :: BigNat# -> Word# -> FloatingX#
