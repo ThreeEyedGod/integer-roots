@@ -284,7 +284,6 @@ unsafefx2Double## (FloatingX# !d# !e#) = upLiftDouble# d# (int64ToInt# e#)
   --   !ex# = n# +# int64ToInt# e#
 {-# INLINE unsafefx2Double## #-}
 
-
 {-# INLINE double2Fx# #-}
 double2Fx# :: Double -> FloatingX#
 double2Fx# !d = case split d of (D# s#, I64# e#) -> FloatingX# s# e# -- let !(D# s#, I64# e#) = split d in FloatingX# s# e#

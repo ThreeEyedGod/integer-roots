@@ -61,7 +61,7 @@ newappsqrt_ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //F
 newappsqrt_ n@(NatJ# (BN# nbn#)) =
   -- //FIXME check to use wide-word package
   let !szT# = bigNatSizeInBase# 4294967296#Word nbn#
-      !(# evnLen#, szF# #) = if even (W# szT#) then (# 1#, word2Int# szT# `quotInt#` 2# #) else (# 0#, 1# +# word2Int# szT# `quotInt#` 2# #)
+      !(# !evnLen#, !szF# #) = if even (W# szT#) then (# 1#, word2Int# szT# `quotInt#` 2# #) else (# 0#, 1# +# word2Int# szT# `quotInt#` 2# #)
    in tni (tfi evnLen# nbn# (szF# -# 1#))
 {-# NOINLINE newappsqrt_ #-}
 
@@ -81,19 +81,18 @@ tfi !evnLen# bn# iidx# =
     evenFirstRmdrBN# !w# =
       let qr w =
             let y = largestNSqLTE## w
-                ysq = y `timesWord64#` y
-                diff = word64ToInt64# w `subInt64#` word64ToInt64# ysq
+                diff = word64ToInt64# w `subInt64#` word64ToInt64# (y `timesWord64#` y)
              in (# y, diff #)
        in handleFirstRemBN## (qr w#)
-    -- {-# INLINE evenFirstRmdrBN# #-}
+    {-# INLINE evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     oddFirstRmdrBN# !w# =
       let qr w =
             let y = largestNSqLTE## w
-                ysq = y `timesWord64#` y
-                diff = w `subWord64#` ysq -- no chance this will be negative
+                diff = w `subWord64#` (y `timesWord64#` y) -- no chance this will be negative
              in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
        in qr w#
+    {-# INLINE oddFirstRmdrBN# #-}
     handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
     handleFirstRemBN## (# yi64#, ri_ #) =
       let qr y r
@@ -105,17 +104,12 @@ tfi !evnLen# bn# iidx# =
             where
               !(I64# zero) = 0
        in qr yi64# ri_
-    -- {-# INLINE handleFirstRemBN## #-}
+    {-# INLINE handleFirstRemBN## #-}
 
     -- -- Fix remainder accompanying a 'next downed digit' see algorithm
     fixRemainder# :: Word64# -> Int64# -> Word64#
-    fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` two `timesInt64#` word64ToInt64# newYc# `plusInt64#` one in if isTrue# (x `ltInt64#` zero) then 0#Word64 else int64ToWord64# x
-      where
-        !(I64# two) = 2
-        !(I64# one) = 1
-        !(I64# zero) = 0
-
--- {-# INLINE fixRemainder# #-}
+    fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
+    {-# INLINE fixRemainder# #-}
 
 {-# NOINLINE tni #-}
 tni :: Itr -> Natural
