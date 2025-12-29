@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
--- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -48,13 +48,14 @@ import GHC.Exts
     (/##),
     (<##),
     (==##),
-    (>=##),
+    (>=##), int2Word#, wordToWord64#, Int (I#),
   )
 import GHC.Float.RealFracMethods (floorDoubleInteger)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, fromInt64, split, split#, upLiftDouble#, _evenInt64#)
+import GHC.Float (floorDouble)
 
 -- *********** END NEW IMPORTS
 
@@ -242,7 +243,7 @@ sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# fx@(FloatingX# !s# !e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
 
 {-# INLINE floorXW64## #-}
-floorXW64## :: FloatingX# -> Word64#
+floorXW64## :: FloatingX# -> Word64# -- //FIXME make this more efficient
 floorXW64## f@(FloatingX# !s# !e#) = case floorDoubleInteger (D# $ unsafefx2Double## f) of iIntger -> case fromInteger iIntger of (W64# w#) -> w#
 
 {-# INLINE scaleByPower2# #-} -- if made NOINLNE seems CAF friendly

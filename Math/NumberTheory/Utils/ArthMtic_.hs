@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
--- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
+{-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
@@ -78,9 +78,9 @@ import GHC.Exts
     (+#),
     (-#),
     (/=#),
-    (>=#), int64ToInt#, (<#),
+    (>=#), int64ToInt#, (<#), Int (..),
   )
-import GHC.Float.RealFracMethods (floorDoubleInteger)
+import GHC.Float.RealFracMethods (floorDoubleInteger, floorDoubleInt)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatShiftR#)
 import GHC.Word (Word32 (..), Word64 (..))
@@ -170,7 +170,7 @@ word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) = (wordToWord64# lMSB# `timesWord6
 
 {-# INLINE largestNSqLTE## #-}
 largestNSqLTE## :: Word64# -> Word64#
-largestNSqLTE## w# = case floorDoubleInteger (sqrt (fromIntegral (W64# w#)) :: Double) of iI -> case fromInteger iI of (W64# r#) -> r#
+largestNSqLTE## w# = case floorDoubleInt (sqrt (fromIntegral (W64# w#)) :: Double) of (I# iI#) -> wordToWord64# $ int2Word# iI#
 
 _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
 _evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
