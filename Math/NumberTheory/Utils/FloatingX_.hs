@@ -50,7 +50,7 @@ import GHC.Exts
     (==##),
     (>=##), int2Word#, wordToWord64#, Int (I#),
   )
-import GHC.Float.RealFracMethods (floorDoubleInteger)
+import GHC.Float.RealFracMethods (floorDoubleInteger, floorDoubleInt)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#)
 import GHC.Word (Word64 (..))
@@ -244,7 +244,7 @@ sqrtFX# fx@(FloatingX# !s# !e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> 
 
 {-# INLINE floorXW64## #-}
 floorXW64## :: FloatingX# -> Word64# -- //FIXME make this more efficient
-floorXW64## f@(FloatingX# !s# !e#) = case floorDoubleInteger (D# $ unsafefx2Double## f) of iIntger -> case fromInteger iIntger of (W64# w#) -> w#
+floorXW64## f@(FloatingX# !s# !e#) = let !(I# iInt#) = floorDoubleInt (D# $ unsafefx2Double## f) in wordToWord64# (int2Word# iInt#)
 
 {-# INLINE scaleByPower2# #-} -- if made NOINLNE seems CAF friendly
 scaleByPower2# :: Int64# -> FloatingX# -> FloatingX#
