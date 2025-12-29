@@ -66,9 +66,9 @@ newappsqrt_ n@(NatJ# (BN# nbn#)) =
 {-# NOINLINE tfi #-}
 tfi :: Bool# -> BigNat# -> Int# -> Itr
 tfi !evnLen# bn# iidx# =
-  let !w# = bigNatIndex# bn# iidx# -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
-      !(# m#, l# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
-      !i# = word64FromWordRvsrdTuple## (# l#, m# #) 4294967296#Word64
+  let  -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
+      -- !(# l#, m# #) = (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
+      !i# = let !w# = bigNatIndex# bn# iidx# in word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
       !(# yVal, yWord#, rm #) = rmdrFn i#
    in Itr bn# iidx# 1#Int8 yVal rm (unsafeword64ToFloatingX## yWord#)
   where
