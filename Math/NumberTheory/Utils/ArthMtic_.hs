@@ -30,13 +30,11 @@ module Math.NumberTheory.Utils.ArthMtic_
     double,
     radixW32,
     secndPlaceW32Radix,
-    word64FromRvsrd2ElemList#,
     largestNSqLTE##,
     maxDouble,
     maxSafeInteger,
     maxUnsafeInteger,
     bnToFxGtWord#,
-    word64From2ElemList#,
     word64FromRvsrdTuple#,
     word64FromWordRvsrdTuple##,
   )
@@ -100,23 +98,6 @@ import Prelude hiding (pred)
 
 -- | HELPER functions
 
--- | Word64# from a "reversed" List of at least 1 and at most 2 Word32 digits
-word64FromRvsrd2ElemList# :: [Word32] -> Word64#
-word64FromRvsrd2ElemList# [] = error "word64FromRvsrd2ElemList# : null list"
-word64FromRvsrd2ElemList# [llsb] = word64FromRvsrdTuple# (llsb, 0) 4294967296#Word64
-word64FromRvsrd2ElemList# [llsb, lmsb] = word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
-word64FromRvsrd2ElemList# (_ : _ : _) = error "word64FromRvsrd2ElemList# : more than 2 elems list"
-{-# INLINE word64FromRvsrd2ElemList# #-}
-
--- | Word64# from a "normal" List of at least 1 and at most 2 Word32 digits
-word64From2ElemList# :: [Word32] -> Word64#
-word64From2ElemList# [] = error "word64From2ElemList# : null list"
-word64From2ElemList# [llsb] = word64FromRvsrdTuple# (llsb, 0) 4294967296#Word64
-word64From2ElemList# [lmsb, llsb] = word64FromRvsrdTuple# (llsb, lmsb) 4294967296#Word64
-word64From2ElemList# (_ : _ : _) = error "word64From2ElemList# : more than 2 elems list"
-{-# INLINE word64From2ElemList# #-}
-
---- END helpers
 --- BEGIN Core numeric helper functions
 --- ***********************************
 
@@ -145,15 +126,6 @@ intgrFromRvsrdTuple (0, 0) 0 = 0
 intgrFromRvsrdTuple (0, lMSB) base = toInteger lMSB * base
 intgrFromRvsrdTuple (lLSB, 0) _ = toInteger lLSB
 intgrFromRvsrdTuple (lLSB, lMSB) base = toInteger lMSB * base + toInteger lLSB
-
-{-# INLINE word64FromRvsrdTuple #-}
-
--- | Word64 from a "reversed" tuple of Word32 digits
-word64FromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64
-word64FromRvsrdTuple (0, 0) 0 = 0
-word64FromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
-word64FromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
-word64FromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
 {-# INLINE word64FromRvsrdTuple# #-}
 

@@ -64,8 +64,8 @@ newappsqrt_ n@(NatJ# (BN# nbn#)) =
 
 {-# NOINLINE tfi #-}
 tfi :: Bool# -> BigNat# -> Int# -> Itr
-tfi !evnLen# bn# iidx# =
-  let -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
+tfi !evnLen# !bn# !iidx# =
+  let -- //FIXME see if indexing can be avoided
       !i# = let !w# = bigNatIndex# bn# iidx# in word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
       !(# yVal, yWord#, rm #) = rmdrFn i#
    in Itr bn# iidx# 1#Int8 yVal rm (unsafeword64ToFloatingX## yWord#)
@@ -107,9 +107,9 @@ tfi !evnLen# bn# iidx# =
 {-# NOINLINE tni #-}
 tni :: Itr -> Natural
 tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
-tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
-  let -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
-      !tA_ =
+tni (Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) =
+  let !tA_ =
+        -- //FIXME see if indexing can be avoided
         let !(# i1w32#, i2w32# #) = let !w# = bigNatIndex# bn# (idxx# -# 1#) in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
          in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32#
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
