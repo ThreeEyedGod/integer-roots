@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -28,12 +28,14 @@ module Math.NumberTheory.Utils.FloatingX_ where
 import GHC.Exts
   ( Double (..),
     Double#,
+    Int (I#),
     Int64#,
     Word#,
     Word64#,
     eqInt64#,
     fmaddDouble#,
     gtInt64#,
+    int2Word#,
     int64ToInt#,
     isTrue#,
     leInt64#,
@@ -42,20 +44,20 @@ import GHC.Exts
     sqrtDouble#,
     subInt64#,
     timesInt64#,
+    wordToWord64#,
     (*##),
     (**##),
     (+##),
     (/##),
     (<##),
     (==##),
-    (>=##), int2Word#, wordToWord64#, Int (I#),
+    (>=##),
   )
-import GHC.Float.RealFracMethods (floorDoubleInteger, floorDoubleInt)
+import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#)
 import GHC.Word (Word64 (..))
 import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, fromInt64, split, split#, upLiftDouble#, _evenInt64#)
-import GHC.Float (floorDouble)
 
 -- *********** END NEW IMPORTS
 
@@ -273,12 +275,12 @@ sqrtFxSplitDbl## (FloatingX# !d# !e#)
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# !d# 0#Int64) = d#
 unsafefx2Double## (FloatingX# !d# !e#) = upLiftDouble# d# (int64ToInt# e#)
-  -- -- \| isTrue# (ex# <# 0#) = case fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) of (D# do#) -> do# -- this is necessary
-  -- -- \| otherwise
-  -- encodeDoubleInteger m ex# -- //FIXME can replace with inline version for speed
-  -- where
-  --   !(# m, n# #) = decodeDoubleInteger d# -- //FIXME can replace with inline version for speed
-  --   !ex# = n# +# int64ToInt# e#
+-- -- \| isTrue# (ex# <# 0#) = case fromIntegral m `divideDouble` (2 ^ (-(I# ex#))) of (D# do#) -> do# -- this is necessary
+-- -- \| otherwise
+-- encodeDoubleInteger m ex# -- //FIXME can replace with inline version for speed
+-- where
+--   !(# m, n# #) = decodeDoubleInteger d# -- //FIXME can replace with inline version for speed
+--   !ex# = n# +# int64ToInt# e#
 {-# INLINE unsafefx2Double## #-}
 
 {-# INLINE double2Fx# #-}

@@ -4,7 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-{-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
 -- note that not using llvm results in fsqrt appearing in ddump=simpl or ddump-asm dumps else not
@@ -48,6 +48,7 @@ import Data.Bits (unsafeShiftL)
 import GHC.Exts
   ( Double (..),
     Double#,
+    Int (..),
     Int#,
     Int64#,
     Word#,
@@ -57,6 +58,7 @@ import GHC.Exts
     eqInt64#,
     eqWord#,
     int2Word#,
+    int64ToInt#,
     intToInt64#,
     isTrue#,
     minusWord#,
@@ -68,7 +70,9 @@ import GHC.Exts
     quotInt64#,
     quotRemWord#,
     remInt64#,
+    shiftL#,
     timesWord64#,
+    uncheckedIShiftL#,
     uncheckedShiftL#,
     uncheckedShiftRL#,
     word2Double#,
@@ -78,15 +82,16 @@ import GHC.Exts
     (+#),
     (-#),
     (/=#),
-    (>=#), int64ToInt#, (<#), Int (..), shiftL#, uncheckedIShiftL#,
+    (<#),
+    (>=#),
   )
-import GHC.Float.RealFracMethods (floorDoubleInteger, floorDoubleInt)
+import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatShiftR#)
+import GHC.Num.Primitives (intEncodeDouble#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Prelude hiding (pred)
-import GHC.Num.Primitives (intEncodeDouble#)
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -163,9 +168,9 @@ word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToW
 
 -- | Word64# from a "reversed" tuple of Word32 digits
 word64FromWordRvsrdTuple## :: (# Word#, Word# #) -> Word64#
-word64FromWordRvsrdTuple## (# 0##, 0## #)  = 0#Word64
-word64FromWordRvsrdTuple## (# 0##, lMSB# #)  = wordToWord64# (lMSB# `uncheckedShiftL#` 32#) -- lMSB# `timesWord64#` 4294967296#Word64
-word64FromWordRvsrdTuple## (# lLSB#, 0## #)  = wordToWord64# lLSB#
+word64FromWordRvsrdTuple## (# 0##, 0## #) = 0#Word64
+word64FromWordRvsrdTuple## (# 0##, lMSB# #) = wordToWord64# (lMSB# `uncheckedShiftL#` 32#) -- lMSB# `timesWord64#` 4294967296#Word64
+word64FromWordRvsrdTuple## (# lLSB#, 0## #) = wordToWord64# lLSB#
 word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) = word64FromWordRvsrdTuple## (# 0##, lMSB# #) `plusWord64#` wordToWord64# lLSB#
 
 {-# INLINE largestNSqLTE## #-}
@@ -184,7 +189,7 @@ fromInt64 (I64# x#) = x#
 
 {-# INLINE upLiftDouble# #-}
 upLiftDouble# :: Double# -> Int# -> Double#
-upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> intEncodeDouble# (int64ToInt# m) (n# +# ex#) 
+upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> intEncodeDouble# (int64ToInt# m) (n# +# ex#)
 
 {-# INLINE split #-}
 split :: Double -> (Double, Int64)
@@ -208,11 +213,8 @@ split# d# =
 radixW32 :: (Integral a) => a
 radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
 
-{-# SPECIALIZE secndPlaceW32Radix :: Word #-}
 {-# SPECIALIZE secndPlaceW32Radix :: Natural #-}
 {-# SPECIALIZE secndPlaceW32Radix :: Integer #-}
-{-# SPECIALIZE secndPlaceW32Radix :: Word64 #-}
-{-# SPECIALIZE secndPlaceW32Radix :: Int64 #-}
 secndPlaceW32Radix :: (Integral a) => a
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 {-# INLINE secndPlaceW32Radix #-}
@@ -250,4 +252,3 @@ bnToFxGtWord# !bn# !lgn# =
             -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
             --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
             !mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
-

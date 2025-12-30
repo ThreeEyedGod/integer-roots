@@ -7,7 +7,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
-{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 -- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
 
 -- addition (also note -mfma flag used to add in suppport for hardware fused ops)
@@ -26,16 +26,14 @@ module Math.NumberTheory.Roots.Squares.InternalBank_ (newappsqrt_) where
 
 -- \*********** BEGIN NEW IMPORTS
 import Data.Bits (finiteBitSize)
-import GHC.Exts (Double (..), Double#, Int#, ltInt8#, Int8#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotInt#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (==#), Int8#, plusInt8#, Int (..), wordToWord64#)
-import GHC.Float.RealFracMethods (floorDoubleInteger, floorDoubleInt)
+import GHC.Exts (Double (..), Double#, Int (..), Int#, Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (==#))
+import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..))
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe, bigNatShiftL#)
-import GHC.Num.Natural (naturalToBigNat#)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe)
 import GHC.Num.Primitives (Bool#)
-import GHC.Word (Word64 (..))
+import GHC.Prim (int2Word#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
-import GHC.Prim (int2Word#)
 
 -- *********** END NEW IMPORTS
 
@@ -67,8 +65,7 @@ newappsqrt_ n@(NatJ# (BN# nbn#)) =
 {-# NOINLINE tfi #-}
 tfi :: Bool# -> BigNat# -> Int# -> Itr
 tfi !evnLen# bn# iidx# =
-  let  -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
-      -- !(# l#, m# #) = (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #) -- Fast bit extraction instead of quotRemWord#: shift & mask are faster than division
+  let -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
       !i# = let !w# = bigNatIndex# bn# iidx# in word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
       !(# yVal, yWord#, rm #) = rmdrFn i#
    in Itr bn# iidx# 1#Int8 yVal rm (unsafeword64ToFloatingX## yWord#)
@@ -111,19 +108,17 @@ tfi !evnLen# bn# iidx# =
 tni :: Itr -> Natural
 tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
 tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
-  let  -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
-      !tA_ = let !(# i1#, i2# #) = let !w# = bigNatIndex# bn# (idxx# -# 1#) in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) 
-         in -- //FIXME make next line more optimal 
-          let !(# x1, x2 #) = i1# `timesWord2#` radixW32w# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord2# x1 x2 `bigNatAddWord#` i2#
+  let -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
+      !tA_ =
+        let !(# i1w32#, i2w32# #) = let !w# = bigNatIndex# bn# (idxx# -# 1#) in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
+         in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32#
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-      !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
+      !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
       -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
       -- weirdly the above and below are both about the same
-      !itr_ = if isTrue# (cl# `ltInt8#` 3#Int8) then Itr bn# (idxx# -# 1#) (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)) else Itr bn# (idxx# -# 1#) cl# ycUpdated# remFinal# tCFx#  -- tcfx is already scaled by 32. Do not use normalize here
+      !itr_ = if isTrue# (cl# `ltInt8#` 3#Int8) then Itr bn# (idxx# -# 1#) (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)) else Itr bn# (idxx# -# 1#) cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
    in tni itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
   where
-    !(W# radixW32w#) = radixW32
-
     yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
     yTildeFinalFx## (# !w#, !fx# #) = case fx# == zeroFx# of
       True -> if isTrue# (w# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w#
@@ -154,12 +149,12 @@ nxtDgtNatW64## !bn# !tcfx#
   | isTrue# (ln# `gtWord#` threshW#) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) -- note the gtWord
   | otherwise = (# inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#, zeroFx# #) -- only 8 cases land here in tests
   where
-    !ln# = bigNatLog2# bn# -- //FIXME is this necessayr and can it be used in the other branch too
+    !ln# = bigNatLog2# bn# -- //FIXME is this necessary and can it be used in the other branch too
     !threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 {-# INLINE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
-nxtDgtDoubleFxW64## !pa# !tcfx# = case inline preComput pa# tcfx# of (# a#, c#, r# #) -> inline computDoubleW64# a# c# r#
+nxtDgtDoubleFxW64## !pa# !tcfx# = case inline preComput pa# tcfx# of (# a_#, c#, r# #) -> inline computDoubleW64# a_# c# r#
 {-# INLINE nxtDgtDoubleFxW64## #-}
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
