@@ -78,7 +78,7 @@ import GHC.Exts
     (+#),
     (-#),
     (/=#),
-    (>=#), int64ToInt#, (<#), Int (..),
+    (>=#), int64ToInt#, (<#), Int (..), shiftL#, uncheckedIShiftL#,
   )
 import GHC.Float.RealFracMethods (floorDoubleInteger, floorDoubleInt)
 import GHC.Int (Int64 (I64#))
@@ -164,9 +164,9 @@ word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToW
 -- | Word64# from a "reversed" tuple of Word32 digits
 word64FromWordRvsrdTuple## :: (# Word#, Word# #) -> Word64#
 word64FromWordRvsrdTuple## (# 0##, 0## #)  = 0#Word64
-word64FromWordRvsrdTuple## (# 0##, lMSB# #)  = wordToWord64# lMSB# `timesWord64#` 4294967296#Word64
+word64FromWordRvsrdTuple## (# 0##, lMSB# #)  = wordToWord64# (lMSB# `uncheckedShiftL#` 32#) -- lMSB# `timesWord64#` 4294967296#Word64
 word64FromWordRvsrdTuple## (# lLSB#, 0## #)  = wordToWord64# lLSB#
-word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) = (wordToWord64# lMSB# `timesWord64#` 4294967296#Word64) `plusWord64#` wordToWord64# lLSB#
+word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) = word64FromWordRvsrdTuple## (# 0##, lMSB# #) `plusWord64#` wordToWord64# lLSB#
 
 {-# INLINE largestNSqLTE## #-}
 largestNSqLTE## :: Word64# -> Word64#

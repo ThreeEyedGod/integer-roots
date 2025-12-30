@@ -29,7 +29,7 @@ import Data.Bits (finiteBitSize)
 import GHC.Exts (Double (..), Double#, Int#, ltInt8#, Int8#, Int64#, Word (..), Word#, Word64#, and#, eqWord#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, plusInt64#, quotInt#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord2#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, (+#), (+##), (-#), (/##), (==#), Int8#, plusInt8#, Int (..), wordToWord64#)
 import GHC.Float.RealFracMethods (floorDoubleInteger, floorDoubleInt)
 import GHC.Natural (Natural (..))
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMul, bigNatMulWord#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe, bigNatShiftL#)
 import GHC.Num.Natural (naturalToBigNat#)
 import GHC.Num.Primitives (Bool#)
 import GHC.Word (Word64 (..))
@@ -112,8 +112,9 @@ tni :: Itr -> Natural
 tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
 tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
   let  -- Word# for the limb (bigNat is little-endian, 64-bit) -- //FIXME see if indexing can be avoided
-      !tA_ = let !(# i1#, i2# #) = let !w# = bigNatIndex# bn# (idxx# -# 1#) in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) in 
-          let !(# x1, x2 #) = i1# `timesWord2#` radixW32w# in (tA `bigNatMul` bnsp) `bigNatAdd` bigNatFromWord2# x1 x2 `bigNatAddWord#` i2#
+      !tA_ = let !(# i1#, i2# #) = let !w# = bigNatIndex# bn# (idxx# -# 1#) in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) 
+         in -- //FIXME make next line more optimal 
+          let !(# x1, x2 #) = i1# `timesWord2#` radixW32w# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord2# x1 x2 `bigNatAddWord#` i2#
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
       !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatMulWord# yCAcc_ 0x100000000##) yt tA_ -- 0x100000000## = 2^32 = radixW32
       -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
@@ -121,7 +122,6 @@ tni (Itr bn# idxx# !cl# !yCAcc_ !tA !t#) =
       !itr_ = if isTrue# (cl# `ltInt8#` 3#Int8) then Itr bn# (idxx# -# 1#) (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)) else Itr bn# (idxx# -# 1#) cl# ycUpdated# remFinal# tCFx#  -- tcfx is already scaled by 32. Do not use normalize here
    in tni itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
   where
-    !bnsp = naturalToBigNat# secndPlaceW32Radix -- secondPlaceW32Radix as BigNat# does not fit into word!!!
     !(W# radixW32w#) = radixW32
 
     yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
