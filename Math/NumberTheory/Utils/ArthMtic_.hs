@@ -101,7 +101,7 @@ import Prelude hiding (pred)
 --- BEGIN Core numeric helper functions
 --- ***********************************
 
-{-# INLINABLE integralFromRvsrdTuple #-}
+{-# DUMMY integralFromRvsrdTuple #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
 
@@ -113,7 +113,7 @@ integralFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
 integralFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
 integralFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
 
-{-# INLINABLE integralFromTuple #-}
+{-# DUMMY integralFromTuple #-}
 {-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Integer -> Integer #-}
 {-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
 integralFromTuple :: (Integral a) => (Word32, Word32) -> a -> a
@@ -127,7 +127,7 @@ intgrFromRvsrdTuple (0, lMSB) base = toInteger lMSB * base
 intgrFromRvsrdTuple (lLSB, 0) _ = toInteger lLSB
 intgrFromRvsrdTuple (lLSB, lMSB) base = toInteger lMSB * base + toInteger lLSB
 
-{-# INLINABLE word64FromRvsrdTuple# #-}
+{-# DUMMY word64FromRvsrdTuple# #-}
 
 -- | Word64# from a "reversed" tuple of Word32 digits
 word64FromRvsrdTuple# :: (Word32, Word32) -> Word64# -> Word64#
@@ -136,7 +136,7 @@ word64FromRvsrdTuple# (0, W32# lMSB#) base# = wordToWord64# (word32ToWord# lMSB#
 word64FromRvsrdTuple# (W32# lLSB#, 0) _ = wordToWord64# (word32ToWord# lLSB#)
 word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#) `plusWord64#` wordToWord64# (word32ToWord# lLSB#)
 
-{-# INLINABLE word64FromWordRvsrdTuple## #-}
+{-# DUMMY word64FromWordRvsrdTuple## #-}
 
 -- | Word64# from a "reversed" tuple of Word32 digits
 word64FromWordRvsrdTuple## :: (# Word#, Word# #) -> Word64#
@@ -145,7 +145,7 @@ word64FromWordRvsrdTuple## (# 0##, lMSB# #) = wordToWord64# (lMSB# `uncheckedShi
 word64FromWordRvsrdTuple## (# lLSB#, 0## #) = wordToWord64# lLSB#
 word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) = word64FromWordRvsrdTuple## (# 0##, lMSB# #) `plusWord64#` wordToWord64# lLSB#
 
-{-# INLINABLE largestNSqLTE## #-}
+{-# DUMMY largestNSqLTE## #-}
 largestNSqLTE## :: Word64# -> Word64#
 largestNSqLTE## w# = case floorDoubleInt (sqrt (fromIntegral (W64# w#)) :: Double) of (I# iI#) -> wordToWord64# $ int2Word# iI#
 
@@ -157,17 +157,17 @@ _oddInt64# = _evenInt64#
 
 fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
-{-# INLINABLE fromInt64 #-}
+{-# DUMMY fromInt64 #-}
 
 {-# INLINABLE upLiftDouble# #-}
 upLiftDouble# :: Double# -> Int# -> Double#
 upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> intEncodeDouble# (int64ToInt# m) (n# +# ex#)
 
-{-# INLINABLE split #-}
+{-# DUMMY split #-}
 split :: Double -> (Double, Int64)
 split (D# d#) = case split# d# of (# s#, ex# #) -> (D# s#, I64# ex#) -- let !(# s#, ex# #) = split# d# in (D# s#, I64# ex#)
 
-{-# INLINABLE split# #-}
+{-# DUMMY split# #-}
 split# :: Double# -> (# Double#, Int64# #)
 split# d# =
   let !(# s64, expInt# #) = decodeDouble_Int64# d#
@@ -176,7 +176,7 @@ split# d# =
    in (# s#, ex# #)
 
 -- | Some Constants
-{-# INLINABLE radixW32 #-}
+{-# DUMMY radixW32 #-}
 {-# SPECIALIZE radixW32 :: Word #-}
 {-# SPECIALIZE radixW32 :: Natural #-}
 {-# SPECIALIZE radixW32 :: Integer #-}
@@ -189,11 +189,11 @@ radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
 {-# SPECIALIZE secndPlaceW32Radix :: Integer #-}
 secndPlaceW32Radix :: (Integral a) => a
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
-{-# INLINABLE secndPlaceW32Radix #-}
+{-# DUMMY secndPlaceW32Radix #-}
 
 sqrtOf2 :: Double
 sqrtOf2 = 1.4142135623730950488016887242097
-{-# INLINABLE sqrtOf2 #-}
+{-# DUMMY sqrtOf2 #-}
 
 maxDouble :: Double
 maxDouble = 1.7976931348623157e308
@@ -212,9 +212,9 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
-{-# INLINABLE double #-}
+{-# DUMMY double #-}
 
-{-# INLINABLE bnToFxGtWord# #-}
+{-# DUMMY bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
 bnToFxGtWord# !bn# !lgn# =
   case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.

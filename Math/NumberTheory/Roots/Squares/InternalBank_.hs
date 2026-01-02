@@ -60,9 +60,9 @@ newappsqrt_ n@(NatJ# (BN# nbn#)) =
   let !szT# = bigNatSizeInBase# 4294967296#Word nbn#
       !(# !evnLen#, !szF# #) = if even (W# szT#) then (# 1#, word2Int# szT# `quotInt#` 2# #) else (# 0#, 1# +# word2Int# szT# `quotInt#` 2# #)
    in tni (tfi evnLen# nbn# (szF# -# 1#))
-{-# NOINLINE newappsqrt_ #-}
+{-# INLINABLE newappsqrt_ #-}
 
-{-# NOINLINE tfi #-}
+{-# INLINABLE tfi #-}
 tfi :: Bool# -> BigNat# -> Int# -> Itr
 tfi !evnLen# !bn# !iidx# =
   let -- //FIXME see if indexing can be avoided
@@ -79,7 +79,7 @@ tfi !evnLen# !bn# !iidx# =
                 diff = word64ToInt64# w `subInt64#` word64ToInt64# (y `timesWord64#` y)
              in (# y, diff #)
        in handleFirstRemBN## (qr w#)
-    {-# INLINABLE evenFirstRmdrBN# #-}
+    {-# DUMMY evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     oddFirstRmdrBN# !w# =
       let qr w =
@@ -87,7 +87,7 @@ tfi !evnLen# !bn# !iidx# =
                 diff = w `subWord64#` (y `timesWord64#` y) -- no chance this will be negative
              in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
        in qr w#
-    {-# INLINABLE oddFirstRmdrBN# #-}
+    {-# DUMMY oddFirstRmdrBN# #-}
     handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
     handleFirstRemBN## (# yi64#, ri_ #) =
       let qr y r
@@ -97,14 +97,14 @@ tfi !evnLen# !bn# !iidx# =
                  in (# bigNatFromWord64# y_, y_, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
             | otherwise = (# bigNatFromWord64# y, y, bigNatFromWord64# (int64ToWord64# r) #)
        in qr yi64# ri_
-    {-# INLINABLE handleFirstRemBN## #-}
+    {-# DUMMY handleFirstRemBN## #-}
 
     -- -- Fix remainder accompanying a 'next downed digit' see algorithm
     fixRemainder# :: Word64# -> Int64# -> Word64#
     fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
-    {-# INLINABLE fixRemainder# #-}
+    {-# DUMMY fixRemainder# #-}
 
-{-# NOINLINE tni #-}
+{-# INLINABLE tni #-}
 tni :: Itr -> Natural
 tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
 tni (Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) =
@@ -123,7 +123,7 @@ tni (Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) =
     yTildeFinalFx## (# !w#, !fx# #) = case fx# == zeroFx# of
       True -> if isTrue# (w# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w#
       !_ -> fx#
-    {-# INLINABLE yTildeFinalFx## #-}
+    {-# DUMMY yTildeFinalFx## #-}
 
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
     rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
@@ -138,16 +138,16 @@ tni (Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) =
                       !adjres = (adjacc `bigNatMulWord#` 2## `bigNatAddWord#` 1##) `bigNatSubUnsafe` res#
                    in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
        in ytrdr
-    {-# INLINABLE rmdrDgt #-}
+    {-# DUMMY rmdrDgt #-}
 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
     subtrahend# !yScaled# !yTilde# = let !wyTilde# = word64ToWord# yTilde# in ((yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde#) `bigNatMulWord#` wyTilde#
-    {-# INLINABLE subtrahend# #-}
+    {-# DUMMY subtrahend# #-}
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## !bn# !tcfx#
-  | isTrue# (ln# `gtWord#` threshW#) = inline computFxW64# (inline preComputFx## bn# ln# tcfx#) -- note the gtWord
-  | otherwise = (# inline nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#, zeroFx# #) -- only 8 cases land here in tests
+  | isTrue# (ln# `gtWord#` threshW#) = computFxW64# (inline preComputFx## bn# ln# tcfx#) -- note the gtWord
+  | otherwise = (# nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#, zeroFx# #) -- only 8 cases land here in tests
   where
     !ln# = bigNatLog2# bn# -- //FIXME is this necessary and can it be used in the other branch too
     !threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
@@ -155,19 +155,19 @@ nxtDgtNatW64## !bn# !tcfx#
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## !pa# !tcfx# = case inline preComput pa# tcfx# of (# a_#, c#, r# #) -> inline computDoubleW64# a_# c# r#
-{-# INLINABLE nxtDgtDoubleFxW64## #-}
+{-# DUMMY nxtDgtDoubleFxW64## #-}
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
 preComput !ax# !tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDouble# c# c# ax# #)
-{-# INLINABLE preComput #-}
+{-# DUMMY preComput #-}
 
-{-# INLINABLE computDoubleW64# #-}
+{-# DUMMY computDoubleW64# #-}
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
 computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDoubleInt (D# (coreD# tAFX# tCFX# radFX#)) of (I# iI#) -> wordToWord64# (int2Word# iI#)
 
 coreD# :: Double# -> Double# -> Double# -> Double#
 coreD# !da# !dc# !dr# = da# /## (sqrtDouble# dr# +## dc#)
-{-# INLINABLE coreD# #-}
+{-# DUMMY coreD# #-}
 
 preComputFx## :: BigNat# -> Word# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComputFx## !tA__bn# !lgn# !tCFX# = case unsafeGtWordbn2Fx## tA__bn# lgn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add

@@ -39,12 +39,14 @@ import Math.NumberTheory.Utils.ArthMtic_
 isqrtB_ :: (Integral a) => a -> a
 isqrtB_ 0 = 0
 isqrtB_ n = fromInteger . integerFromNatural . newappsqrt_ . fromIntegral $ n
-{-# INLINEABLE isqrtB_ #-}
+{-# DUMMY isqrtB_ #-}
 
+
+-- //FIXME pickup karatsuba from package poly? (dense.hs)
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
-  | lgN < 2300 =
+  | lgN < 513 = -- lgN < 2300 =
       let s = isqrtB_ n in (s, n - s * s)
   | otherwise =
       if lgN .&. 2 /= 0 -- //FIXME check if logic needs to be updated

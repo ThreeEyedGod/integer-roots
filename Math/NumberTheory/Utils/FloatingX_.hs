@@ -69,7 +69,7 @@ import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, fromInt64, split, split
 -- | Custom double "unboxed" and its arithmetic
 data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-# UNPACK #-} !Int64#} deriving (Eq) -- ! for strict data type
 
-{-# INLINABLE zeroFx# #-}
+{-# DUMMY zeroFx# #-}
 zeroFx# :: FloatingX#
 zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 
@@ -77,11 +77,11 @@ zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!+##) !x !y = x `addFx#` y
 
-{-# INLINABLE (!*##) #-}
+{-# DUMMY (!*##) #-}
 (!*##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!*##) !x !y = x `mulFx#` y
 
-{-# INLINABLE (!/##) #-}
+{-# INLINEABLE (!/##) #-}
 (!/##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!/##) !x !y = x `unsafeDivFx#` y ---- note this is the unsafest version of divide
 
@@ -90,7 +90,7 @@ zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
   | isTrue# (xe# `eqInt64#` ye#) = isTrue# (x# <## y#)
   | isTrue# (xe# `ltInt64#` ye#) = isTrue# (x# <## y#)
   | otherwise = False
-{-# INLINABLE (!<##) #-}
+{-# DUMMY (!<##) #-}
 
 {-# INLINABLE (!**+##) #-}
 (!**+##) :: FloatingX# -> FloatingX# -> FloatingX#
@@ -114,7 +114,7 @@ addFx# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
           !resSignif# = sBig# +## scaledLittle#
        in FloatingX# resSignif# expBig#
 
-{-# INLINABLE addFxNorm# #-}
+{-# DUMMY addFxNorm# #-}
 addFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
 addFxNorm# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
   -- \| a == zero# = b
@@ -134,11 +134,11 @@ addFxNorm# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
             then FloatingX# (resSignif# *## 0.5##) (expBig# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# expBig#
 
-{-# INLINABLE mulFx# #-}
+{-# DUMMY mulFx# #-}
 mulFx# :: FloatingX# -> FloatingX# -> FloatingX#
 mulFx# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#) = FloatingX# (sA# *## sB#) (expA# `plusInt64#` expB#)
 
-{-# INLINABLE mulFx_# #-}
+{-# DUMMY mulFx_# #-}
 mulFx_# :: FloatingX# -> FloatingX# -> FloatingX#
 mulFx_# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
   | isTrue# (sA# ==## 0.00##) = zeroFx#
@@ -150,7 +150,7 @@ mulFx_# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
           !resSignif# = sA# *## sB#
        in FloatingX# resSignif# resExp#
 
-{-# INLINABLE mulFxNorm# #-}
+{-# DUMMY mulFxNorm# #-}
 mulFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
 mulFxNorm# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
   | isTrue# (sA# ==## 0.00##) = zeroFx#
@@ -164,7 +164,7 @@ mulFxNorm# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
             then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# resExp#
 
-{-# INLINABLE divFxNorm# #-}
+{-# DUMMY divFxNorm# #-}
 divFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
 divFxNorm# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
   | d == FloatingX# 1.0## (fromInt64 0) = n
@@ -186,7 +186,7 @@ divFxNorm# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
             then zeroFx#
             else FloatingX# finalSignif# finalExp#
 
-{-# INLINABLE unsafeDivFxNorm# #-}
+{-# DUMMY unsafeDivFxNorm# #-}
 unsafeDivFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
 unsafeDivFxNorm# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) =
   -- \| d == FloatingX# 1.0## (fromInt64 0) = n
@@ -227,7 +227,7 @@ unsafeDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
             then zeroFx#
             else FloatingX# finalSignif# finalExp#
 
-{-# INLINABLE unsafestDivFx# #-}
+{-# DUMMY unsafestDivFx# #-}
 unsafestDivFx# :: FloatingX# -> FloatingX# -> FloatingX#
 unsafestDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) = FloatingX# (s1# /## s2#) (e1# `subInt64#` e2#)
 
@@ -248,7 +248,7 @@ sqrtFX# fx@(FloatingX# !s# !e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> 
 floorXW64## :: FloatingX# -> Word64# -- //FIXME make this more efficient
 floorXW64## f@(FloatingX# !s# !e#) = let !(I# iInt#) = floorDoubleInt (D# $ unsafefx2Double## f) in wordToWord64# (int2Word# iInt#)
 
-{-# INLINABLE scaleByPower2# #-} -- if made NOINLNE seems CAF friendly
+{-# NOINLINE scaleByPower2# #-} -- if made NOINLNE seems CAF friendly
 scaleByPower2# :: Int64# -> FloatingX# -> FloatingX#
 scaleByPower2# n# (FloatingX# !s# !e#) = if isTrue# (s# ==## 0.00##) then zeroFx# else FloatingX# s# (e# `plusInt64#` n#) -- normalizeFX# $ FloatingX# s# (e# `plusInt64#` n#)
 
@@ -259,7 +259,7 @@ scaleByPower2# n# (FloatingX# !s# !e#) = if isTrue# (s# ==## 0.00##) then zeroFx
 --   | even (I64# e#) = (# sqrtDouble# d#, e# `quotInt64#` 2#Int64 #) -- even
 --   | otherwise = (# 1.4142135623730950488016887242097## *## sqrtDouble# d#, (e# `subInt64#` 1#Int64) `quotInt64#` 2#Int64 #) -- odd sqrt2 times sqrt d#
 --   -- | otherwise = (# sqrtDouble# 2.00## *## d#, (e# `subInt64#` 1#Int64) `quotInt64#` 2#Int64 #) -- odd sqrt2 times sqrt d#
--- {-# INLINABLE sqrtSplitDbl# #-}
+-- {-# DUMMY sqrtSplitDbl# #-}
 
 -- | actual sqrt call to the hardware for custom type happens here
 sqrtFxSplitDbl## :: FloatingX# -> (# Double#, Int64# #)
@@ -283,22 +283,22 @@ unsafefx2Double## (FloatingX# !d# !e#) = upLiftDouble# d# (int64ToInt# e#)
 --   !ex# = n# +# int64ToInt# e#
 {-# INLINABLE unsafefx2Double## #-}
 
-{-# INLINABLE double2Fx# #-}
+{-# DUMMY double2Fx# #-}
 double2Fx# :: Double -> FloatingX#
 double2Fx# !d = case split d of (D# s#, I64# e#) -> FloatingX# s# e# -- let !(D# s#, I64# e#) = split d in FloatingX# s# e#
 
-{-# INLINABLE double2Fx## #-}
+{-# DUMMY double2Fx## #-}
 double2Fx## :: Double# -> FloatingX#
 double2Fx## !d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 
-{-# INLINABLE unsafeGtWordbn2Fx## #-}
+{-# DUMMY unsafeGtWordbn2Fx## #-}
 unsafeGtWordbn2Fx## :: BigNat# -> Word# -> FloatingX#
 unsafeGtWordbn2Fx## !ibn# !lgn# = case bnToFxGtWord# ibn# lgn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
-{-# INLINABLE unsafeword64ToFx# #-}
+{-# DUMMY unsafeword64ToFx# #-}
 unsafeword64ToFx# :: Word64 -> FloatingX#
 unsafeword64ToFx# !i = double2Fx# (fromIntegral i)
 
-{-# INLINABLE unsafeword64ToFloatingX## #-}
+{-# DUMMY unsafeword64ToFloatingX## #-}
 unsafeword64ToFloatingX## :: Word64# -> FloatingX#
 unsafeword64ToFloatingX## !w# = case W64# w# of i -> unsafeword64ToFx# i
