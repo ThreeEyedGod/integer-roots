@@ -152,14 +152,14 @@ largestNSqLTE## w# = case floorDoubleInt (sqrt (fromIntegral (W64# w#)) :: Doubl
 _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
 _evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
 _oddInt64# = _evenInt64#
-{-# INLINABLE _evenInt64# #-}
-{-# INLINABLE _oddInt64# #-}
+{-# INLINABLE_1 _evenInt64# #-}
+{-# INLINABLE_1 _oddInt64# #-}
 
 fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
 {-# DUMMY fromInt64 #-}
 
-{-# INLINABLE upLiftDouble# #-}
+{-# INLINABLE_1 upLiftDouble# #-}
 upLiftDouble# :: Double# -> Int# -> Double#
 upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> intEncodeDouble# (int64ToInt# m) (n# +# ex#)
 

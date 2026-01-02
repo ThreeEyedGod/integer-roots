@@ -73,7 +73,7 @@ data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-#
 zeroFx# :: FloatingX#
 zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 
-{-# INLINABLE (!+##) #-}
+{-# INLINABLE_1 (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!+##) !x !y = x `addFx#` y
 
@@ -92,11 +92,11 @@ zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
   | otherwise = False
 {-# DUMMY (!<##) #-}
 
-{-# INLINABLE (!**+##) #-}
+{-# INLINABLE_1 (!**+##) #-}
 (!**+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!**+##) !x !y = x `fsqraddFloatingX#` y
 
-{-# INLINABLE addFx# #-}
+{-# INLINABLE_1 addFx# #-}
 addFx# :: FloatingX# -> FloatingX# -> FloatingX#
 addFx# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
   | a == zeroFx# = b
@@ -208,7 +208,7 @@ unsafeDivFxNorm# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) =
         then zeroFx#
         else FloatingX# finalSignif# finalExp#
 
-{-# INLINABLE unsafeDivFx# #-}
+{-# INLINABLE_1 unsafeDivFx# #-}
 unsafeDivFx# :: FloatingX# -> FloatingX# -> FloatingX#
 unsafeDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
   | d == FloatingX# 1.0## (fromInt64 0) = n
@@ -231,7 +231,7 @@ unsafeDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
 unsafestDivFx# :: FloatingX# -> FloatingX# -> FloatingX#
 unsafestDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) = FloatingX# (s1# /## s2#) (e1# `subInt64#` e2#)
 
-{-# INLINABLE fsqraddFloatingX# #-}
+{-# INLINABLE_1 fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fsqraddFloatingX# (FloatingX# !sA# !expA#) (FloatingX# !sC# !expC#)
   | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
@@ -240,11 +240,11 @@ fsqraddFloatingX# (FloatingX# !sA# !expA#) (FloatingX# !sC# !expC#)
     !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
     !diff# = expC# `subInt64#` twoTimesExpA#
 
-{-# INLINABLE sqrtFX# #-}
+{-# INLINABLE_1 sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# fx@(FloatingX# !s# !e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
 
-{-# INLINABLE floorXW64## #-}
+{-# INLINABLE_1 floorXW64## #-}
 floorXW64## :: FloatingX# -> Word64# -- //FIXME make this more efficient
 floorXW64## f@(FloatingX# !s# !e#) = let !(I# iInt#) = floorDoubleInt (D# $ unsafefx2Double## f) in wordToWord64# (int2Word# iInt#)
 
@@ -270,7 +270,7 @@ sqrtFxSplitDbl## (FloatingX# !d# !e#)
   | otherwise = (# sqrtDouble# 2.0## *## d#, quo64# #) -- odd sqrt2 times sqrt d# ---//FIXME what's he right thing to do here
   where
     !(# yesEven, quo64# #) = _evenInt64# e#
-{-# INLINABLE sqrtFxSplitDbl## #-}
+{-# INLINABLE_1 sqrtFxSplitDbl## #-}
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# !d# 0#Int64) = d#
@@ -281,7 +281,7 @@ unsafefx2Double## (FloatingX# !d# !e#) = upLiftDouble# d# (int64ToInt# e#)
 -- where
 --   !(# m, n# #) = decodeDoubleInteger d# -- //FIXME can replace with inline version for speed
 --   !ex# = n# +# int64ToInt# e#
-{-# INLINABLE unsafefx2Double## #-}
+{-# INLINABLE_1 unsafefx2Double## #-}
 
 {-# DUMMY double2Fx# #-}
 double2Fx# :: Double -> FloatingX#
