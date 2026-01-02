@@ -46,7 +46,7 @@ isqrtB_ n = fromInteger . integerFromNatural . newappsqrt_ . fromIntegral $ n
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
-  | lgN < 513 = -- lgN < 2300 =
+  | lgN <= 512 = -- lgN < 2300 =
       let s = isqrtB_ n in (s, n - s * s)
   | otherwise =
       if lgN .&. 2 /= 0 -- //FIXME check if logic needs to be updated
