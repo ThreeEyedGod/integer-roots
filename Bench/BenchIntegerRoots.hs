@@ -15,6 +15,7 @@ main = do
   iGoogolplex <- getRndMInt (iRange 511)
   iFZeight <- getRndMInt (iRange 1023)
   iBoogol <- getRndMInt (iRange 2046)
+  iBoogolZeight <- getRndMInt (iRange 4096)
   defaultMain
     [ bgroup
         "IntegerSquare Roots"
@@ -31,7 +32,9 @@ main = do
           bench "Old FZeight Integer " $ whnf Old.integerSquareRoot iFZeight,
           bench "New FZeight Integer " $ whnf New.integerSquareRoot iFZeight,
           bench "Old Boogol Integer " $ whnf Old.integerSquareRoot iBoogol,
-          bench "New Boogol Integer " $ whnf New.integerSquareRoot iBoogol
+          bench "New Boogol Integer " $ whnf New.integerSquareRoot iBoogol,
+          bench "Old BoogolZeight Integer " $ whnf Old.integerSquareRoot iBoogolZeight,
+          bench "New BoogolZeight Integer " $ whnf New.integerSquareRoot iBoogolZeight
         ]
     ]
 

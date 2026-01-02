@@ -27,6 +27,7 @@ module Math.NumberTheory.TestUtils.Wrappers
   , Googolplex(..)
   , FZeight(..)
   , Boogol(..)
+  , BoogolZeight(..)
   ) where
 
 import Control.Applicative
@@ -216,6 +217,30 @@ instance Ord1 Boogol where
 
 instance Show1 Boogol where
   liftShowsPrec shw _ p (Boogol a) = shw p a
+
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- BoogolZeight
+
+newtype BoogolZeight a = BoogolZeight { getBoogolZeight :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (BoogolZeight a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ BoogolZeight $ foldl1 (\acc n -> acc * 2 ^ (4096 :: Int) + n) ds 
+
+instance Eq1 BoogolZeight where
+  liftEq eq (BoogolZeight a) (BoogolZeight b) = a `eq` b
+
+instance Ord1 BoogolZeight where
+  liftCompare cmp (BoogolZeight a) (BoogolZeight b) = a `cmp` b
+
+instance Show1 BoogolZeight where
+  liftShowsPrec shw _ p (BoogolZeight a) = shw p a
 
 -------------------------------------------------------------------------------
 
