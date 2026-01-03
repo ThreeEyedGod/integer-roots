@@ -29,7 +29,6 @@ where
 
 
 -- \*********** BEGIN NEW IMPORTS
-import Data.Bits (finiteBitSize)
 import GHC.Exts (Double (..), Double#, Int (..), Int#, Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (==#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..))
@@ -38,9 +37,8 @@ import GHC.Num.Primitives (Bool#)
 import GHC.Prim (int2Word#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
-import GHC.Num.Integer (integerFromNatural)
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
+import GHC.Num.Integer (integerLog2#, integerFromNatural)
 
 -- *********** END NEW IMPORTS
 
@@ -127,15 +125,17 @@ tfi !evnLen# !bn# !iidx# =
 tni :: Itr -> Natural
 tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
 tni (Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) =
-  let !tA_ =
+  let 
+      !idyy# = idxx# -# 1#
+      !tA_ =
         -- //FIXME see if indexing can be avoided
-        let !(# i1w32#, i2w32# #) = let !w# = bigNatIndex# bn# (idxx# -# 1#) in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
+        let !(# i1w32#, i2w32# #) = let !w# = bigNatIndex# bn# idyy# in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
          in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32#
       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
       !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
       -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
       -- weirdly the above and below are both about the same
-      !itr_ = if isTrue# (cl# `ltInt8#` 3#Int8) then Itr bn# (idxx# -# 1#) (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)) else Itr bn# (idxx# -# 1#) cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+      !itr_ = if isTrue# (cl# `ltInt8#` 3#Int8) then Itr bn# idyy# (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)) else Itr bn# idyy# cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
    in tni itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
   where
     yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
@@ -200,6 +200,7 @@ coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
 coreFx# (# !tAFX#, !tCFX#, !radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
 {-# INLINE coreFx# #-}
 
+{-# INLINE karatsubaSqrt #-}
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
@@ -225,6 +226,7 @@ karatsubaSqrt n
     lgN = I# (word2Int# (integerLog2# n))
 #endif
 
+{-# INLINE karatsubaStep #-}
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)
     | r >= 0 = (s, r)
@@ -237,6 +239,7 @@ karatsubaStep k (a3, a2, a1, a0)
     cat x y = x `unsafeShiftL` k .|. y
     {-# INLINE cat #-}
 
+{-# INLINE karatsubaSplit #-}
 karatsubaSplit :: Int -> Integer -> (Integer, Integer, Integer, Integer)
 karatsubaSplit k n0 = (a3, a2, a1, a0)
   where

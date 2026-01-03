@@ -89,7 +89,6 @@ import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatShiftR#)
 import GHC.Num.Primitives (intEncodeDouble#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
-import Prelude hiding (pred)
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
