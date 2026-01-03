@@ -159,7 +159,7 @@ fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
 {-# DUMMY fromInt64 #-}
 
-{-# INLINABLE_1 upLiftDouble# #-}
+{-# INLINE upLiftDouble# #-}
 upLiftDouble# :: Double# -> Int# -> Double#
 upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> intEncodeDouble# (int64ToInt# m) (n# +# ex#)
 
@@ -214,7 +214,7 @@ double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
 {-# DUMMY double #-}
 
-{-# DUMMY bnToFxGtWord# #-}
+{-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
 bnToFxGtWord# !bn# !lgn# =
   case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.

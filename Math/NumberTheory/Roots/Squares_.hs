@@ -247,7 +247,7 @@ isqrtWord n
   where
     !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
 
-{-# INLINE isqrtInteger #-}
+-- {-# INLINE isqrtInteger #-}
 isqrtInteger :: Integer -> Integer
 isqrtInteger = fst . karatsubaSqrt
 
