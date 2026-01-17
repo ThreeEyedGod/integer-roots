@@ -58,9 +58,10 @@ import Test.Tasty
 import Test.Tasty.QuickCheck as QC hiding (NonNegative (..), Positive (..), generate)
 import Test.Tasty.SmallCheck as SC
 
-instance Arbitrary Natural where
-  arbitrary = fromInteger <$> (arbitrary `suchThat` (>= 0))
-  shrink = map fromInteger . filter (>= 0) . shrink . toInteger
+-- now (@ghc-9.14.1) defined already in QuickCheck-2.17.1.0:Test.QuickCheck.Arbitrary
+-- instance Arbitrary Natural where
+--   arbitrary = fromInteger <$> (arbitrary `suchThat` (>= 0))
+--   shrink = map fromInteger . filter (>= 0) . shrink . toInteger
 
 #if !MIN_VERSION_smallcheck(1,2,0)
 instance Functor NonNegative where

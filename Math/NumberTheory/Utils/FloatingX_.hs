@@ -3,6 +3,7 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE StrictData #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 
@@ -67,13 +68,13 @@ import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, fromInt64, split, split
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
 -- | Custom double "unboxed" and its arithmetic
-data FloatingX# = FloatingX# {signif# :: {-# UNPACK #-} !Double#, expnnt# :: {-# UNPACK #-} !Int64#} deriving (Eq) -- ! for strict data type
+data FloatingX# = FloatingX# {signif# :: Double#, expnnt# :: Int64#} deriving (Eq) -- ! for strict data type
 
 {-# DUMMY zeroFx# #-}
 zeroFx# :: FloatingX#
 zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 
-{-# INLINE (!+##) #-}
+{-# INLINABLE (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!+##) !x !y = x `addFx#` y
 
@@ -92,11 +93,11 @@ zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
   | otherwise = False
 {-# DUMMY (!<##) #-}
 
-{-# INLINE (!**+##) #-}
+{-# INLINABLE (!**+##) #-}
 (!**+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!**+##) !x !y = x `fsqraddFloatingX#` y
 
-{-# INLINE addFx# #-}
+{-# INLINABLE addFx# #-}
 addFx# :: FloatingX# -> FloatingX# -> FloatingX#
 addFx# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
   | a == zeroFx# = b
@@ -208,7 +209,7 @@ unsafeDivFxNorm# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) =
         then zeroFx#
         else FloatingX# finalSignif# finalExp#
 
-{-# INLINE unsafeDivFx# #-}
+{-# INLINABLE unsafeDivFx# #-}
 unsafeDivFx# :: FloatingX# -> FloatingX# -> FloatingX#
 unsafeDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
   | d == FloatingX# 1.0## (fromInt64 0) = n
@@ -231,7 +232,7 @@ unsafeDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
 unsafestDivFx# :: FloatingX# -> FloatingX# -> FloatingX#
 unsafestDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) = FloatingX# (s1# /## s2#) (e1# `subInt64#` e2#)
 
-{-# INLINE fsqraddFloatingX# #-}
+{-# INLINABLE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
 fsqraddFloatingX# (FloatingX# !sA# !expA#) (FloatingX# !sC# !expC#)
   | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
@@ -240,11 +241,11 @@ fsqraddFloatingX# (FloatingX# !sA# !expA#) (FloatingX# !sC# !expC#)
     !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
     !diff# = expC# `subInt64#` twoTimesExpA#
 
-{-# INLINE sqrtFX# #-}
+{-# INLINABLE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# fx@(FloatingX# !s# !e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
 
-{-# INLINE floorXW64## #-}
+{-# INLINABLE floorXW64## #-}
 floorXW64## :: FloatingX# -> Word64# -- //FIXME make this more efficient
 floorXW64## f@(FloatingX# !s# !e#) = let !(I# iInt#) = floorDoubleInt (D# $ unsafefx2Double## f) in wordToWord64# (int2Word# iInt#)
 
@@ -270,7 +271,7 @@ sqrtFxSplitDbl## (FloatingX# !d# !e#)
   | otherwise = (# sqrtDouble# 2.0## *## d#, quo64# #) -- odd sqrt2 times sqrt d# ---//FIXME what's he right thing to do here
   where
     !(# yesEven, quo64# #) = _evenInt64# e#
-{-# INLINE sqrtFxSplitDbl## #-}
+{-# INLINABLE sqrtFxSplitDbl## #-}
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# !d# 0#Int64) = d#
@@ -281,7 +282,7 @@ unsafefx2Double## (FloatingX# !d# !e#) = upLiftDouble# d# (int64ToInt# e#)
 -- where
 --   !(# m, n# #) = decodeDoubleInteger d# -- //FIXME can replace with inline version for speed
 --   !ex# = n# +# int64ToInt# e#
-{-# INLINE unsafefx2Double## #-}
+{-# INLINABLE unsafefx2Double## #-}
 
 {-# DUMMY double2Fx# #-}
 double2Fx# :: Double -> FloatingX#
@@ -291,7 +292,7 @@ double2Fx# !d = case split d of (D# s#, I64# e#) -> FloatingX# s# e# -- let !(D#
 double2Fx## :: Double# -> FloatingX#
 double2Fx## !d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 
-{-# INLINE unsafeGtWordbn2Fx## #-}
+{-# INLINABLE unsafeGtWordbn2Fx## #-}
 unsafeGtWordbn2Fx## :: BigNat# -> Word# -> FloatingX#
 unsafeGtWordbn2Fx## !ibn# !lgn# = case bnToFxGtWord# ibn# lgn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 

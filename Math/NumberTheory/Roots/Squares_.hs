@@ -64,7 +64,7 @@ integerSquareRoot n
 -- "integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
   #-}
 
-{-# INLINE [1] integerSquareRoot' #-}
+{-# INLINABLE [1] integerSquareRoot' #-}
 integerSquareRoot' :: (Integral a) => a -> a
 integerSquareRoot' = isqrtB_
 
@@ -98,7 +98,7 @@ integerSquareRootRem n
 "integerSquareRootRem'/Integer" integerSquareRootRem' = karatsubaSqrt
   #-}
 
-{-# INLINE [1] integerSquareRootRem' #-}
+{-# INLINABLE [1] integerSquareRootRem' #-}
 integerSquareRootRem' :: (Integral a) => a -> (a, a)
 integerSquareRootRem' n = (s, n - s * s)
   where
@@ -247,11 +247,11 @@ isqrtWord n
   where
     !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
 
--- {-# INLINE isqrtInteger #-}
+-- {-# INLINABLE isqrtInteger #-}
 isqrtInteger :: Integer -> Integer
 isqrtInteger = fst . karatsubaSqrt
 
-{-# INLINE isqrtNatural #-}
+{-# INLINABLE isqrtNatural #-}
 isqrtNatural :: Natural -> Natural
 isqrtNatural n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
 isqrtNatural n@(NatJ# bn) = fromInteger . isqrtInteger . toInteger $ n
