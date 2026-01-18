@@ -28,6 +28,7 @@ library
   if impl(ghc < 9.0)
     build-depends: integer-gmp <1.2
   else
+    -- notice the less than or equal to constraint. Ghc 9.14.1 includes ghc-bignum-1.4
     build-depends: ghc-bignum <= 1.4
   exposed-modules:
     Math.NumberTheory.Roots
