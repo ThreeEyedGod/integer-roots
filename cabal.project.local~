@@ -1,7 +1,10 @@
-profiling: True
+profiling: False
 profiling-detail: toplevel-functions
 
+tests: True
+benchmarks: True
+
 package *
-  coverage: True
-  library-coverage: True
-  documentation: True
+  coverage: False
+  library-coverage: False
+  documentation: False

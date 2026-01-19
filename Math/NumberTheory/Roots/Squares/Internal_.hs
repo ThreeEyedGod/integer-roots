@@ -51,7 +51,7 @@ isqrtB_ :: (Integral a) => a -> a
 isqrtB_ 0 = 0
 isqrtB_ n = fromInteger . integerFromNatural . newappsqrt_ . fromIntegral $ n
 
-{-# DUMMY isqrtB_ #-}
+{-# INLINEABLE isqrtB_ #-}
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
