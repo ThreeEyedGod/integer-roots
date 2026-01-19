@@ -57,6 +57,7 @@ import GHC.Exts
     eqWord#,
     int2Word#,
     int64ToInt#,
+    int64ToWord64#,
     intToInt64#,
     isTrue#,
     minusWord#,
@@ -85,8 +86,8 @@ import GHC.Exts
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatShiftR#)
-import GHC.Num.Primitives (intEncodeDouble#)
+import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWord64#, bigNatShiftR#)
+-- import GHC.Num.Primitives (intEncodeDouble#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 
@@ -151,16 +152,18 @@ largestNSqLTE## w# = case floorDoubleInt (sqrt (fromIntegral (W64# w#)) :: Doubl
 _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
 _evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
 _oddInt64# = _evenInt64#
+
 {-# INLINABLE_1 _evenInt64# #-}
 {-# INLINABLE_1 _oddInt64# #-}
 
 fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
+
 {-# DUMMY fromInt64 #-}
 
-{-# INLINABLE upLiftDouble# #-}
+{-# INLINEABLE upLiftDouble# #-}
 upLiftDouble# :: Double# -> Int# -> Double#
-upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> intEncodeDouble# (int64ToInt# m) (n# +# ex#)
+upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> bigNatEncodeDouble# (bigNatFromWord64# (int64ToWord64# m)) (n# +# ex#) -- intEncodeDouble# (int64ToInt# m) (n# +# ex#)
 
 {-# DUMMY split #-}
 split :: Double -> (Double, Int64)
@@ -175,6 +178,7 @@ split# d# =
    in (# s#, ex# #)
 
 -- | Some Constants
+
 {-# DUMMY radixW32 #-}
 {-# SPECIALIZE radixW32 :: Word #-}
 {-# SPECIALIZE radixW32 :: Natural #-}
@@ -192,6 +196,7 @@ secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 
 sqrtOf2 :: Double
 sqrtOf2 = 1.4142135623730950488016887242097
+
 {-# DUMMY sqrtOf2 #-}
 
 maxDouble :: Double
@@ -211,9 +216,10 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
+
 {-# DUMMY double #-}
 
-{-# INLINABLE bnToFxGtWord# #-}
+{-# INLINEABLE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
 bnToFxGtWord# !bn# !lgn# =
   case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.

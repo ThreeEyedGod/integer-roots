@@ -1,10 +1,11 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 -- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
 
@@ -27,21 +28,18 @@ module Math.NumberTheory.Roots.Squares.Internal_
   )
 where
 
-
 -- \*********** BEGIN NEW IMPORTS
-import GHC.Exts (Double (..), Double#, Int (..), Int#, Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, inline, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (==#))
+
+import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
+import GHC.Exts (Double (..), Double#, Int (..), Int#, Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, inline, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (==#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..))
 import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe)
-import GHC.Num.Primitives (Bool#)
-import GHC.Prim (int2Word#)
+import GHC.Num.Integer (integerFromNatural, integerLog2#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
-import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import GHC.Num.Integer (integerLog2#, integerFromNatural)
 
 -- *********** END NEW IMPORTS
-
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
@@ -52,6 +50,7 @@ import GHC.Num.Integer (integerLog2#, integerFromNatural)
 isqrtB_ :: (Integral a) => a -> a
 isqrtB_ 0 = 0
 isqrtB_ n = fromInteger . integerFromNatural . newappsqrt_ . fromIntegral $ n
+
 {-# DUMMY isqrtB_ #-}
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
@@ -75,19 +74,19 @@ newappsqrt_ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //F
         !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
 newappsqrt_ n@(NatJ# (BN# nbn#)) =
   let !szT# = bigNatSizeInBase# 4294967296#Word nbn#
-      !(# !evnLen#, !szF# #) = if even (W# szT#) then (# 1#, word2Int# szT# `quotInt#` 2# #) else (# 0#, 1# +# word2Int# szT# `quotInt#` 2# #)
-   in tni (tfi evnLen# nbn# (szF# -# 1#))
-{-# INLINABLE newappsqrt_ #-}
+      !(# !evnLen, !szF# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)
+   in tni (tfi evnLen nbn# (szF# -# 1#))
+{-# INLINEABLE newappsqrt_ #-}
 
-{-# INLINABLE tfi #-}
-tfi :: Bool# -> BigNat# -> Int# -> Itr
-tfi !evnLen# !bn# !iidx# =
+{-# INLINEABLE tfi #-}
+tfi :: Bool -> BigNat# -> Int# -> Itr
+tfi !evnLen !bn# !iidx# =
   let -- //FIXME see if indexing can be avoided
       !i# = let !w# = bigNatIndex# bn# iidx# in word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
       !(# yVal, yWord#, rm #) = rmdrFn i#
    in Itr bn# iidx# 1#Int8 yVal rm (unsafeword64ToFloatingX## yWord#)
   where
-    !rmdrFn = if isTrue# (evnLen# ==# 1#) then evenFirstRmdrBN# else oddFirstRmdrBN#
+    !rmdrFn = if evnLen then evenFirstRmdrBN# else oddFirstRmdrBN#
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     evenFirstRmdrBN# !w# =
@@ -96,7 +95,7 @@ tfi !evnLen# !bn# !iidx# =
                 diff = word64ToInt64# w `subInt64#` word64ToInt64# (y `timesWord64#` y)
              in (# y, diff #)
        in handleFirstRemBN## (qr w#)
-    {-# INLINABLE evenFirstRmdrBN# #-}
+    {-# INLINEABLE evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     oddFirstRmdrBN# !w# =
       let qr w =
@@ -104,7 +103,7 @@ tfi !evnLen# !bn# !iidx# =
                 diff = w `subWord64#` (y `timesWord64#` y) -- no chance this will be negative
              in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
        in qr w#
-    {-# INLINABLE oddFirstRmdrBN# #-}
+    {-# INLINEABLE oddFirstRmdrBN# #-}
     handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
     handleFirstRemBN## (# yi64#, ri_ #) =
       let qr y r
@@ -114,19 +113,18 @@ tfi !evnLen# !bn# !iidx# =
                  in (# bigNatFromWord64# y_, y_, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
             | otherwise = (# bigNatFromWord64# y, y, bigNatFromWord64# (int64ToWord64# r) #)
        in qr yi64# ri_
-    {-# INLINABLE handleFirstRemBN## #-}
+    {-# INLINEABLE handleFirstRemBN## #-}
 
     -- -- Fix remainder accompanying a 'next downed digit' see algorithm
     fixRemainder# :: Word64# -> Int64# -> Word64#
     fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
-    {-# INLINABLE fixRemainder# #-}
+    {-# INLINEABLE fixRemainder# #-}
 
-{-# INLINABLE tni #-}
+{-# INLINEABLE tni #-}
 tni :: Itr -> Natural
 tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
 tni (Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) =
-  let 
-      !idyy# = idxx# -# 1#
+  let !idyy# = idxx# -# 1#
       !tA_ =
         -- //FIXME see if indexing can be avoided
         let !(# i1w32#, i2w32# #) = let !w# = bigNatIndex# bn# idyy# in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
@@ -142,7 +140,7 @@ tni (Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) =
     yTildeFinalFx## (# !w#, !fx# #) = case fx# == zeroFx# of
       True -> if isTrue# (w# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w#
       !_ -> fx#
-    {-# INLINABLE yTildeFinalFx## #-}
+    {-# INLINEABLE yTildeFinalFx## #-}
 
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
     rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
@@ -157,11 +155,11 @@ tni (Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) =
                       !adjres = (adjacc `bigNatMulWord#` 2## `bigNatAddWord#` 1##) `bigNatSubUnsafe` res#
                    in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
        in ytrdr
-    {-# INLINABLE rmdrDgt #-}
+    {-# INLINEABLE rmdrDgt #-}
 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
     subtrahend# !yScaled# !yTilde# = let !wyTilde# = word64ToWord# yTilde# in ((yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde#) `bigNatMulWord#` wyTilde#
-    {-# INLINABLE subtrahend# #-}
+    {-# INLINEABLE subtrahend# #-}
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## !bn# !tcfx#
@@ -170,14 +168,16 @@ nxtDgtNatW64## !bn# !tcfx#
   where
     !ln# = bigNatLog2# bn# -- //FIXME is this necessary and can it be used in the other branch too
     !threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
-{-# INLINABLE nxtDgtNatW64## #-}
+{-# INLINEABLE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## !pa# !tcfx# = case preComput pa# tcfx# of (# a_#, c#, r# #) -> computDoubleW64# a_# c# r#
+
 {-# DUMMY nxtDgtDoubleFxW64## #-}
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
 preComput !ax# !tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDouble# c# c# ax# #)
+
 {-# DUMMY preComput #-}
 
 {-# DUMMY computDoubleW64# #-}
@@ -186,38 +186,41 @@ computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDoubleInt (D# (coreD# tAFX# t
 
 coreD# :: Double# -> Double# -> Double# -> Double#
 coreD# !da# !dc# !dr# = da# /## (sqrtDouble# dr# +## dc#)
+
 {-# DUMMY coreD# #-}
 
 preComputFx## :: BigNat# -> Word# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComputFx## !tA__bn# !lgn# !tCFX# = case unsafeGtWordbn2Fx## tA__bn# lgn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
-{-# INLINABLE preComputFx## #-}
+{-# INLINEABLE preComputFx## #-}
 
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> (# Word64#, FloatingX# #)
 computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = let !w64Fx# = coreFx# (# tAFX#, tCFX#, radFX# #) in (# floorXW64## w64Fx#, w64Fx# #)
-{-# INLINABLE computFxW64# #-}
+{-# INLINEABLE computFxW64# #-}
 
 coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
 coreFx# (# !tAFX#, !tCFX#, !radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
-{-# INLINABLE coreFx# #-}
+{-# INLINEABLE coreFx# #-}
 
-{-# INLINABLE karatsubaSqrt #-}
+{-# INLINEABLE karatsubaSqrt #-}
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
-    | lgN < 2300 =
-        let s = isqrtB_ n in (s, n - s * s)
-    | otherwise =
-        if lgN .&. 2 /= 0 then
-            karatsubaStep k (karatsubaSplit k n)
+  | lgN < 2300 =
+      let s = isqrtB_ n in (s, n - s * s)
+  | otherwise =
+      if lgN .&. 2 /= 0
+        then
+          karatsubaStep k (karatsubaSplit k n)
         else
-            -- before we split n into 4 part we must ensure that the first part
-            -- is at least 2^k/4, since this doesn't happen here we scale n by
-            -- multiplying it by 4
-            let n' = n `unsafeShiftL` 2
-                (s, r) = karatsubaStep k (karatsubaSplit k n')
-                r' | s .&. 1 == 0 = r
-                   | otherwise = r + double s - 1
-            in  (s `unsafeShiftR` 1, r' `unsafeShiftR` 2)
+          -- before we split n into 4 part we must ensure that the first part
+          -- is at least 2^k/4, since this doesn't happen here we scale n by
+          -- multiplying it by 4
+          let n' = n `unsafeShiftL` 2
+              (s, r) = karatsubaStep k (karatsubaSplit k n')
+              r'
+                | s .&. 1 == 0 = r
+                | otherwise = r + double s - 1
+           in (s `unsafeShiftR` 1, r' `unsafeShiftR` 2)
   where
     k = lgN `unsafeShiftR` 2 + 1
 #ifdef MIN_VERSION_integer_gmp
@@ -226,20 +229,20 @@ karatsubaSqrt n
     lgN = I# (word2Int# (integerLog2# n))
 #endif
 
-{-# INLINABLE karatsubaStep #-}
+{-# INLINEABLE karatsubaStep #-}
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)
-    | r >= 0 = (s, r)
-    | otherwise = (s - 1, r + double s - 1)
+  | r >= 0 = (s, r)
+  | otherwise = (s - 1, r + double s - 1)
   where
     r = cat u a0 - q * q
     s = s' `unsafeShiftL` k + q
     (q, u) = cat r' a1 `quotRem` double s'
     (s', r') = karatsubaSqrt (cat a3 a2)
     cat x y = x `unsafeShiftL` k .|. y
-    {-# INLINABLE cat #-}
+    {-# INLINEABLE cat #-}
 
-{-# INLINABLE karatsubaSplit #-}
+{-# INLINEABLE karatsubaSplit #-}
 karatsubaSplit :: Int -> Integer -> (Integer, Integer, Integer, Integer)
 karatsubaSplit k n0 = (a3, a2, a1, a0)
   where
