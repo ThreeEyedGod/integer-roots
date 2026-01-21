@@ -24,6 +24,7 @@ source-repository head
 library
   build-depends:
     base >=4.9 && <5
+   ,parallel >=3.2 && <4
   exposed-modules:
     Math.NumberTheory.Roots
     Math.NumberTheory.Roots_
