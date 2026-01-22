@@ -29,7 +29,7 @@ where
 import Data.Bits (finiteBitSize, (.&.))
 import GHC.Exts (Ptr (..), Word (..))
 import GHC.Natural (Natural (..))
-import Math.NumberTheory.Roots.Squares.Internal_
+import Math.NumberTheory.Roots.Squares.Internal_ (karatsubaSqrt, isqrtB_)
 import Math.NumberTheory.Utils.BitMask (indexBitSet)
 
 -- | For a non-negative input \( n \)
@@ -60,8 +60,8 @@ integerSquareRoot n
 "integerSquareRoot'/Int" integerSquareRoot' = isqrtInt'
 "integerSquareRoot'/Word" integerSquareRoot' = isqrtWord
 "integerSquareRoot'/Integer" integerSquareRoot' = isqrtInteger
-"integerSquareRoot'/Natural" integerSquareRoot' = isqrtNatural
--- "integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
+-- "integerSquareRoot'/Natural" integerSquareRoot' = isqrtNatural
+"integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
   #-}
 
 {-# INLINABLE [1] integerSquareRoot' #-}
@@ -251,7 +251,7 @@ isqrtWord n
 isqrtInteger :: Integer -> Integer
 isqrtInteger = fst . karatsubaSqrt
 
-{-# INLINABLE isqrtNatural #-}
-isqrtNatural :: Natural -> Natural
-isqrtNatural n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
-isqrtNatural n@(NatJ# bn) = fromInteger . isqrtInteger . toInteger $ n
+-- {-# INLINABLE isqrtNatural #-}
+-- isqrtNatural :: Natural -> Natural
+-- isqrtNatural n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo#
+-- isqrtNatural n@(NatJ# bn) = fromInteger . isqrtInteger . toInteger $ n
