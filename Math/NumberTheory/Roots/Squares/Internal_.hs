@@ -99,14 +99,12 @@ newappsqrt_ n@(IP nbn#)
     | isTrue# (sz# <=# 1#) = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#) 
     | otherwise = 
         let 
-          (W# wrd#, xs_) = let xs = bigNatToWordList_ nbn# sz# in (head xs, tail xs) 
-          tfiPlus = tfi evnLen wrd#
-          (tfi_, wBExs) = (tfiPlus, xs_) `using` parTuple2 rpar rseq -- do first iteration in parallel with building the rest of the word list for next iterations
+          (tfi_, wBExs) = (tfi evnLen (bigNatIndex# nbn# (sz# -# 1#)), tail (bigNatToWordList_ nbn# sz#)) `using` parTuple2 rpar rseq -- do first iteration in parallel with building the rest of the word list for next iterations
         in tniP tfi_ wBExs
         where
           -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
           !szT# = bigNatSizeInBase# 4294967296#Word nbn#
-          !(# evnLen, !sz# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)         
+          !(# !evnLen, !sz# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)         
 newappsqrt_ _ = error "integerSquareRoot': negative argument"
 {-# INLINEABLE newappsqrt_ #-}
 
