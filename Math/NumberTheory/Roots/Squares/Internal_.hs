@@ -33,10 +33,10 @@ where
 
 import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import GHC.Exts (Double (..), (<=#), int2Double#, double2Int#, Double#, Int (..), Int#, Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, inline, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (==#))
+import GHC.Exts (Double (..), (<=#), timesWord#, quotWord#, int2Double#, double2Int#, Double#, Int (..), Int#, Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, inline, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (+#), (+##), (-#), (/##), (==#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..), naturalFromInteger, naturalToInteger)
-import GHC.Num.BigNat (BigNat (..), bigNatSize#, BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe, bigNatToWordList)
+import GHC.Num.BigNat (BigNat (..), bigNatIndex, bigNatSize#, BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe, bigNatToWordList)
 import GHC.Num.Integer (integerFromNatural, integerLog2#, Integer(..))
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
@@ -76,16 +76,23 @@ newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_# where
                 where
                   !r = (truncate :: Double -> Int) . sqrt $ fromIntegral n
 newappsqrt_ n@(IP nbn#)
-    | isTrue# ((bigNatSize# nbn#) <=# 1#) = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#) 
+    | isTrue# (sz# <=# 1#) = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#) 
     | otherwise = 
         -- do first iteration in parallel with building the rest of the word list for next iterations
-        let (tfi_, wBExs) = (tfiPlus, tail (bigNatToWordList nbn#)) `using` parTuple2 rpar rseq
+        let (tfi_, wBExs) = (tfiPlus, tail (bigNatToWordList_ nbn# sz#)) `using` parTuple2 rpar rseq
         in tniP tfi_ wBExs
         where
-          tfiPlus =
-            let szT# = bigNatSizeInBase# 4294967296#Word nbn#
-                (# !evnLen, !szF# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)
-            in tfi evnLen nbn# (szF# -# 1#)
+          -- size it once in base 2^32 then compute it in 2^64 words (which is bigNatSize# bn# for processing and repurpose as required
+          !szT# = bigNatSizeInBase# 4294967296#Word nbn#
+          !(# !evnLen, !sz# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)
+          -- !sz# = if even (W# szT#) then word2Int# szT# `quotInt#` 2# else 1# +# word2Int# szT# `quotInt#` 2# --bigNatSize# nbn#
+          -- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
+          bigNatToWordList_ :: BigNat# -> Int# -> [Word]
+          bigNatToWordList_ bn = go 
+            where
+                go 0# = []
+                go n  = bigNatIndex bn (n -# 1#) : go (n -# 1#)
+          tfiPlus = tfi evnLen nbn# (sz# -# 1#)
           -- threshold for shifting vs. direct fromInteger
           -- we shift when we expect more than 256 bits
           isqrtWord :: Word -> Word
