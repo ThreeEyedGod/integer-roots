@@ -65,57 +65,58 @@ isqrtB_ n = fromInteger . newappsqrt_ . fromIntegral $ n
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
-data Itr = Itr {bnn# :: {-# UNPACK #-} !BigNat#, idx# :: {-# UNPACK #-} !Int#, a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
+-- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
+bigNatToWordList_ :: BigNat# -> Int# -> [Word]
+bigNatToWordList_ bn = go 
+  where
+      go 0# = []
+      go n  = bigNatIndex bn (n -# 1#) : go (n -# 1#)
+{-# INLINEABLE bigNatToWordList_ #-}
+
+isqrtInt' :: Int -> Int
+isqrtInt' n
+  | n < r * r = r - 1
+  | otherwise = r
+  where
+    !r = (truncate :: Double -> Int) . sqrt $ fromIntegral n
+{-# INLINEABLE isqrtInt' #-}
+isqrtWord :: Word -> Word
+isqrtWord x
+    | x < (r * r)
+        -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
+        || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
+        r - 1
+    | otherwise = r
+    where
+      !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x          
+{-# INLINEABLE isqrtWord #-}
+
+data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
 newappsqrt_ :: Integer -> Integer
-newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_# where 
-              isqrtInt' :: Int -> Int
-              isqrtInt' n
-                | n < r * r = r - 1
-                | otherwise = r
-                where
-                  !r = (truncate :: Double -> Int) . sqrt $ fromIntegral n
+newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#  
 newappsqrt_ n@(IP nbn#)
     | isTrue# (sz# <=# 1#) = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#) 
     | otherwise = 
-        -- do first iteration in parallel with building the rest of the word list for next iterations
-        let (tfi_, wBExs) = (tfiPlus, tail (bigNatToWordList_ nbn# sz#)) `using` parTuple2 rpar rseq
+        let 
+          (W# wrd#, xs_) = let xs = bigNatToWordList_ nbn# sz# in (head xs, tail xs) 
+          tfiPlus = tfi evnLen wrd#
+          (tfi_, wBExs) = (tfiPlus, xs_) `using` parTuple2 rpar rseq -- do first iteration in parallel with building the rest of the word list for next iterations
         in tniP tfi_ wBExs
         where
-          -- size it once in base 2^32 then compute it in 2^64 words (which is bigNatSize# bn# for processing and repurpose as required
+          -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
           !szT# = bigNatSizeInBase# 4294967296#Word nbn#
-          !(# !evnLen, !sz# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)
-          -- !sz# = if even (W# szT#) then word2Int# szT# `quotInt#` 2# else 1# +# word2Int# szT# `quotInt#` 2# --bigNatSize# nbn#
-          -- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
-          bigNatToWordList_ :: BigNat# -> Int# -> [Word]
-          bigNatToWordList_ bn = go 
-            where
-                go 0# = []
-                go n  = bigNatIndex bn (n -# 1#) : go (n -# 1#)
-          tfiPlus = tfi evnLen nbn# (sz# -# 1#)
-          -- threshold for shifting vs. direct fromInteger
-          -- we shift when we expect more than 256 bits
-          isqrtWord :: Word -> Word
-          isqrtWord x
-              | x < (r * r)
-                  -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
-                  || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
-                  r - 1
-              | otherwise = r
-              where
-                !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x          
--- There's already a check for negative in integerSquareRoot,
--- but integerSquareRoot' is exported directly too.
+          !(# evnLen, !sz# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)         
 newappsqrt_ _ = error "integerSquareRoot': negative argument"
 {-# INLINEABLE newappsqrt_ #-}
 
 {-# INLINEABLE tfi #-}
-tfi :: Bool -> BigNat# -> Int# -> Itr
-tfi !evnLen !bn# !iidx# =
-  let -- //FIXME see if indexing can be avoided
-      !i# = let !w# = bigNatIndex# bn# iidx# in word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
+tfi :: Bool -> Word# -> Itr
+tfi !evnLen !w# =
+  let 
+      !i# = word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
       !(# yVal, yWord#, rm #) = rmdrFn i#
-   in Itr bn# iidx# 1#Int8 yVal rm (unsafeword64ToFloatingX## yWord#)
+   in Itr 1#Int8 yVal rm (unsafeword64ToFloatingX## yWord#)
   where
     !rmdrFn = if evnLen then evenFirstRmdrBN# else oddFirstRmdrBN#
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
@@ -155,13 +156,12 @@ data ItrP = ItrP {ap# :: Int8#, yaccbnp :: BigNat#, iRbnp :: BigNat#, tbnp# :: F
 
 {-# INLINEABLE tniP #-}
 tniP :: Itr -> [Word] -> Integer
-tniP itr@(Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) wBExsRest = IP (yaccbnp (foldl' go (ItrP cl# yCAcc_ tA t#) wBExsRest))
+tniP itr@(Itr !cl# !yCAcc_ !tA !t#) wBExsRest = IP (yaccbnp (foldl' go (ItrP cl# yCAcc_ tA t#) wBExsRest))
   where
     go :: ItrP -> Word -> ItrP
     go (ItrP !cl# !yCAcc_ !tA !t#) wBEx@(W# w#) =
       let !tA_ =
             let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
-            -- let !(# i1w32#, i2w32# #) = let !w# = bigNatIndex# bn# idyy# in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
              in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32#
           !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
           !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
@@ -194,157 +194,6 @@ tniP itr@(Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) wBExsRest = IP (yaccbnp (foldl' 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
     subtrahend# !yScaled# !yTilde# = let !wyTilde# = word64ToWord# yTilde# in ((yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde#) `bigNatMulWord#` wyTilde#
     {-# INLINEABLE subtrahend# #-}
-
-
--- newappsqrt_ :: Natural -> Natural
--- newappsqrt_ n@(NatS# w#) = let !(W# wo#) = isqrtWord (W# w#) in NatS# wo# -- //FIXME insert our logic < 63 excised before here and check -- 2^63 <= n < 2^64-1
---           where
---             isqrtWord :: Word -> Word
---             isqrtWord x
---               | x < (r * r)
---                   -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
---                   || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
---                   r - 1
---               | otherwise = r
---               where
---                 !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
--- newappsqrt_ n@(NatJ# (BN# nbn#)) =
---   -- do first iteration in parallel with building the rest of the word list for next iterations
---   let (tfi_, wBExs) = (tfiPlus, tail (bigNatToWordList nbn#)) `using` parTuple2 rpar rseq
---    in tniP tfi_ wBExs
---   where
---     tfiPlus =
---       let szT# = bigNatSizeInBase# 4294967296#Word nbn#
---           (# !evnLen, !szF# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)
---        in tfi evnLen nbn# (szF# -# 1#)
--- {-# INLINEABLE newappsqrt_ #-}
-
--- {-# INLINEABLE tfi #-}
--- tfi :: Bool -> BigNat# -> Int# -> Itr
--- tfi !evnLen !bn# !iidx# =
---   let -- //FIXME see if indexing can be avoided
---       !i# = let !w# = bigNatIndex# bn# iidx# in word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
---       !(# yVal, yWord#, rm #) = rmdrFn i#
---    in Itr bn# iidx# 1#Int8 yVal rm (unsafeword64ToFloatingX## yWord#)
---   where
---     !rmdrFn = if evnLen then evenFirstRmdrBN# else oddFirstRmdrBN#
---     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
---     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
---     evenFirstRmdrBN# !w# =
---       let qr w =
---             let y = largestNSqLTE## w
---                 diff = word64ToInt64# w `subInt64#` word64ToInt64# (y `timesWord64#` y)
---              in (# y, diff #)
---        in handleFirstRemBN## (qr w#)
---     {-# INLINEABLE evenFirstRmdrBN# #-}
---     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
---     oddFirstRmdrBN# !w# =
---       let qr w =
---             let y = largestNSqLTE## w
---                 diff = w `subWord64#` (y `timesWord64#` y) -- no chance this will be negative
---              in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
---        in qr w#
---     {-# INLINEABLE oddFirstRmdrBN# #-}
---     handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
---     handleFirstRemBN## (# yi64#, ri_ #) =
---       let qr y r
---             | isTrue# (r `ltInt64#` 0#Int64) =
---                 let !y_ = y `subWord64#` 1#Word64
---                     !rdr = fixRemainder# y_ r
---                  in (# bigNatFromWord64# y_, y_, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
---             | otherwise = (# bigNatFromWord64# y, y, bigNatFromWord64# (int64ToWord64# r) #)
---        in qr yi64# ri_
---     {-# INLINEABLE handleFirstRemBN## #-}
-
---     -- -- Fix remainder accompanying a 'next downed digit' see algorithm
---     fixRemainder# :: Word64# -> Int64# -> Word64#
---     fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
---     {-# INLINEABLE fixRemainder# #-}
-
--- data ItrP = ItrP {ap# :: Int8#, yaccbnp :: BigNat#, iRbnp :: BigNat#, tbnp# :: FloatingX#}
-
--- {-# INLINEABLE tniP #-}
--- tniP :: Itr -> [Word] -> Natural
--- tniP itr@(Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) wBExsRest = NatJ# (BN# (yaccbnp (foldl' go (ItrP cl# yCAcc_ tA t#) wBExsRest)))
---   where
---     go :: ItrP -> Word -> ItrP
---     go (ItrP !cl# !yCAcc_ !tA !t#) wBEx@(W# w#) =
---       let !tA_ =
---             let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
---             -- let !(# i1w32#, i2w32# #) = let !w# = bigNatIndex# bn# idyy# in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
---              in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32#
---           !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
---           !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
---           -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
---           -- weirdly the above and below are both about the same
---           !itr_ = if isTrue# (cl# `ltInt8#` 3#Int8) then ItrP (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)) else ItrP cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
---        in itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
---       where
---         yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
---         yTildeFinalFx## (# !w#, !fx# #) = case fx# == zeroFx# of
---           True -> if isTrue# (w# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w#
---           !_ -> fx#
---         {-# INLINEABLE yTildeFinalFx## #-}
-
---     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
---     rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
---       let !sbtnd# = subtrahend# ycScaledbn# yTilde#
---           !ytrdr = case ta# `bigNatSub` sbtnd# of
---             (# | res# #) -> (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
---             _ ->
---               -- bigNat thankfully returns a zero if they are equal and it would go into above branch
---               let !res# = sbtnd# `bigNatSubUnsafe` ta# -- since we know resTrial < 0 and this is safe
---                in let !adjyt = yTilde# `subWord64#` 1#Word64
---                       !adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
---                       !adjres = (adjacc `bigNatMulWord#` 2## `bigNatAddWord#` 1##) `bigNatSubUnsafe` res#
---                    in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
---        in ytrdr
---     {-# INLINEABLE rmdrDgt #-}
-
---     subtrahend# :: BigNat# -> Word64# -> BigNat#
---     subtrahend# !yScaled# !yTilde# = let !wyTilde# = word64ToWord# yTilde# in ((yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde#) `bigNatMulWord#` wyTilde#
---     {-# INLINEABLE subtrahend# #-}
-
--- {-# INLINEABLE tni #-}
--- tni :: Itr -> Natural
--- tni (Itr _ 0# _ !yCAcc_ _ _) = NatJ# (BN# yCAcc_) -- final accumulator is the result
--- tni (Itr !bn# !idxx# !cl# !yCAcc_ !tA !t#) =
---   let !idyy# = idxx# -# 1#
---       !tA_ =
---         -- //FIXME see if indexing can be avoided
---         let !(# i1w32#, i2w32# #) = let !w# = bigNatIndex# bn# idyy# in (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
---          in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32#
---       !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
---       !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
---       -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
---       -- weirdly the above and below are both about the same
---       !itr_ = if isTrue# (cl# `ltInt8#` 3#Int8) then Itr bn# idyy# (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)) else Itr bn# idyy# cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
---    in tni itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
---   where
---     yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
---     yTildeFinalFx## (# !w#, !fx# #) = case fx# == zeroFx# of
---       True -> if isTrue# (w# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w#
---       !_ -> fx#
---     {-# INLINEABLE yTildeFinalFx## #-}
-
---     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
---     rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
---       let !sbtnd# = subtrahend# ycScaledbn# yTilde#
---           !ytrdr = case ta# `bigNatSub` sbtnd# of
---             (# | res# #) -> (# ycScaledbn# `bigNatAddWord#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
---             _ ->
---               -- bigNat thankfully returns a zero if they are equal and it would go into above branch
---               let !res# = sbtnd# `bigNatSubUnsafe` ta# -- since we know resTrial < 0 and this is safe
---                in let !adjyt = yTilde# `subWord64#` 1#Word64
---                       !adjacc = ycScaledbn# `bigNatAddWord#` word64ToWord# adjyt
---                       !adjres = (adjacc `bigNatMulWord#` 2## `bigNatAddWord#` 1##) `bigNatSubUnsafe` res#
---                    in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
---        in ytrdr
---     {-# INLINEABLE rmdrDgt #-}
-
---     subtrahend# :: BigNat# -> Word64# -> BigNat#
---     subtrahend# !yScaled# !yTilde# = let !wyTilde# = word64ToWord# yTilde# in ((yScaled# `bigNatAdd` yScaled#) `bigNatAddWord#` wyTilde#) `bigNatMulWord#` wyTilde#
---     {-# INLINEABLE subtrahend# #-}
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## !bn# !tcfx#
