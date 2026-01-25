@@ -2,10 +2,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OrPatterns #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE OrPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
@@ -33,13 +32,12 @@ where
 -- \*********** BEGIN NEW IMPORTS
 
 import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
-import Numeric.QuoteQuot (quoteQuot)
-import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import GHC.Exts (Double (..), (<=#), plusWord#, timesWord#, quotWord#, int2Double#, double2Int#, Double#, Int (..), Int#, Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, inline, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (*#), (+#), (+##), (-#), (/##), (==#))
+import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
+import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (<=#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
-import GHC.Natural (Natural (..), naturalFromInteger, naturalToInteger)
-import GHC.Num.BigNat (BigNat (..), bigNatIsZero, bigNatToWord#, bigNatIndex, bigNatQuotWord#, bigNatSize#, BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSizeInBase#, bigNatSub, bigNatSubUnsafe, bigNatToWordList)
-import GHC.Num.Integer (integerFromNatural, integerLog2#, Integer(..))
+import GHC.Natural (Natural (..), naturalToInteger)
+import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSub, bigNatSubUnsafe)
+import GHC.Num.Integer (Integer (..), integerLog2#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
 
@@ -61,73 +59,26 @@ isqrtB_ n = fromInteger . newappsqrt_ . fromIntegral $ n
 --- https ://arxiv.org/abs/2406.07751
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
--- Equivalent to (`quot` 32).
-quot32 :: Word -> Word
-quot32 = $$(quoteQuot 32)
-{-# INLINEABLE quot32 #-}
-
-bigNatSizeInBase4294967296# :: BigNat# -> Word#
-bigNatSizeInBase4294967296# a
-   | bigNatIsZero a
-   = 0##
-
-   | otherwise
-   = bigNatLogBaseWord4294967296# a `plusWord#` 1##
-{-# INLINEABLE bigNatSizeInBase4294967296# #-}
-
--- | Logarithm for an 2^32 base
-bigNatLogBaseWord4294967296# :: BigNat# -> Word#
-bigNatLogBaseWord4294967296# bn# = let (W# w#) = quot32 (W# (bigNatLog2# bn#)) in w#-- bigNatLog2# bn# `quotWord#` 32## 
-{-# INLINEABLE bigNatLogBaseWord4294967296# #-}
-
--- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
-bigNatToWordList_ :: BigNat# -> Int# -> [Word]
-bigNatToWordList_ bn = go 
-  where
-      go 0# = []
-      go n  = bigNatIndex bn (n -# 1#) : go (n -# 1#)
-{-# INLINEABLE bigNatToWordList_ #-}
-
-isqrtInt' :: Int -> Int
-isqrtInt' n
-  | n < r * r = r - 1
-  | otherwise = r
-  where
-    !r = (truncate :: Double -> Int) . sqrt $ fromIntegral n
-{-# INLINEABLE isqrtInt' #-}
-isqrtWord :: Word -> Word
-isqrtWord x
-    | x < (r * r)
-        -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
-        || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
-        r - 1
-    | otherwise = r
-    where
-      !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x          
-{-# INLINEABLE isqrtWord #-}
-
 data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 
 newappsqrt_ :: Integer -> Integer
-newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#  
+newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
 newappsqrt_ n@(IP nbn#)
-    | isTrue# (sz# <=# 1#) = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#) 
-    | otherwise = 
-        let 
-          (tfi_, wBExs) = (tfi evnLen (bigNatIndex# nbn# (sz# -# 1#)), tail (bigNatToWordList_ nbn# sz#)) `using` parTuple2 rpar rseq -- do first iteration in parallel with building the rest of the word list for next iterations
-        in tniP tfi_ wBExs
-        where
-          -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
-          !szT# = bigNatSizeInBase4294967296# nbn# -- bigNatSizeInBase# 4294967296#Word nbn# 
-          !(# !evnLen, !sz# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)         
+  | isTrue# (sz# <=# 1#) = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
+  | otherwise =
+      let (tfi_, wBExs) = (tfi evnLen (bigNatIndex# nbn# (sz# -# 1#)), tail (bigNatToWordList_ nbn# sz#)) `using` parTuple2 rpar rseq -- do first iteration in parallel with building the rest of the word list for next iterations
+       in tniP tfi_ wBExs
+  where
+    -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
+    !szT# = bigNatSizeInBase4294967296# nbn# -- bigNatSizeInBase# 4294967296#Word nbn#
+    !(# !evnLen, !sz# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)
 newappsqrt_ _ = error "integerSquareRoot': negative argument"
 {-# INLINEABLE newappsqrt_ #-}
 
 {-# INLINEABLE tfi #-}
 tfi :: Bool -> Word# -> Itr
 tfi !evnLen !w# =
-  let 
-      !i# = word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
+  let !i# = word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
       !(# yVal, yWord#, rm #) = rmdrFn i#
    in Itr 1#Int8 yVal rm (unsafeword64ToFloatingX## yWord#)
   where

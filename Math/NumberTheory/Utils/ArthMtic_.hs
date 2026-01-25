@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
@@ -37,18 +38,24 @@ module Math.NumberTheory.Utils.ArthMtic_
     bnToFxGtWord#,
     word64FromRvsrdTuple#,
     word64FromWordRvsrdTuple##,
+    quot32,
+    bigNatSizeInBase4294967296#,
+    bigNatToWordList_,
+    isqrtInt',
+    isqrtWord,
   )
 where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Data.Bits (unsafeShiftL)
+import Data.Bits (finiteBitSize, unsafeShiftL)
 import GHC.Exts
   ( Double (..),
     Double#,
     Int (..),
     Int#,
     Int64#,
+    Word (..),
     Word#,
     Word64#,
     and#,
@@ -86,10 +93,11 @@ import GHC.Exts
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWord64#, bigNatShiftR#)
+import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWord64#, bigNatIndex, bigNatIsZero, bigNatLog2#, bigNatShiftR#)
 -- import GHC.Num.Primitives (intEncodeDouble#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
+import Numeric.QuoteQuot (quoteQuot)
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -100,6 +108,51 @@ import Numeric.Natural (Natural)
 
 --- BEGIN Core numeric helper functions
 --- ***********************************
+
+isqrtInt' :: Int -> Int
+isqrtInt' n
+  | n < r * r = r - 1
+  | otherwise = r
+  where
+    !r = (truncate :: Double -> Int) . sqrt $ fromIntegral n
+{-# INLINEABLE isqrtInt' #-}
+
+isqrtWord :: Word -> Word
+isqrtWord x
+  | x < (r * r)
+      -- Double interprets values near maxBound as 2^64, we don't have that problem for 32 bits
+      || finiteBitSize (0 :: Word) == 64 && r == 4294967296 =
+      r - 1
+  | otherwise = r
+  where
+    !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
+{-# INLINEABLE isqrtWord #-}
+
+-- Equivalent to (`quot` 32).
+quot32 :: Word -> Word
+quot32 = $$(quoteQuot 32)
+{-# INLINEABLE quot32 #-}
+
+bigNatSizeInBase4294967296# :: BigNat# -> Word#
+bigNatSizeInBase4294967296# a
+  | bigNatIsZero a =
+      0##
+  | otherwise =
+      bigNatLogBaseWord4294967296# a `plusWord#` 1##
+{-# INLINEABLE bigNatSizeInBase4294967296# #-}
+
+-- | Logarithm for an 2^32 base
+bigNatLogBaseWord4294967296# :: BigNat# -> Word#
+bigNatLogBaseWord4294967296# bn# = let (W# w#) = quot32 (W# (bigNatLog2# bn#)) in w# -- bigNatLog2# bn# `quotWord#` 32##
+{-# INLINEABLE bigNatLogBaseWord4294967296# #-}
+
+-- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
+bigNatToWordList_ :: BigNat# -> Int# -> [Word]
+bigNatToWordList_ bn = go
+  where
+    go 0# = []
+    go n = bigNatIndex bn (n -# 1#) : go (n -# 1#)
+{-# INLINEABLE bigNatToWordList_ #-}
 
 {-# DUMMY integralFromRvsrdTuple #-}
 {-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer #-}
