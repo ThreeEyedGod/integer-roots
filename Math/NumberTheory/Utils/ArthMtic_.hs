@@ -93,7 +93,7 @@ import GHC.Exts
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWord64#, bigNatIndex, bigNatIsZero, bigNatLog2#, bigNatShiftR#)
+import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWord64#, bigNatIndex, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatAdd)
 -- import GHC.Num.Primitives (intEncodeDouble#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)

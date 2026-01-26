@@ -31,12 +31,12 @@ where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
+import Control.Parallel.Strategies (parTuple2, rpar, rseq, using, runEval)
 import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (>#), (<=#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..), naturalToInteger)
-import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSub, bigNatSubUnsafe)
+import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSub, bigNatSubUnsafe, BigNat (..))
 import GHC.Num.Integer (Integer (..), integerLog2#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
@@ -117,13 +117,28 @@ data ItrP = ItrP {ap# :: Int8#, yaccbnp :: BigNat#, iRbnp :: BigNat#, tbnp# :: F
 
 {-# INLINEABLE tniP #-}
 tniP :: Itr -> [Word] -> Integer
-tniP itr@(Itr !cl# !yCAcc_ !tA !t#) wBExsRest = IP (yaccbnp (foldl' go (ItrP cl# yCAcc_ tA t#) wBExsRest))
+tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbnp (foldl' go (ItrP cli# yCAcci_ tAi ti#) wBExsRest))
   where
+    spl :: Word# -> BigNat
+    spl w# =
+      let i1 = w# `uncheckedShiftRL#` 32# -- max of either of them is 2^32-1
+          i2 = w# `and#` 0xffffffff##  -- max of either of them is 2^32-1
+          x1 = i1 `shiftL#` 32# 
+          r = bigNatFromWord# x1 `bigNatAddWord#` i2
+       in BN# r
+    {-# INLINEABLE spl #-}
+    mul2To64 :: BigNat# -> BigNat
+    mul2To64 x_ = BN# (x_ `bigNatShiftL#` 64##)
+    {-# INLINEABLE mul2To64 #-}
+
     go :: ItrP -> Word -> ItrP
     go (ItrP !cl# !yCAcc_ !tA !t#) wBEx@(W# w#) =
-      let !tA_ =
-            let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
-             in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32#
+      -- let !tA_ =
+      --       let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
+      --        in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32# -- // FIXME PARALLEIZRION OPPTY?
+        let
+          !(BN# tAb# , BN# tAa#) = (spl w# , mul2To64 tA) `using` parTuple2 rseq rpar -- //FIXME not any faster 
+          !tA_ = tAa# `bigNatAdd` tAb#
           !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
           !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
           -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
