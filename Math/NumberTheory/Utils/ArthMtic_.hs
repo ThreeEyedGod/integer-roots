@@ -141,9 +141,9 @@ bigNatSizeInBase4294967296# a
       bigNatLogBaseWord4294967296# a `plusWord#` 1##
 {-# INLINEABLE bigNatSizeInBase4294967296# #-}
 
--- | Logarithm for an 2^32 base
+-- | Logarithm for a 2^32 base
 bigNatLogBaseWord4294967296# :: BigNat# -> Word#
-bigNatLogBaseWord4294967296# bn# = let (W# w#) = quot32 (W# (bigNatLog2# bn#)) in w# -- bigNatLog2# bn# `quotWord#` 32##
+bigNatLogBaseWord4294967296# bn# = let !(W# w#) = quot32 (W# (bigNatLog2# bn#)) in w# -- bigNatLog2# bn# `quotWord#` 32##
 {-# INLINEABLE bigNatLogBaseWord4294967296# #-}
 
 -- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied

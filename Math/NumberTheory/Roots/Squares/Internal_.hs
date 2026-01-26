@@ -33,7 +33,7 @@ where
 
 import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
 import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (<=#))
+import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (>#), (<=#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..), naturalToInteger)
 import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSub, bigNatSubUnsafe)
@@ -63,16 +63,13 @@ data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, 
 
 newappsqrt_ :: Integer -> Integer
 newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
-newappsqrt_ n@(IP nbn#)
-  | isTrue# (sz# <=# 1#) = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
-  | otherwise =
-      let (tfi_, wBExs) = (tfi evnLen (bigNatIndex# nbn# (sz# -# 1#)), tail (bigNatToWordList_ nbn# sz#)) `using` parTuple2 rpar rseq -- do first iteration in parallel with building the rest of the word list for next iterations
-       in tniP tfi_ wBExs
-  where
-    -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
-    !szT# = bigNatSizeInBase4294967296# nbn# -- bigNatSizeInBase# 4294967296#Word nbn#
-    !(# !evnLen, !sz# #) = if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #)
-newappsqrt_ _ = error "integerSquareRoot': negative argument"
+newappsqrt_ n@(IP nbn#) -- //FIXME conside using parListN and N =1 
+  |   szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
+      (# !evnLen, !sz# #) <- if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #),
+      isTrue# (sz# ># 1#) = let (tfi_, wBExs) = (tfi evnLen (bigNatIndex# nbn# (sz# -# 1#)), tail (bigNatToWordList_ nbn# sz#)) `using` parTuple2 rpar rseq -- do first iteration in parallel with building the rest of the word list for next iterations
+                              in tniP tfi_ wBExs 
+  | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
+newappsqrt_ _ = error "newappsqrt_: negative argument"
 {-# INLINEABLE newappsqrt_ #-}
 
 {-# INLINEABLE tfi #-}
@@ -85,20 +82,20 @@ tfi !evnLen !w# =
     !rmdrFn = if evnLen then evenFirstRmdrBN# else oddFirstRmdrBN#
     -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
     evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-    evenFirstRmdrBN# !w# =
+    evenFirstRmdrBN# !w_# =
       let qr w =
             let y = largestNSqLTE## w
                 diff = word64ToInt64# w `subInt64#` word64ToInt64# (y `timesWord64#` y)
              in (# y, diff #)
-       in handleFirstRemBN## (qr w#)
+       in handleFirstRemBN## (qr w_#)
     {-# INLINEABLE evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
-    oddFirstRmdrBN# !w# =
+    oddFirstRmdrBN# !w_# =
       let qr w =
             let y = largestNSqLTE## w
                 diff = w `subWord64#` (y `timesWord64#` y) -- no chance this will be negative
              in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
-       in qr w#
+       in qr w_#
     {-# INLINEABLE oddFirstRmdrBN# #-}
     handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
     handleFirstRemBN## (# yi64#, ri_ #) =
