@@ -156,24 +156,6 @@ bigNatToWordList_ bn = go
     go n = bigNatIndex bn (n -# 1#) : go (n -# 1#)
 {-# INLINEABLE bigNatToWordList_ #-}
 
-{-# DUMMY integralFromRvsrdTuple #-}
-{-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer #-}
-{-# SPECIALIZE integralFromRvsrdTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
-
--- | Integer from a "reversed" tuple of Word32 digits
--- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259
-integralFromRvsrdTuple :: (Integral a) => (Word32, Word32) -> a -> a
-integralFromRvsrdTuple (0, 0) 0 = 0
-integralFromRvsrdTuple (0, lMSB) base = fromIntegral lMSB * base
-integralFromRvsrdTuple (lLSB, 0) _ = fromIntegral lLSB
-integralFromRvsrdTuple (lLSB, lMSB) base = fromIntegral lMSB * base + fromIntegral lLSB
-
-{-# DUMMY integralFromTuple #-}
-{-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Integer -> Integer #-}
-{-# SPECIALIZE integralFromTuple :: (Word32, Word32) -> Word64 -> Word64 #-}
-integralFromTuple :: (Integral a) => (Word32, Word32) -> a -> a
-integralFromTuple (lMSB, lLSB) = integralFromRvsrdTuple (lLSB, lMSB)
-
 -- | Integer from a "reversed" tuple of Word32 digits
 -- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259
 intgrFromRvsrdTuple :: (Word32, Word32) -> Integer -> Integer
