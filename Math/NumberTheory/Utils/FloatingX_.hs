@@ -4,6 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE StrictData #-}
+-- {-# LANGUAGE Strict #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 
@@ -234,9 +235,7 @@ unsafestDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) = FloatingX# (s
 
 {-# INLINABLE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
-fsqraddFloatingX# (FloatingX# !sA# !expA#) (FloatingX# !sC# !expC#)
-  | isTrue# (diff# `eqInt64#` 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) expC#
-  | otherwise = case upLiftDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
+fsqraddFloatingX# (FloatingX# !sA# !expA#) (FloatingX# !sC# !expC#) = case upLiftDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
   where
     !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
     !diff# = expC# `subInt64#` twoTimesExpA#
@@ -284,7 +283,7 @@ unsafefx2Double## (FloatingX# !d# !e#) = upLiftDouble# d# (int64ToInt# e#)
 --   !ex# = n# +# int64ToInt# e#
 {-# INLINABLE unsafefx2Double## #-}
 
-{-# DUMMY double2Fx# #-}
+{-# INLINABLE double2Fx# #-}
 double2Fx# :: Double -> FloatingX#
 double2Fx# !d = case split d of (D# s#, I64# e#) -> FloatingX# s# e# -- let !(D# s#, I64# e#) = split d in FloatingX# s# e#
 
@@ -296,10 +295,10 @@ double2Fx## !d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 unsafeGtWordbn2Fx## :: BigNat# -> Word# -> FloatingX#
 unsafeGtWordbn2Fx## !ibn# !lgn# = case bnToFxGtWord# ibn# lgn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
-{-# DUMMY unsafeword64ToFx# #-}
+{-# INLINABLE unsafeword64ToFx# #-}
 unsafeword64ToFx# :: Word64 -> FloatingX#
 unsafeword64ToFx# !i = double2Fx# (fromIntegral i)
 
-{-# DUMMY unsafeword64ToFloatingX## #-}
+{-# INLINABLE unsafeword64ToFloatingX## #-}
 unsafeword64ToFloatingX## :: Word64# -> FloatingX#
 unsafeword64ToFloatingX## !w# = case W64# w# of i -> unsafeword64ToFx# i

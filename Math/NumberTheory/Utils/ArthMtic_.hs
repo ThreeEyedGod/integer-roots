@@ -4,6 +4,8 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE StrictData #-}
+-- {-# LANGUAGE Strict #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
 
@@ -189,7 +191,7 @@ word64FromRvsrdTuple# (0, W32# lMSB#) base# = wordToWord64# (word32ToWord# lMSB#
 word64FromRvsrdTuple# (W32# lLSB#, 0) _ = wordToWord64# (word32ToWord# lLSB#)
 word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#) `plusWord64#` wordToWord64# (word32ToWord# lLSB#)
 
-{-# DUMMY word64FromWordRvsrdTuple## #-}
+{-# INLINABLE word64FromWordRvsrdTuple## #-}
 
 -- | Word64# from a "reversed" tuple of Word32 digits
 word64FromWordRvsrdTuple## :: (# Word#, Word# #) -> Word64#
@@ -198,7 +200,7 @@ word64FromWordRvsrdTuple## (# 0##, lMSB# #) = wordToWord64# (lMSB# `uncheckedShi
 word64FromWordRvsrdTuple## (# lLSB#, 0## #) = wordToWord64# lLSB#
 word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) = word64FromWordRvsrdTuple## (# 0##, lMSB# #) `plusWord64#` wordToWord64# lLSB#
 
-{-# DUMMY largestNSqLTE## #-}
+{-# INLINABLE largestNSqLTE## #-}
 largestNSqLTE## :: Word64# -> Word64#
 largestNSqLTE## w# = case floorDoubleInt (sqrt (fromIntegral (W64# w#)) :: Double) of (I# iI#) -> wordToWord64# $ int2Word# iI#
 
@@ -206,8 +208,8 @@ _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
 _evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
 _oddInt64# = _evenInt64#
 
-{-# INLINABLE_1 _evenInt64# #-}
-{-# INLINABLE_1 _oddInt64# #-}
+{-# INLINABLE _evenInt64# #-}
+{-# INLINABLE _oddInt64# #-}
 
 fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
@@ -218,11 +220,11 @@ fromInt64 (I64# x#) = x#
 upLiftDouble# :: Double# -> Int# -> Double#
 upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> bigNatEncodeDouble# (bigNatFromWord64# (int64ToWord64# m)) (n# +# ex#) -- intEncodeDouble# (int64ToInt# m) (n# +# ex#)
 
-{-# DUMMY split #-}
+{-# INLINABLE split #-}
 split :: Double -> (Double, Int64)
 split (D# d#) = case split# d# of (# s#, ex# #) -> (D# s#, I64# ex#) -- let !(# s#, ex# #) = split# d# in (D# s#, I64# ex#)
 
-{-# DUMMY split# #-}
+{-# INLINABLE split# #-}
 split# :: Double# -> (# Double#, Int64# #)
 split# d# =
   let !(# s64, expInt# #) = decodeDouble_Int64# d#

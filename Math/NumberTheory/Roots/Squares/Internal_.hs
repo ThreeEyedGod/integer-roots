@@ -5,6 +5,8 @@
 {-# LANGUAGE OrPatterns #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE StrictData #-}
+-- {-# LANGUAGE Strict #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
