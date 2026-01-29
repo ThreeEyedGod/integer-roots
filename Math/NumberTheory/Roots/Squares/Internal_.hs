@@ -33,7 +33,7 @@ where
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Control.Parallel.Strategies (parTuple2, rpar, rseq, using, runEval)
+import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
 import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (>#), (<=#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
@@ -65,7 +65,7 @@ data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, 
 
 newappsqrt_ :: Integer -> Integer
 newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
-newappsqrt_ n@(IP nbn#) -- //FIXME conside using parListN and N =1 
+newappsqrt_ n@(IP nbn#) -- //FIXME consider using parListN and N =1 
   |   szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
       (# !evnLen, !sz# #) <- if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #),
       isTrue# (sz# ># 1#) = let (tfi_, wBExs) = (tfi evnLen (bigNatIndex# nbn# (sz# -# 1#)), tail (bigNatToWordList_ nbn# sz#)) `using` parTuple2 rpar rseq -- do first iteration in parallel with building the rest of the word list for next iterations
