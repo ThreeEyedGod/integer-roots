@@ -2,9 +2,10 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE StrictData #-}
+
 -- {-# LANGUAGE Strict #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
@@ -95,7 +96,7 @@ import GHC.Exts
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWord64#, bigNatIndex, bigNatIsZero, bigNatLog2#, bigNatShiftR#, bigNatAdd)
+import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWord64#, bigNatIndex, bigNatIsZero, bigNatLog2#, bigNatShiftR#)
 -- import GHC.Num.Primitives (intEncodeDouble#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
@@ -133,7 +134,7 @@ isqrtWord x
 -- Equivalent to (`quot` 32).
 quot32 :: Word -> Word
 quot32 = $$(quoteQuot 32)
-{-# INLINEABLE quot32 #-}
+{-# INLINE quot32 #-}
 
 bigNatSizeInBase4294967296# :: BigNat# -> Word#
 bigNatSizeInBase4294967296# a
@@ -141,7 +142,7 @@ bigNatSizeInBase4294967296# a
       0##
   | otherwise =
       bigNatLogBaseWord4294967296# a `plusWord#` 1##
-{-# INLINEABLE bigNatSizeInBase4294967296# #-}
+{-# INLINE bigNatSizeInBase4294967296# #-}
 
 -- | Logarithm for a 2^32 base
 bigNatLogBaseWord4294967296# :: BigNat# -> Word#
@@ -149,12 +150,14 @@ bigNatLogBaseWord4294967296# bn# = let !(W# w#) = quot32 (W# (bigNatLog2# bn#)) 
 {-# INLINEABLE bigNatLogBaseWord4294967296# #-}
 
 -- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
-bigNatToWordList_ :: BigNat# -> Int# -> [Word]
-bigNatToWordList_ bn = go
+bigNatToWordList_ :: Word# -> BigNat# -> Int# -> [Word]
+bigNatToWordList_ = go
   where
-    go 0# = []
-    go n = bigNatIndex bn (n -# 1#) : go (n -# 1#)
-{-# INLINEABLE bigNatToWordList_ #-}
+    go :: Word# -> BigNat# -> Int# -> [Word]
+    go _ _ 0# = []
+    go 0## bn_ n = bigNatIndex bn_ (n -# 1#) : go 0## bn_ (n -# 1#)
+    go m bn_ n = W# m : go 0## bn_ (n -# 1#)
+{-# INLINE bigNatToWordList_ #-}
 
 -- | Integer from a "reversed" tuple of Word32 digits
 -- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259
@@ -173,40 +176,40 @@ word64FromRvsrdTuple# (0, W32# lMSB#) base# = wordToWord64# (word32ToWord# lMSB#
 word64FromRvsrdTuple# (W32# lLSB#, 0) _ = wordToWord64# (word32ToWord# lLSB#)
 word64FromRvsrdTuple# (W32# lLSB#, W32# lMSB#) base# = (wordToWord64# (word32ToWord# lMSB#) `timesWord64#` base#) `plusWord64#` wordToWord64# (word32ToWord# lLSB#)
 
-{-# INLINABLE word64FromWordRvsrdTuple## #-}
+{-# INLINE word64FromWordRvsrdTuple## #-}
 
 -- | Word64# from a "reversed" tuple of Word32 digits
 word64FromWordRvsrdTuple## :: (# Word#, Word# #) -> Word64#
 word64FromWordRvsrdTuple## (# 0##, 0## #) = 0#Word64
 word64FromWordRvsrdTuple## (# 0##, lMSB# #) = wordToWord64# (lMSB# `uncheckedShiftL#` 32#) -- lMSB# `timesWord64#` 4294967296#Word64
 word64FromWordRvsrdTuple## (# lLSB#, 0## #) = wordToWord64# lLSB#
-word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) = word64FromWordRvsrdTuple## (# 0##, lMSB# #) `plusWord64#` wordToWord64# lLSB#
+word64FromWordRvsrdTuple## (# lLSB#, lMSB# #) = wordToWord64# (lMSB# `uncheckedShiftL#` 32#) `plusWord64#` wordToWord64# lLSB# -- don't recurse else it does not inline
 
-{-# INLINABLE largestNSqLTE## #-}
+{-# INLINE largestNSqLTE## #-}
 largestNSqLTE## :: Word64# -> Word64#
 largestNSqLTE## w# = case floorDoubleInt (sqrt (fromIntegral (W64# w#)) :: Double) of (I# iI#) -> wordToWord64# $ int2Word# iI#
 
 _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
 _evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
 _oddInt64# = _evenInt64#
-
-{-# INLINABLE _evenInt64# #-}
-{-# INLINABLE _oddInt64# #-}
+{-# INLINEABLE _evenInt64# #-}
+{-# INLINEABLE _oddInt64# #-}
 
 fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
 
 {-# DUMMY fromInt64 #-}
 
-{-# INLINEABLE upLiftDouble# #-}
+{-# INLINE upLiftDouble# #-}
 upLiftDouble# :: Double# -> Int# -> Double#
+upLiftDouble# d# 0# = d#
 upLiftDouble# d# ex# = case decodeDouble_Int64# d# of (# !m, !n# #) -> bigNatEncodeDouble# (bigNatFromWord64# (int64ToWord64# m)) (n# +# ex#) -- intEncodeDouble# (int64ToInt# m) (n# +# ex#)
 
-{-# INLINABLE split #-}
+{-# INLINE split #-}
 split :: Double -> (Double, Int64)
 split (D# d#) = case split# d# of (# s#, ex# #) -> (D# s#, I64# ex#) -- let !(# s#, ex# #) = split# d# in (D# s#, I64# ex#)
 
-{-# INLINABLE split# #-}
+{-# INLINE split# #-}
 split# :: Double# -> (# Double#, Int64# #)
 split# d# =
   let !(# s64, expInt# #) = decodeDouble_Int64# d#
@@ -254,9 +257,7 @@ maxUnsafeInteger = 1797693134862315708145274237317043567980705675258449965989174
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
 
-{-# DUMMY double #-}
-
-{-# INLINEABLE bnToFxGtWord# #-}
+{-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
 bnToFxGtWord# !bn# !lgn# =
   case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.

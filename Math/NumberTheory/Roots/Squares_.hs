@@ -27,7 +27,7 @@ module Math.NumberTheory.Roots.Squares_
 where
 
 import Data.Bits (finiteBitSize, (.&.))
-import GHC.Exts (Ptr (..), Word (..))
+import GHC.Exts (Ptr (..))
 import GHC.Natural (Natural (..))
 import Math.NumberTheory.Roots.Squares.Internal_ (karatsubaSqrt, isqrtB_)
 import Math.NumberTheory.Utils.BitMask (indexBitSet)
@@ -42,12 +42,10 @@ import Math.NumberTheory.Utils.BitMask (indexBitSet)
 -- 10
 -- >>> integerSquareRoot 101
 -- 10
-{-# SPECIALIZE integerSquareRoot ::
-  Int -> Int,
-  Word -> Word,
-  Integer -> Integer,
-  Natural -> Natural
-  #-}
+{-# SPECIALIZE integerSquareRoot :: Int -> Int #-}
+{-# SPECIALIZE integerSquareRoot :: Word -> Word #-}
+{-# SPECIALIZE integerSquareRoot :: Integer -> Integer #-}
+{-# SPECIALIZE integerSquareRoot :: Natural -> Natural #-}
 integerSquareRoot :: (Integral a) => a -> a
 integerSquareRoot n
   | n < 0 = error "integerSquareRoot: negative argument"
@@ -64,7 +62,7 @@ integerSquareRoot n
 "integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
   #-}
 
-{-# INLINABLE [1] integerSquareRoot' #-}
+{-# INLINABLE [2] integerSquareRoot' #-}
 integerSquareRoot' :: (Integral a) => a -> a
 integerSquareRoot' = isqrtB_
 
@@ -79,12 +77,10 @@ integerSquareRoot' = isqrtB_
 -- (10,0)
 -- >>> integerSquareRootRem 101
 -- (10,1)
-{-# SPECIALIZE integerSquareRootRem ::
-  Int -> (Int, Int),
-  Word -> (Word, Word),
-  Integer -> (Integer, Integer),
-  Natural -> (Natural, Natural)
-  #-}
+{-# SPECIALIZE integerSquareRootRem :: Int -> (Int, Int) #-}
+{-# SPECIALIZE integerSquareRootRem :: Word -> (Word, Word) #-}
+{-# SPECIALIZE integerSquareRootRem :: Integer -> (Integer, Integer) #-}
+{-# SPECIALIZE integerSquareRootRem :: Natural -> (Natural, Natural) #-}
 integerSquareRootRem :: (Integral a) => a -> (a, a)
 integerSquareRootRem n
   | n < 0 = error "integerSquareRootRem: negative argument"
@@ -98,7 +94,7 @@ integerSquareRootRem n
 "integerSquareRootRem'/Integer" integerSquareRootRem' = karatsubaSqrt
   #-}
 
-{-# INLINABLE [1] integerSquareRootRem' #-}
+{-# INLINABLE [2] integerSquareRootRem' #-}
 integerSquareRootRem' :: (Integral a) => a -> (a, a)
 integerSquareRootRem' n = (s, n - s * s)
   where
@@ -109,12 +105,10 @@ integerSquareRootRem' n = (s, n - s * s)
 --
 -- >>> map exactSquareRoot [-100, 99, 100, 101]
 -- [Nothing,Nothing,Just 10,Nothing]
-{-# SPECIALIZE exactSquareRoot ::
-  Int -> Maybe Int,
-  Word -> Maybe Word,
-  Integer -> Maybe Integer,
-  Natural -> Maybe Natural
-  #-}
+{-# SPECIALIZE exactSquareRoot :: Int -> Maybe Int #-}
+{-# SPECIALIZE exactSquareRoot :: Word -> Maybe Word #-}
+{-# SPECIALIZE exactSquareRoot :: Integer -> Maybe Integer #-}
+{-# SPECIALIZE exactSquareRoot :: Natural -> Maybe Natural #-}
 exactSquareRoot :: (Integral a) => a -> Maybe a
 exactSquareRoot n
   | n >= 0,
@@ -127,12 +121,10 @@ exactSquareRoot n
 --
 -- >>> map isSquare [-100, 99, 100, 101]
 -- [False,False,True,False]
-{-# SPECIALIZE isSquare ::
-  Int -> Bool,
-  Word -> Bool,
-  Integer -> Bool,
-  Natural -> Bool
-  #-}
+{-# SPECIALISE isSquare :: Int     -> Bool #-}
+{-# SPECIALISE isSquare :: Word    -> Bool #-}
+{-# SPECIALISE isSquare :: Integer -> Bool #-}
+{-# SPECIALISE isSquare :: Natural -> Bool #-}
 isSquare :: (Integral a) => a -> Bool
 isSquare n = n >= 0 && isSquare' n
 
@@ -142,12 +134,10 @@ isSquare n = n >= 0 && isSquare' n
 --
 --   The precondition @n >= 0@ is not tested, passing negative
 --   arguments may cause any kind of havoc.
-{-# SPECIALIZE isSquare' ::
-  Int -> Bool,
-  Word -> Bool,
-  Integer -> Bool,
-  Natural -> Bool
-  #-}
+{-# SPECIALIZE isSquare' :: Int -> Bool #-}
+{-# SPECIALIZE isSquare' :: Word -> Bool #-}
+{-# SPECIALIZE isSquare' :: Integer -> Bool #-}
+{-# SPECIALIZE isSquare' :: Natural -> Bool #-}
 isSquare' :: (Integral a) => a -> Bool
 isSquare' n
   | isPossibleSquare n,
@@ -163,12 +153,10 @@ isSquare' n
 --   easily without division and eliminates about 82% of all numbers).
 --   After that, the remainders modulo 9, 25, 7, 11 and 13 are tested
 --   to eliminate altogether about 99.436% of all numbers.
-{-# SPECIALIZE isPossibleSquare ::
-  Int -> Bool,
-  Word -> Bool,
-  Integer -> Bool,
-  Natural -> Bool
-  #-}
+{-# SPECIALIZE isPossibleSquare :: Int -> Bool #-}
+{-# SPECIALIZE isPossibleSquare :: Word -> Bool #-}
+{-# SPECIALIZE isPossibleSquare :: Integer -> Bool #-}
+{-# SPECIALIZE isPossibleSquare :: Natural -> Bool #-}
 isPossibleSquare :: (Integral a) => a -> Bool
 isPossibleSquare n' =
   indexBitSet mask256 (fromInteger (n .&. 255))
@@ -247,7 +235,7 @@ isqrtWord n
   where
     !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral n
 
--- {-# INLINABLE isqrtInteger #-}
+{-# INLINABLE [2] isqrtInteger #-}
 isqrtInteger :: Integer -> Integer
 isqrtInteger = fst . karatsubaSqrt
 

@@ -10,12 +10,12 @@ import qualified Math.NumberTheory.Roots.SquaresTests as Squares
 import qualified Math.NumberTheory.Roots.SquaresTests_ as Squares_
 
 main :: IO ()
-main
-  = defaultMain
+main = defaultMain
   $ adjustOption
     (\(QuickCheckTests n) -> QuickCheckTests (max n 10000))
   $ adjustOption
     (\(SmallCheckDepth n) -> SmallCheckDepth (max n 100))
+  -- $ alltests
   $ tests_
 
 alltests :: TestTree 

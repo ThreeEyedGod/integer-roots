@@ -3,9 +3,9 @@
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OrPatterns #-}
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE StrictData #-}
 -- {-# LANGUAGE Strict #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
@@ -35,10 +35,10 @@ where
 
 import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
 import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (>#), (<=#))
+import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (<=#), (>#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..), naturalToInteger)
-import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSub, bigNatSubUnsafe, BigNat (..))
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSub, bigNatSubUnsafe)
 import GHC.Num.Integer (Integer (..), integerLog2#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
@@ -54,7 +54,7 @@ import Math.NumberTheory.Utils.FloatingX_
 isqrtB_ :: (Integral a) => a -> a
 isqrtB_ 0 = 0
 isqrtB_ n = fromInteger . newappsqrt_ . fromIntegral $ n
-{-# INLINEABLE isqrtB_ #-}
+{-# INLINEABLE [1] isqrtB_ #-}
 
 -- | Square root using Fabio Romano's Faster Bombelli method.
 
@@ -65,14 +65,16 @@ data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, 
 
 newappsqrt_ :: Integer -> Integer
 newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
-newappsqrt_ n@(IP nbn#) -- //FIXME consider using parListN and N =1 
-  |   szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
-      (# !evnLen, !sz# #) <- if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #),
-      isTrue# (sz# ># 1#) = let (tfi_, wBExs) = (tfi evnLen (bigNatIndex# nbn# (sz# -# 1#)), tail (bigNatToWordList_ nbn# sz#)) `using` parTuple2 rpar rseq -- do first iteration in parallel with building the rest of the word list for next iterations
-                              in tniP tfi_ wBExs 
+newappsqrt_ n@(IP nbn#)
+  | szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
+    (# !evnLen, !sz# #) <- if even (W# szT#) then (# True, word2Int# szT# `quotInt#` 2# #) else (# False, 1# +# word2Int# szT# `quotInt#` 2# #),
+    isTrue# (sz# ># 1#) =
+      let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
+          !(tfi_, wBExs) = (tfi evnLen msbWrd, tail (bigNatToWordList_ msbWrd nbn# sz#)) `using` parTuple2 rseq rpar -- do first iteration in parallel with building the rest of the word list for next iterations
+       in tniP tfi_ wBExs
   | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
 newappsqrt_ _ = error "newappsqrt_: negative argument"
-{-# INLINEABLE newappsqrt_ #-}
+{-# INLINE newappsqrt_ #-}
 
 {-# INLINEABLE tfi #-}
 tfi :: Bool -> Word# -> Itr
@@ -115,44 +117,43 @@ tfi !evnLen !w# =
     fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
     {-# INLINEABLE fixRemainder# #-}
 
-data ItrP = ItrP {ap# :: Int8#, yaccbnp :: BigNat#, iRbnp :: BigNat#, tbnp# :: FloatingX#}
-
 {-# INLINEABLE tniP #-}
 tniP :: Itr -> [Word] -> Integer
-tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbnp (foldl' go (ItrP cli# yCAcci_ tAi ti#) wBExsRest))
+tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (foldl' go (Itr cli# yCAcci_ tAi ti#) wBExsRest))
   where
-    spl :: Word# -> BigNat
-    spl w# =
-      let i1 = w# `uncheckedShiftRL#` 32# -- max of either of them is 2^32-1
-          i2 = w# `and#` 0xffffffff##  -- max of either of them is 2^32-1
-          x1 = i1 `shiftL#` 32# 
-          r = bigNatFromWord# x1 `bigNatAddWord#` i2
-       in BN# r
-    {-# INLINEABLE spl #-}
-    mul2To64 :: BigNat# -> BigNat
-    mul2To64 x_ = BN# (x_ `bigNatShiftL#` 64##)
-    {-# INLINEABLE mul2To64 #-}
-
-    go :: ItrP -> Word -> ItrP
-    go (ItrP !cl# !yCAcc_ !tA !t#) wBEx@(W# w#) =
-      -- let !tA_ =
-      --       let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
-      --        in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32# -- // FIXME PARALLEIZRION OPPTY?
-        let
-          !(BN# tAb# , BN# tAa#) = (spl w# , mul2To64 tA) `using` parTuple2 rseq rpar -- //FIXME not any faster 
-          !tA_ = tAa# `bigNatAdd` tAb#
+    go :: Itr -> Word -> Itr
+    go (Itr !cl# !yCAcc_ !tA !t#) wBEx@(W# w#) =
+      let !tA_ =
+            let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
+             in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd` bigNatFromWord# x1 `bigNatAddWord#` i2w32# -- unparallized version of the below, which is about the same speed as the parallel version, but the parallel version is more scalable and faster for larger inputs
           !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+      -- let !(BN# tAb#, BN# tAa#, tCFx_#) = (spl w#, mul2To64 tA, scaleByPower2# 32#Int64 t#) `using` parTuple3 rpar rseq rseq -- //FIXME not any faster boxing inside called functions
+      --     !(# tA_, tCFx# #) = (# tAa# `bigNatAdd` tAb#, tCFx_# #)
           !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
           -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
-          -- weirdly the above and below are both about the same
-          !itr_ = if isTrue# (cl# `ltInt8#` 3#Int8) then ItrP (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #)) else ItrP cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+          -- weirdly the above and below are both about the same  
+          !itr_ =
+            if isTrue# (cl# `ltInt8#` 3#Int8)
+              then Itr (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #))
+              else Itr cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
        in itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
       where
         yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
-        yTildeFinalFx## (# !w#, !fx# #) = case fx# == zeroFx# of
-          True -> if isTrue# (w# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w#
+        yTildeFinalFx## (# !w64#, !fx# #) = case fx# == zeroFx# of
+          True -> if isTrue# (w64# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w64#
           !_ -> fx#
         {-# INLINEABLE yTildeFinalFx## #-}
+        spl :: Word# -> BigNat
+        spl w_# =
+          let !i1 = w_# `uncheckedShiftRL#` 32# -- max of either of them is 2^32-1
+              !i2 = w_# `and#` 0xffffffff## -- max of either of them is 2^32-1
+              !x1 = i1 `shiftL#` 32#
+              !r = bigNatFromWord# x1 `bigNatAddWord#` i2
+           in BN# r
+        {-# INLINEABLE spl #-}
+        mul2To64 :: BigNat# -> BigNat
+        mul2To64 x_ = BN# (x_ `bigNatShiftL#` 64##)
+        {-# INLINEABLE mul2To64 #-}
 
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
     rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
@@ -178,19 +179,17 @@ nxtDgtNatW64## !bn# !tcfx#
   | isTrue# (ln# `gtWord#` threshW#) = computFxW64# (preComputFx## bn# ln# tcfx#) -- note the gtWord
   | otherwise = (# nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#, zeroFx# #) -- only 8 cases land here in tests
   where
-    !ln# = bigNatLog2# bn# -- //FIXME is this necessary and can it be used in the other branch too
+    !ln# = bigNatLog2# bn#
     !threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
 {-# INLINEABLE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## !pa# !tcfx# = case preComput pa# tcfx# of (# a_#, c#, r# #) -> computDoubleW64# a_# c# r#
-
-{-# DUMMY nxtDgtDoubleFxW64## #-}
+{-# INLINE nxtDgtDoubleFxW64## #-}
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
 preComput !ax# !tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDouble# c# c# ax# #)
-
-{-# DUMMY preComput #-}
+{-# INLINE preComput #-}
 
 {-# DUMMY computDoubleW64# #-}
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
@@ -203,15 +202,15 @@ coreD# !da# !dc# !dr# = da# /## (sqrtDouble# dr# +## dc#)
 
 preComputFx## :: BigNat# -> Word# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
 preComputFx## !tA__bn# !lgn# !tCFX# = case unsafeGtWordbn2Fx## tA__bn# lgn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
-{-# INLINEABLE preComputFx## #-}
+{-# INLINE preComputFx## #-}
 
 computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> (# Word64#, FloatingX# #)
 computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = let !w64Fx# = coreFx# (# tAFX#, tCFX#, radFX# #) in (# floorXW64## w64Fx#, w64Fx# #)
-{-# INLINEABLE computFxW64# #-}
+{-# INLINE computFxW64# #-}
 
 coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
 coreFx# (# !tAFX#, !tCFX#, !radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
-{-# INLINEABLE coreFx# #-}
+{-# INLINE coreFx# #-}
 
 {-# INLINEABLE karatsubaSqrt #-}
 karatsubaSqrt :: Integer -> (Integer, Integer)

@@ -5,6 +5,6 @@ tests: True
 benchmarks: True
 
 package *
-  coverage: False
-  library-coverage: False
+  coverage: True
+  library-coverage: True
   documentation: False

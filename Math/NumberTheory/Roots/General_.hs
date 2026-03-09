@@ -68,17 +68,16 @@ import Math.NumberTheory.Utils.FromIntegral (wordToInt)
 -- -5
 -- >>> integerRoot 1 5
 -- 5
-{-# SPECIALISE integerRoot :: Int -> Int -> Int,
-                              Int -> Word -> Word,
-                              Int -> Integer -> Integer,
-                              Int -> Natural -> Natural,
-                              Word -> Int -> Int,
-                              Word -> Word -> Word,
-                              Word -> Integer -> Integer,
-                              Word -> Natural -> Natural,
-                              Integer -> Integer -> Integer,
-                              Natural -> Natural -> Natural
-  #-}
+{-# SPECIALISE integerRoot :: Int -> Int -> Int #-}
+{-# SPECIALISE integerRoot :: Int -> Word -> Word #-}
+{-# SPECIALISE integerRoot :: Int -> Integer -> Integer #-}
+{-# SPECIALISE integerRoot :: Int -> Natural -> Natural #-}
+{-# SPECIALISE integerRoot :: Word -> Int -> Int #-}
+{-# SPECIALISE integerRoot :: Word -> Word -> Word #-}
+{-# SPECIALISE integerRoot :: Word -> Integer -> Integer #-}
+{-# SPECIALISE integerRoot :: Word -> Natural -> Natural #-}
+{-# SPECIALISE integerRoot :: Integer -> Integer -> Integer #-}
+{-# SPECIALISE integerRoot :: Natural -> Natural -> Natural #-}
 integerRoot :: (Integral a, Integral b) => b -> a -> a
 integerRoot 1 n         = n
 integerRoot 2 n         = P2.integerSquareRoot n
