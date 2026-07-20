@@ -60,7 +60,7 @@ import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#)
 import GHC.Word (Word64 (..))
-import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, fromInt64, split, split#, upLiftDouble#, _evenInt64#)
+import Math.NumberTheory.Utils.ArthMtic_ (bnToFxGtWord#, fromInt64, split#, upLiftDouble#, _evenInt64#)
 
 -- import Control.DeepSeq (NFData(..), rnf)
 
@@ -214,16 +214,17 @@ unsafeDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
   | otherwise =
       let !resExp# = e1# `subInt64#` e2#
           !resSignif# = s1# /## s2#
-          -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
-          -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#              
-       in FloatingX# resSignif# resExp#
-      --     !(# finalSignif#, finalExp# #) = (# resSignif#, resExp# #)
-      --  in -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
-      --     -- //TODO fix this next line
-      --     -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
-      --     if isTrue# (finalSignif# <## 1.0##) && isTrue# (finalExp# `leInt64#` 0#Int64)
-      --       then zeroFx#
-      --       else FloatingX# finalSignif# finalExp#
+       in -- !l1Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# e2#
+          -- !l2Word64# = int64ToWord64# e1# `xor64#` int64ToWord64# resExp#
+          FloatingX# resSignif# resExp#
+
+--     !(# finalSignif#, finalExp# #) = (# resSignif#, resExp# #)
+--  in -- in if (e1 `xor` e2) .&. (e1 `xor` resExp) < 0 || (resSignif < 1.0 && resExp == (minBound :: Integer))
+--     -- //TODO fix this next line
+--     -- in if W64# l1Word64# .&. W64# l2Word64# < 0 || (isTrue# (resSignif# <## 1.0##) && isTrue# (resExp# `leInt64#` intToInt64# 0#) )
+--     if isTrue# (finalSignif# <## 1.0##) && isTrue# (finalExp# `leInt64#` 0#Int64)
+--       then zeroFx#
+--       else FloatingX# finalSignif# finalExp#
 
 unsafestDivFx# :: FloatingX# -> FloatingX# -> FloatingX#
 unsafestDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) = FloatingX# (s1# /## s2#) (e1# `subInt64#` e2#)
@@ -240,7 +241,7 @@ sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# fx@(FloatingX# !s# !e#) = case sqrtFxSplitDbl## fx of (# sX#, eX# #) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
 
 {-# INLINE floorXW64## #-}
-floorXW64## :: FloatingX# -> Word64# 
+floorXW64## :: FloatingX# -> Word64#
 floorXW64## f@(FloatingX# !s# !e#) = let !(I# iInt#) = floorDoubleInt (D# $ unsafefx2Double## f) in wordToWord64# (int2Word# iInt#)
 
 {-# INLINE scaleByPower2# #-} -- if made NOINLNE seems CAF friendly
@@ -273,8 +274,8 @@ unsafefx2Double## (FloatingX# !d# !e#) = upLiftDouble# d# (int64ToInt# e#)
 {-# INLINE unsafefx2Double## #-}
 
 {-# INLINEABLE double2Fx# #-}
-double2Fx# :: Double -> FloatingX# 
-double2Fx# (D# d#) = case split# d# of (# s#, e# #) -> FloatingX# s# e#  
+double2Fx# :: Double -> FloatingX#
+double2Fx# (D# d#) = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 
 double2Fx## :: Double# -> FloatingX#
 double2Fx## !d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
@@ -284,7 +285,7 @@ unsafeGtWordbn2Fx## :: BigNat# -> Word# -> FloatingX#
 unsafeGtWordbn2Fx## !ibn# !lgn# = case bnToFxGtWord# ibn# lgn# of (# s#, e_# #) -> FloatingX# s# e_# -- let !(# s#, e_# #) = cI2D2_ ibn# in FloatingX# s# e_# --cI2D2 i -- so that i_ is below integral equivalent of maxUnsafeInteger=maxDouble
 
 {-# INLINE unsafeword64ToFx# #-}
-unsafeword64ToFx# :: Word64 -> FloatingX# 
+unsafeword64ToFx# :: Word64 -> FloatingX#
 unsafeword64ToFx# !i = double2Fx# (fromIntegral i)
 
 {-# INLINE unsafeword64ToFloatingX## #-}

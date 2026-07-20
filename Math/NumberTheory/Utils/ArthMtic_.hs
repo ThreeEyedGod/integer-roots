@@ -1,10 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExtendedLiterals #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- {-# LANGUAGE Strict #-}
 
@@ -46,6 +48,12 @@ module Math.NumberTheory.Utils.ArthMtic_
     bigNatToWordList_,
     isqrtInt',
     isqrtWord,
+    bigNatAddWord'#,
+    bigNatLog2'#,
+    bigNatMulWord'#,
+    bigNatAdd',
+    bigNatShiftR'#,
+    bigNatSub',
   )
 where
 
@@ -64,39 +72,29 @@ import GHC.Exts
     and#,
     decodeDouble_Int64#,
     eqInt64#,
-    eqWord#,
     int2Word#,
-    int64ToInt#,
     int64ToWord64#,
     intToInt64#,
     isTrue#,
     minusWord#,
-    neWord#,
     not#,
-    or#,
     plusWord#,
     plusWord64#,
     quotInt64#,
-    quotRemWord#,
     remInt64#,
-    shiftL#,
+    timesWord2#,
     timesWord64#,
-    uncheckedIShiftL#,
     uncheckedShiftL#,
-    uncheckedShiftRL#,
-    word2Double#,
     word2Int#,
     word32ToWord#,
     wordToWord64#,
     (+#),
     (-#),
-    (/=#),
     (<#),
-    (>=#),
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat#, bigNatEncodeDouble#, bigNatFromWord64#, bigNatIndex, bigNatIsZero, bigNatLog2#, bigNatShiftR#)
+import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex, bigNatIndex#, bigNatIsOne, bigNatIsZero, bigNatLog2#, bigNatMulWord#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatZero#)
 -- import GHC.Num.Primitives (intEncodeDouble#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
@@ -146,7 +144,7 @@ bigNatSizeInBase4294967296# a
 
 -- | Logarithm for a 2^32 base
 bigNatLogBaseWord4294967296# :: BigNat# -> Word#
-bigNatLogBaseWord4294967296# bn# = let !(W# w#) = quot32 (W# (bigNatLog2# bn#)) in w# -- bigNatLog2# bn# `quotWord#` 32##
+bigNatLogBaseWord4294967296# bn# = let !(W# w#) = quot32 (W# (bigNatLog2'# bn#)) in w# -- bigNatLog2# bn# `quotWord#` 32##
 {-# INLINEABLE bigNatLogBaseWord4294967296# #-}
 
 -- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
@@ -166,8 +164,6 @@ intgrFromRvsrdTuple (0, 0) 0 = 0
 intgrFromRvsrdTuple (0, lMSB) base = toInteger lMSB * base
 intgrFromRvsrdTuple (lLSB, 0) _ = toInteger lLSB
 intgrFromRvsrdTuple (lLSB, lMSB) base = toInteger lMSB * base + toInteger lLSB
-
-{-# DUMMY word64FromRvsrdTuple# #-}
 
 -- | Word64# from a "reversed" tuple of Word32 digits
 word64FromRvsrdTuple# :: (Word32, Word32) -> Word64# -> Word64#
@@ -198,8 +194,6 @@ _oddInt64# = _evenInt64#
 fromInt64 :: Int64 -> Int64#
 fromInt64 (I64# x#) = x#
 
-{-# DUMMY fromInt64 #-}
-
 {-# INLINE upLiftDouble# #-}
 upLiftDouble# :: Double# -> Int# -> Double#
 upLiftDouble# d# 0# = d#
@@ -218,8 +212,6 @@ split# d# =
    in (# s#, ex# #)
 
 -- | Some Constants
-
-{-# DUMMY radixW32 #-}
 {-# SPECIALIZE radixW32 :: Word #-}
 {-# SPECIALIZE radixW32 :: Natural #-}
 {-# SPECIALIZE radixW32 :: Integer #-}
@@ -232,12 +224,9 @@ radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
 {-# SPECIALIZE secndPlaceW32Radix :: Integer #-}
 secndPlaceW32Radix :: (Integral a) => a
 secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
-{-# DUMMY secndPlaceW32Radix #-}
 
 sqrtOf2 :: Double
 sqrtOf2 = 1.4142135623730950488016887242097
-
-{-# DUMMY sqrtOf2 #-}
 
 maxDouble :: Double
 maxDouble = 1.7976931348623157e308
@@ -263,7 +252,57 @@ bnToFxGtWord# !bn# !lgn# =
   case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
     !rawSh# ->
       let !shift# = rawSh# `and#` not# 1##
-       in case bigNatShiftR# bn# shift# of
+       in case bigNatShiftR'# bn# shift# of
             -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
             --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
             !mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
+
+-- -----************** INLINED VERSIONS OF A FEW BIGNAT FUNCTONS ---------
+
+-- | Add a bigNat and a Word#
+{-# INLINE bigNatAddWord'# #-}
+bigNatAddWord'# :: BigNat# -> Word# -> BigNat#
+bigNatAddWord'# a 0## = a
+bigNatAddWord'# (bigNatIsZero -> True) b = bigNatFromWord# b
+bigNatAddWord'# a b = bigNatAddWord# a b
+
+-- | Base 2 logarithm
+{-# INLINE bigNatLog2'# #-}
+bigNatLog2'# :: BigNat# -> Word#
+bigNatLog2'# (bigNatIsZero -> True) = 0##
+bigNatLog2'# a = bigNatLog2# a
+
+-- | Multiply a BigNat by a Word#
+{-# INLINE bigNatMulWord'# #-}
+bigNatMulWord'# :: BigNat# -> Word# -> BigNat#
+bigNatMulWord'# a 0## = bigNatZero# (# #)
+bigNatMulWord'# a 1## = a
+bigNatMulWord'# (bigNatIsZero -> True) _ = bigNatZero# (# #)
+bigNatMulWord'# (bigNatIsOne -> True) w = bigNatFromWord# w
+bigNatMulWord'# a@(bigNatSize# -> 1#) w = case timesWord2# (bigNatIndex# a 0#) w of
+  (# h, l #) -> bigNatFromWord2# h l
+bigNatMulWord'# a w = bigNatMulWord# a w
+
+{-# INLINE bigNatAdd' #-}
+
+-- | Add two bigNats
+bigNatAdd' :: BigNat# -> BigNat# -> BigNat#
+bigNatAdd' (bigNatIsZero -> True) b = b
+bigNatAdd' a (bigNatIsZero -> True) = a
+bigNatAdd' a b = bigNatAdd a b
+
+{-# INLINE bigNatShiftR'# #-}
+
+-- | Bit shift right
+bigNatShiftR'# :: BigNat# -> Word# -> BigNat#
+bigNatShiftR'# a 0## = a
+bigNatShiftR'# a@(bigNatSize# -> 0#) _ = a
+bigNatShiftR'# a n = bigNatShiftR# a n
+
+{-# INLINE bigNatSub' #-}
+
+-- | Subtract two BigNat
+bigNatSub' :: BigNat# -> BigNat# -> (# (# #) | BigNat# #)
+bigNatSub' a (bigNatIsZero -> True) = (# | a #)
+bigNatSub' a b@(\x -> isTrue# (bigNatSize# a <# bigNatSize# x) -> True) = (# (# #) | #)
+bigNatSub' a b = bigNatSub a b
