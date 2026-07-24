@@ -54,6 +54,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     bigNatAdd',
     bigNatShiftR'#,
     bigNatSub',
+    quot2,
   )
 where
 
@@ -95,7 +96,6 @@ import GHC.Exts
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex, bigNatIndex#, bigNatIsOne, bigNatIsZero, bigNatLog2#, bigNatMulWord#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatZero#)
--- import GHC.Num.Primitives (intEncodeDouble#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Numeric.QuoteQuot (quoteQuot)
@@ -133,6 +133,12 @@ isqrtWord x
 quot32 :: Word -> Word
 quot32 = $$(quoteQuot 32)
 {-# INLINE quot32 #-}
+
+-- Equivalent to (`quot` 2).
+quot2 :: Word -> Word
+quot2 = $$(quoteQuot 2)
+{-# INLINE quot2 #-}
+
 
 bigNatSizeInBase4294967296# :: BigNat# -> Word#
 bigNatSizeInBase4294967296# a
