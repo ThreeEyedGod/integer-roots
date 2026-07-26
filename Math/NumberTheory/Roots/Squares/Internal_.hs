@@ -35,10 +35,10 @@ where
 
 import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
 import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
-import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, gtWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, quotInt#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (>#), shiftRL#)
+import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, geWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (>#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..), naturalToInteger)
-import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatSub, bigNatSubUnsafe)
+import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord64#, bigNatFromWordArray#, bigNatIndex#, bigNatLog2#, bigNatMulWord#, bigNatShiftL#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatSubUnsafe)
 import GHC.Num.Integer (Integer (..), integerLog2#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
@@ -67,8 +67,8 @@ newappsqrt_ :: Integer -> Integer
 newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
 newappsqrt_ n@(IP nbn#)
   | szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
-    -- (# !evnLen, !sz# #) <- let szi# = word2Int# szT# `quotInt#` 2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
-    -- (# !evnLen, !sz# #) <- let !szi# = word2Int# (szT# `shiftRL#` 1#) in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
+  -- (# !evnLen, !sz# #) <- let szi# = word2Int# szT# `quotInt#` 2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
+  -- (# !evnLen, !sz# #) <- let !szi# = word2Int# (szT# `shiftRL#` 1#) in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     isTrue# (sz# ># 1#) =
       let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
@@ -145,17 +145,17 @@ tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (foldl' go (Itr c
           True -> if isTrue# (w64# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w64#
           !_ -> fx#
         {-# INLINEABLE yTildeFinalFx## #-}
-        -- spl :: Word# -> BigNat
-        -- spl w_# =
-        --   let !i1 = w_# `uncheckedShiftRL#` 32# -- max of either of them is 2^32-1
-        --       !i2 = w_# `and#` 0xffffffff## -- max of either of them is 2^32-1
-        --       !x1 = i1 `shiftL#` 32#
-        --       !r = bigNatFromWord# x1 `bigNatAddWord'#` i2
-        --    in BN# r
-        -- {-# INLINEABLE spl #-}
-        -- mul2To64 :: BigNat# -> BigNat
-        -- mul2To64 x_ = BN# (x_ `bigNatShiftL#` 64##)
-        -- {-# INLINEABLE mul2To64 #-}
+    -- spl :: Word# -> BigNat
+    -- spl w_# =
+    --   let !i1 = w_# `uncheckedShiftRL#` 32# -- max of either of them is 2^32-1
+    --       !i2 = w_# `and#` 0xffffffff## -- max of either of them is 2^32-1
+    --       !x1 = i1 `shiftL#` 32#
+    --       !r = bigNatFromWord# x1 `bigNatAddWord'#` i2
+    --    in BN# r
+    -- {-# INLINEABLE spl #-}
+    -- mul2To64 :: BigNat# -> BigNat
+    -- mul2To64 x_ = BN# (x_ `bigNatShiftL#` 64##)
+    -- {-# INLINEABLE mul2To64 #-}
 
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
     rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
@@ -178,11 +178,11 @@ tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (foldl' go (Itr c
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## !bn# !tcfx#
-  | isTrue# (ln# `gtWord#` threshW#) = computFxW64# (preComputFx## bn# ln# tcfx#) -- note the gtWord
-  | otherwise = (# nxtDgtDoubleFxW64## (bigNatEncodeDouble# bn# 0#) tcfx#, zeroFx# #) -- only 8 cases land here in tests
+  | isTrue# (ln# `geWord#` threshW##) = computFxW64# (preComputFx## bn# ln# tcfx#) -- note the gtWord
+  | otherwise = (# nxtDgtDoubleFxW64## (bigNatEncodeDouble'# bn# 0#) tcfx#, zeroFx# #) -- only ~8 cases land here in tests
   where
     !ln# = bigNatLog2'# bn#
-    !threshW# = 512## -- if finiteBitSize (0 :: Word) == 64 then 9# else 14#
+    !threshW## = 512## -- if finiteBitSize (0 :: Word) == 64 then 8# else 14#
 {-# INLINEABLE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#

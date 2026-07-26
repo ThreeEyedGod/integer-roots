@@ -53,6 +53,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     bigNatMulWord'#,
     bigNatAdd',
     bigNatShiftR'#,
+    bigNatEncodeDouble'#,
     bigNatSub',
     quot2,
   )
@@ -77,6 +78,7 @@ import GHC.Exts
     int64ToWord64#,
     intToInt64#,
     isTrue#,
+    leWord#,
     minusWord#,
     not#,
     plusWord#,
@@ -86,6 +88,7 @@ import GHC.Exts
     timesWord2#,
     timesWord64#,
     uncheckedShiftL#,
+    word2Double#,
     word2Int#,
     word32ToWord#,
     wordToWord64#,
@@ -138,7 +141,6 @@ quot32 = $$(quoteQuot 32)
 quot2 :: Word -> Word
 quot2 = $$(quoteQuot 2)
 {-# INLINE quot2 #-}
-
 
 bigNatSizeInBase4294967296# :: BigNat# -> Word#
 bigNatSizeInBase4294967296# a
@@ -255,13 +257,17 @@ double x = x `unsafeShiftL` 1
 {-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
 bnToFxGtWord# !bn# !lgn# =
-  case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
-    !rawSh# ->
-      let !shift# = rawSh# `and#` not# 1##
-       in case bigNatShiftR'# bn# shift# of
-            -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
-            --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
-            !mbn# -> (# bigNatEncodeDouble# mbn# 0#, intToInt64# (word2Int# shift#) #)
+  if isTrue# (lgn# `leWord#` maxThreshold##)
+    then (# bigNatEncodeDouble'# bn# 0#, 0#Int64 #)
+    else case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
+      !rawSh# ->
+        let !shift# = rawSh# `and#` not# 1##
+         in case bigNatShiftR'# bn# shift# of
+              -- l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
+              --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
+              !mbn# -> (# bigNatEncodeDouble'# mbn# 0#, intToInt64# (word2Int# shift#) #)
+  where
+    !maxThreshold## = 1023##
 
 -- -----************** INLINED VERSIONS OF A FEW BIGNAT FUNCTONS ---------
 
@@ -312,3 +318,10 @@ bigNatSub' :: BigNat# -> BigNat# -> (# (# #) | BigNat# #)
 bigNatSub' a (bigNatIsZero -> True) = (# | a #)
 bigNatSub' a b@(\x -> isTrue# (bigNatSize# a <# bigNatSize# x) -> True) = (# (# #) | #)
 bigNatSub' a b = bigNatSub a b
+
+{-# INLINE bigNatEncodeDouble'# #-}
+
+-- | Encode (# BigNat mantissa, Int# exponent #) into a Double#
+bigNatEncodeDouble'# :: BigNat# -> Int# -> Double#
+bigNatEncodeDouble'# (bigNatIsZero -> True) _ = word2Double# 0## -- FIXME: isn't it NaN on 0# exponent?
+bigNatEncodeDouble'# a e = bigNatEncodeDouble# a e
