@@ -94,14 +94,15 @@ import GHC.Exts
     wordToWord64#,
     (+#),
     (-#),
-    (<#),
+    (<#), inline,
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
-import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatEncodeDouble#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex, bigNatIndex#, bigNatIsOne, bigNatIsZero, bigNatLog2#, bigNatMulWord#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatZero#)
+import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex, bigNatIndex#, bigNatIsOne, bigNatIsZero, bigNatLog2#, bigNatMulWord#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatZero#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Numeric.QuoteQuot (quoteQuot)
+import GHC.Internal.Bignum.Backend.Native ( bignat_encode_double )
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -325,3 +326,13 @@ bigNatSub' a b = bigNatSub a b
 bigNatEncodeDouble'# :: BigNat# -> Int# -> Double#
 bigNatEncodeDouble'# (bigNatIsZero -> True) _ = word2Double# 0## -- FIXME: isn't it NaN on 0# exponent?
 bigNatEncodeDouble'# a e = bigNatEncodeDouble# a e
+
+{-# INLINE bigNatEncodeDouble# #-}
+-- | Encode (# BigNat mantissa, Int# exponent #) into a Double#
+bigNatEncodeDouble# :: BigNat# -> Int# -> Double#
+bigNatEncodeDouble# 
+  --  | bigNatIsZero a
+  --  = word2Double# 0## -- FIXME: isn't it NaN on 0# exponent?
+
+  --  | True
+   = inline bignat_encode_double

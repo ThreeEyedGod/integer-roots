@@ -27,6 +27,7 @@ library
    ,parallel >=3.2 && <4
    ,deepseq >= 1.5.1.0
    ,quote-quot >= 0.2.1.0
+   ,ghc-internal >= 9.1401.0
   exposed-modules:
     Math.NumberTheory.Roots
     Math.NumberTheory.Roots_
