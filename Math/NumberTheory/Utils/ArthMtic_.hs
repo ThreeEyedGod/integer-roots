@@ -56,6 +56,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     bigNatEncodeDouble'#,
     bigNatSub',
     quot2,
+    bigNatToWordVec_
   )
 where
 
@@ -103,6 +104,7 @@ import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.Natural (Natural)
 import Numeric.QuoteQuot (quoteQuot)
 import GHC.Internal.Bignum.Backend.Native ( bignat_encode_double )
+import qualified Data.Vector.Unboxed as VU
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -165,6 +167,15 @@ bigNatToWordList_ = go
     go 0## bn_ n = bigNatIndex bn_ (n -# 1#) : go 0## bn_ (n -# 1#)
     go m bn_ n = W# m : go 0## bn_ (n -# 1#)
 {-# INLINE bigNatToWordList_ #-}
+
+-- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
+bigNatToWordVec_ :: Word# -> BigNat# -> Int# -> VU.Vector Word
+bigNatToWordVec_ ix## bn# i# = VU.unfoldr (go ix## bn# (I# i#)) (I# i#)
+  where
+    go :: Word# -> BigNat# -> Int -> Int -> Maybe (Word, Int)
+    go _ _ _ 0 = Nothing
+    go m bn_ sz n@(I# n#) = if n == sz then Just (W# m, n-1) else Just (bigNatIndex bn_ (n# -# 1#), n - 1)
+{-# INLINE bigNatToWordVec_ #-}
 
 -- | Integer from a "reversed" tuple of Word32 digits
 -- Base 4.21 shipped with ghc 9.12.1 had a toInteger improvement : https://github.com/haskell/core-libraries-committee/issues/259

@@ -42,6 +42,8 @@ import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEn
 import GHC.Num.Integer (Integer (..), integerLog2#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
+import qualified Data.Vector.Unboxed as VU
+
 
 -- *********** END NEW IMPORTS
 
@@ -72,7 +74,7 @@ newappsqrt_ n@(IP nbn#)
     (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     isTrue# (sz# ># 1#) =
       let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
-          !(tfi_, wBExs) = (tfi evnLen msbWrd, tail (bigNatToWordList_ msbWrd nbn# sz#)) `using` parTuple2 rseq rpar -- do first iteration in parallel with building the rest of the word list for next iterations
+          !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#)) `using` parTuple2 rseq rpar -- do first iteration in parallel with building the rest of the word list for next iterations
        in tniP tfi_ wBExs
   | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
 newappsqrt_ _ = error "newappsqrt_: negative argument"
@@ -120,8 +122,8 @@ tfi !evnLen !w# =
     {-# INLINEABLE fixRemainder# #-}
 
 {-# INLINEABLE tniP #-}
-tniP :: Itr -> [Word] -> Integer
-tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (foldl' go (Itr cli# yCAcci_ tAi ti#) wBExsRest))
+tniP :: Itr -> VU.Vector Word -> Integer
+tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (VU.foldl' go (Itr cli# yCAcci_ tAi ti#) wBExsRest))
   where
     go :: Itr -> Word -> Itr
     go (Itr !cl# !yCAcc_ !tA !t#) wBEx@(W# w#) =
