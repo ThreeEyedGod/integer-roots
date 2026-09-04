@@ -35,6 +35,7 @@ where
 
 import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
 import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
+import qualified Data.Vector.Unboxed as VU
 import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, geWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (>#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..), naturalToInteger)
@@ -42,8 +43,6 @@ import GHC.Num.BigNat (BigNat (..), BigNat#, bigNatAdd, bigNatAddWord#, bigNatEn
 import GHC.Num.Integer (Integer (..), integerLog2#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
-import qualified Data.Vector.Unboxed as VU
-
 
 -- *********** END NEW IMPORTS
 
