@@ -184,7 +184,7 @@ nxtDgtNatW64## !bn# !tcfx#
   | otherwise = (# nxtDgtDoubleFxW64## (bigNatEncodeDouble'# bn# 0#) tcfx#, zeroFx# #) -- only ~8 cases land here in tests
   where
     !ln# = bigNatLog2'# bn#
-    !(W# threshW##) = thresWMaxDouble -- if finiteBitSize (0 :: Word) == 64 then 8# else 14#
+    !(W# threshW##) = threshWMaxDouble -- if finiteBitSize (0 :: Word) == 64 then 8# else 14#
 {-# INLINEABLE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#

@@ -51,13 +51,14 @@ module Math.NumberTheory.Utils.ArthMtic_
     bigNatSub',
     quot2,
     bigNatToWordVec_,
-    thresWMaxDouble
+    threshWMaxDouble,
   )
 where
 
 -- \*********** BEGIN NEW IMPORTS
 
 import Data.Bits (finiteBitSize, unsafeShiftL)
+import qualified Data.Vector.Unboxed as VU
 import GHC.Exts
   ( Double (..),
     Double#,
@@ -70,6 +71,7 @@ import GHC.Exts
     and#,
     decodeDouble_Int64#,
     eqInt64#,
+    inline,
     int2Word#,
     int64ToWord64#,
     intToInt64#,
@@ -89,15 +91,14 @@ import GHC.Exts
     wordToWord64#,
     (+#),
     (-#),
-    (<#), inline
+    (<#),
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
+import GHC.Internal.Bignum.Backend.Native (bignat_encode_double)
 import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex, bigNatIndex#, bigNatIsOne, bigNatIsZero, bigNatLog2#, bigNatMulWord#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatZero#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.QuoteQuot (quoteQuot)
-import GHC.Internal.Bignum.Backend.Native ( bignat_encode_double )
-import qualified Data.Vector.Unboxed as VU
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -167,7 +168,7 @@ bigNatToWordVec_ ix## bn# i# = VU.unfoldr (go ix## bn# (I# i#)) (I# i#)
   where
     go :: Word# -> BigNat# -> Int -> Int -> Maybe (Word, Int)
     go _ _ _ 0 = Nothing
-    go m bn_ sz n@(I# n#) = if n == sz then Just (W# m, n-1) else Just (bigNatIndex bn_ (n# -# 1#), n - 1)
+    go m bn_ sz n@(I# n#) = if n == sz then Just (W# m, n - 1) else Just (bigNatIndex bn_ (n# -# 1#), n - 1)
 {-# INLINE bigNatToWordVec_ #-}
 
 -- | Integer from a "reversed" tuple of Word32 digits
@@ -263,7 +264,7 @@ double x = x `unsafeShiftL` 1
 {-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
 bnToFxGtWord# !bn# !lgn# =
-  if checkFinite (D# test#) 
+  if checkFinite (D# test#)
     then (# test#, 0#Int64 #)
     else case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
       !rawSh# ->
@@ -276,11 +277,11 @@ bnToFxGtWord# !bn# !lgn# =
     !test# = bigNatEncodeDouble'# bn# 0#
 
 checkFinite :: Double -> Bool
-checkFinite d = not $ isInfinite d 
+checkFinite = not . isInfinite
 
 -- | Threshold for max Double = 512 for 64 bit Word, 14 for 32 bit Word. This is used to determine if a BigNat can be converted to Double without losing precision.
-thresWMaxDouble :: Word
-thresWMaxDouble = let wordSize = finiteBitSize (0 :: Word) in let numW = if wordSize == 64 then 8 else 14 in let !(I# x#) = wordSize * numW in W# (int2Word# x#)
+threshWMaxDouble :: Word
+threshWMaxDouble = let wordSize = finiteBitSize (0 :: Word) in let numW = if wordSize == 64 then 8 else 14 in let !(I# x#) = wordSize * numW in W# (int2Word# x#)
 
 -- -----************** INLINED VERSIONS OF A FEW BIGNAT FUNCTONS ---------
 
@@ -340,11 +341,12 @@ bigNatEncodeDouble'# (bigNatIsZero -> True) _ = word2Double# 0## -- FIXME: isn't
 bigNatEncodeDouble'# a e = bigNatEncodeDouble# a e
 
 {-# INLINE bigNatEncodeDouble# #-}
+
 -- | Encode (# BigNat mantissa, Int# exponent #) into a Double#
 bigNatEncodeDouble# :: BigNat# -> Int# -> Double#
-bigNatEncodeDouble# 
+bigNatEncodeDouble# =
   --  | bigNatIsZero a
   --  = word2Double# 0## -- FIXME: isn't it NaN on 0# exponent?
 
   --  | True
-   = inline bignat_encode_double
+  inline bignat_encode_double
