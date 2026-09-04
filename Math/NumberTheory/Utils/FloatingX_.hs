@@ -4,6 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- {-# LANGUAGE Strict #-}
 
@@ -42,6 +43,7 @@ import GHC.Exts
     int64ToInt#,
     isTrue#,
     leInt64#,
+    eqInt64#,
     ltInt64#,
     plusInt64#,
     sqrtDouble#,
@@ -55,6 +57,7 @@ import GHC.Exts
     (<##),
     (==##),
     (>=##),
+    (==#)
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
@@ -231,6 +234,8 @@ unsafestDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) = FloatingX# (s
 
 {-# INLINE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
+fsqraddFloatingX# (FloatingX# !sA# 0#Int64) (FloatingX# !sC# 0#Int64) = FloatingX# (fmaddDouble# sA# sA# sC#) 0#Int64
+-- fsqraddFloatingX# (FloatingX# !sA# !expA#) (FloatingX# !sC# ((==# 1# (eqInt64# expA#))-> True)) = FloatingX# (fmaddDouble# sA# sA# sC#) 0#Int64
 fsqraddFloatingX# (FloatingX# !sA# !expA#) (FloatingX# !sC# !expC#) = case upLiftDouble# sC# (int64ToInt# diff#) of sC_# -> FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA# -- let !sC_# = updateDouble# sC# (int64ToInt# diff#) in FloatingX# (fmaddDouble# sA# sA# sC_#) twoTimesExpA#
   where
     !twoTimesExpA# = 2#Int64 `timesInt64#` expA#

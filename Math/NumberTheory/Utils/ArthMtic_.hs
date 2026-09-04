@@ -32,14 +32,8 @@ module Math.NumberTheory.Utils.ArthMtic_
     split,
     split#,
     fromInt64,
-    sqrtOf2,
     double,
-    radixW32,
-    secndPlaceW32Radix,
     largestNSqLTE##,
-    maxDouble,
-    maxSafeInteger,
-    maxUnsafeInteger,
     bnToFxGtWord#,
     word64FromRvsrdTuple#,
     word64FromWordRvsrdTuple##,
@@ -56,7 +50,8 @@ module Math.NumberTheory.Utils.ArthMtic_
     bigNatEncodeDouble'#,
     bigNatSub',
     quot2,
-    bigNatToWordVec_
+    bigNatToWordVec_,
+    thresWMaxDouble
   )
 where
 
@@ -79,7 +74,6 @@ import GHC.Exts
     int64ToWord64#,
     intToInt64#,
     isTrue#,
-    leWord#,
     minusWord#,
     not#,
     plusWord#,
@@ -95,13 +89,12 @@ import GHC.Exts
     wordToWord64#,
     (+#),
     (-#),
-    (<#), inline,
+    (<#), inline
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
 import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex, bigNatIndex#, bigNatIsOne, bigNatIsZero, bigNatLog2#, bigNatMulWord#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatZero#)
 import GHC.Word (Word32 (..), Word64 (..))
-import Numeric.Natural (Natural)
 import Numeric.QuoteQuot (quoteQuot)
 import GHC.Internal.Bignum.Backend.Native ( bignat_encode_double )
 import qualified Data.Vector.Unboxed as VU
@@ -232,34 +225,35 @@ split# d# =
    in (# s#, ex# #)
 
 -- | Some Constants
-{-# SPECIALIZE radixW32 :: Word #-}
-{-# SPECIALIZE radixW32 :: Natural #-}
-{-# SPECIALIZE radixW32 :: Integer #-}
-{-# SPECIALIZE radixW32 :: Word64 #-}
-{-# SPECIALIZE radixW32 :: Int64 #-}
-radixW32 :: (Integral a) => a
-radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
+-- {-# SPECIALIZE radixW32 :: Word #-}
+-- {-# SPECIALIZE radixW32 :: Natural #-}
+-- {-# SPECIALIZE radixW32 :: Integer #-}
+-- {-# SPECIALIZE radixW32 :: Word64 #-}
+-- {-# SPECIALIZE radixW32 :: Int64 #-}
+-- radixW32 :: (Integral a) => a
+-- radixW32 = 4294967296 -- 2 ^ finiteBitSize (0 :: Word32)
 
-{-# SPECIALIZE secndPlaceW32Radix :: Natural #-}
-{-# SPECIALIZE secndPlaceW32Radix :: Integer #-}
-secndPlaceW32Radix :: (Integral a) => a
-secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
+-- {-# SPECIALIZE secndPlaceW32Radix :: Natural #-}
+-- {-# SPECIALIZE secndPlaceW32Radix :: Integer #-}
+-- secndPlaceW32Radix :: (Integral a) => a
+-- secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 
-sqrtOf2 :: Double
-sqrtOf2 = 1.4142135623730950488016887242097
+-- sqrtOf2 :: Double
+-- sqrtOf2 = 1.4142135623730950488016887242097
 
-maxDouble :: Double
-maxDouble = 1.7976931348623157e308
+-- maxDouble :: Double
+-- maxDouble = 1.7976931348623157e308
 
-minDouble :: Double
-minDouble = 4.9406564584124654e-324 -- Minimum positive normalized value for Double as per IEEE 754
+-- minDouble :: Double
+-- minDouble = 4.9406564584124654e-324 -- Minimum positive normalized value for Double as per IEEE 754
 
-maxSafeInteger :: Integer
-maxSafeInteger = 9007199254740991 -- 2^53 -1 this is the max integer that can be represented without losing precision
+-- maxSafeInteger :: Integer
+-- maxSafeInteger :: Integer
+-- maxSafeInteger = 9007199254740991 -- 2^53 -1 this is the max integer that can be represented without losing precision
 
 -- This is approximately 1.8 x 10^308 representable as Double but will lose precision
-maxUnsafeInteger :: Integer
-maxUnsafeInteger = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368
+-- maxUnsafeInteger :: Integer
+-- maxUnsafeInteger = 179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
@@ -269,8 +263,8 @@ double x = x `unsafeShiftL` 1
 {-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)
 bnToFxGtWord# !bn# !lgn# =
-  if isTrue# (lgn# `leWord#` maxThreshold##)
-    then (# bigNatEncodeDouble'# bn# 0#, 0#Int64 #)
+  if checkFinite (D# test#) 
+    then (# test#, 0#Int64 #)
     else case lgn# `minusWord#` 94## of -- //FIXME is shift# calc needed. workd without it.
       !rawSh# ->
         let !shift# = rawSh# `and#` not# 1##
@@ -279,7 +273,14 @@ bnToFxGtWord# !bn# !lgn# =
               --   h# -> let !shift# = (2## `timesWord#` h#) in case bigNatShiftR# bn# shift# of
               !mbn# -> (# bigNatEncodeDouble'# mbn# 0#, intToInt64# (word2Int# shift#) #)
   where
-    !maxThreshold## = 1023##
+    !test# = bigNatEncodeDouble'# bn# 0#
+
+checkFinite :: Double -> Bool
+checkFinite d = not $ isInfinite d 
+
+-- | Threshold for max Double = 512 for 64 bit Word, 14 for 32 bit Word. This is used to determine if a BigNat can be converted to Double without losing precision.
+thresWMaxDouble :: Word
+thresWMaxDouble = let wordSize = finiteBitSize (0 :: Word) in let numW = if wordSize == 64 then 8 else 14 in let !(I# x#) = wordSize * numW in W# (int2Word# x#)
 
 -- -----************** INLINED VERSIONS OF A FEW BIGNAT FUNCTONS ---------
 
