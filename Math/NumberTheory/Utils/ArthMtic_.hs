@@ -68,7 +68,6 @@ import GHC.Exts
     Word (..),
     Word#,
     Word64#,
-    and#,
     decodeDouble_Int64#,
     eqInt64#,
     inline,
@@ -76,8 +75,6 @@ import GHC.Exts
     int64ToWord64#,
     intToInt64#,
     isTrue#,
-    minusWord#,
-    not#,
     plusWord#,
     plusWord64#,
     quotInt64#,
@@ -91,7 +88,7 @@ import GHC.Exts
     wordToWord64#,
     (+#),
     (-#),
-    (<#),
+    (<#), minusWord#, and#, not#,
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
