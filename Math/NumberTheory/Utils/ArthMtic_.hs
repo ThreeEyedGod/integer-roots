@@ -32,7 +32,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     split,
     split#,
     fromInt64,
-    double,
+    -- double,
     largestNSqLTE##,
     bnToFxGtWord#,
     word64FromRvsrdTuple#,
@@ -255,8 +255,8 @@ split# d# =
 
 -- https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
 
-double :: Integer -> Integer
-double x = x `unsafeShiftL` 1
+-- double :: Integer -> Integer
+-- double x = x `unsafeShiftL` 1
 
 {-# INLINE bnToFxGtWord# #-}
 bnToFxGtWord# :: BigNat# -> Word# -> (# Double#, Int64# #)

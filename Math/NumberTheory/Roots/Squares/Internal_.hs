@@ -10,9 +10,27 @@
 {-# LANGUAGE MagicHash        #-}
 {- HLINT ignore "Use fewer imports" -}
 
+-- ** New Pragmas
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ExtendedLiterals #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OrPatterns #-}
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE TypeAbstractions #-}
+{-# LANGUAGE UnboxedTuples #-}
+-- {-# LANGUAGE Strict #-}
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+
+{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+-- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
+
+-- ** end New Pragmas
+
+
 module Math.NumberTheory.Roots.Squares.Internal_
   ( karatsubaSqrt
-  , isqrtA
+  , isqrtB_
   ) where
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
@@ -31,58 +49,182 @@ import GHC.Num.BigNat (bigNatSize#)
 import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
 #endif
 
--- Find approximation to square root in 'Integer', then
--- find the integer square root by the integer variant
--- of Heron's method. Takes only a handful of steps
--- unless the input is really large.
-{-# SPECIALISE isqrtA :: Integer -> Integer #-}
-isqrtA :: Integral a => a -> a
-isqrtA 0 = 0
-isqrtA n = heron n (fromInteger . appSqrt . fromIntegral $ n)
+-- \*********** BEGIN NEW IMPORTS
 
--- Heron's method for integers. First make one step to ensure
--- the value we're working on is @>= r@, then we have
--- @k == r@ iff @k <= step k@.
-{-# SPECIALISE heron :: Integer -> Integer -> Integer #-}
-heron :: Integral a => a -> a -> a
-heron n a = go (step a)
+import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
+import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
+import qualified Data.Vector.Unboxed as VU
+import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, geWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (>#))
+import GHC.Float.RealFracMethods (floorDoubleInt)
+import GHC.Natural (Natural (..), naturalToInteger)
+import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatShiftL#, bigNatSubUnsafe)
+import GHC.Num.Integer (Integer (..), integerLog2#)
+import Math.NumberTheory.Utils.ArthMtic_
+import Math.NumberTheory.Utils.FloatingX_
+
+-- *********** END NEW IMPORTS
+
+-- | Square root using Fabio Romano's Faster Bombelli method.
+
+--- https ://arxiv.org/abs/2406.07751
+--- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
+
+{-# SPECIALIZE isqrtB_ :: Integer -> Integer #-}
+isqrtB_ :: (Integral a) => a -> a
+isqrtB_ 0 = 0
+isqrtB_ n = fromInteger . newappsqrt_ . fromIntegral $ n
+{-# INLINEABLE [1] isqrtB_ #-}
+
+
+data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
+
+newappsqrt_ :: Integer -> Integer
+newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
+newappsqrt_ n@(IP nbn#)
+  | szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
+  -- (# !evnLen, !sz# #) <- let szi# = word2Int# szT# `quotInt#` 2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
+  -- (# !evnLen, !sz# #) <- let !szi# = word2Int# (szT# `shiftRL#` 1#) in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
+    (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
+    isTrue# (sz# ># 1#) =
+      let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
+          !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#)) `using` parTuple2 rseq rpar -- do first iteration in parallel with building the rest of the word list for next iterations
+       in tniP tfi_ wBExs
+  | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
+newappsqrt_ _ = error "newappsqrt_: negative argument"
+{-# INLINE newappsqrt_ #-}
+
+{-# INLINEABLE tfi #-}
+tfi :: Bool -> Word# -> Itr
+tfi !evnLen !w# =
+  let !i# = word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
+      !(# yVal, yWord#, rm #) = rmdrFn i#
+   in Itr 1#Int8 yVal rm (unsafeword64ToFloatingX## yWord#)
+  where
+    !rmdrFn = if evnLen then evenFirstRmdrBN# else oddFirstRmdrBN#
+    -- \| Find the largest n such that n^2 <= w, where n is even. different for even length list of digits and odd length lists
+    evenFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
+    evenFirstRmdrBN# !w_# =
+      let qr w =
+            let y = largestNSqLTE## w
+                diff = word64ToInt64# w `subInt64#` word64ToInt64# (y `timesWord64#` y)
+             in (# y, diff #)
+       in handleFirstRemBN## (qr w_#)
+    {-# INLINEABLE evenFirstRmdrBN# #-}
+    oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
+    oddFirstRmdrBN# !w_# =
+      let qr w =
+            let y = largestNSqLTE## w
+                diff = w `subWord64#` (y `timesWord64#` y) -- no chance this will be negative
+             in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
+       in qr w_#
+    {-# INLINEABLE oddFirstRmdrBN# #-}
+    handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
+    handleFirstRemBN## (# yi64#, ri_ #) =
+      let qr y r
+            | isTrue# (r `ltInt64#` 0#Int64) =
+                let !y_ = y `subWord64#` 1#Word64
+                    !rdr = fixRemainder# y_ r
+                 in (# bigNatFromWord64# y_, y_, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
+            | otherwise = (# bigNatFromWord64# y, y, bigNatFromWord64# (int64ToWord64# r) #)
+       in qr yi64# ri_
+    {-# INLINEABLE handleFirstRemBN## #-}
+
+    -- -- Fix remainder accompanying a 'next downed digit' see algorithm
+    fixRemainder# :: Word64# -> Int64# -> Word64#
+    fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
+    {-# INLINEABLE fixRemainder# #-}
+
+{-# INLINEABLE tniP #-}
+tniP :: Itr -> VU.Vector Word -> Integer
+tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (VU.foldl' go (Itr cli# yCAcci_ tAi ti#) wBExsRest))
+  where
+    go :: Itr -> Word -> Itr
+    go (Itr !cl# !yCAcc_ !tA !t#) wBEx@(W# w#) =
+      let !tA_ =
+            let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
+             in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd'` bigNatFromWord# x1 `bigNatAddWord'#` i2w32# -- unparallized version of the below, which is about the same speed as the parallel version, but the parallel version is more scalable and faster for larger inputs
+          !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+          -- let !(BN# tAb#, BN# tAa#, tCFx_#) = (spl w#, mul2To64 tA, scaleByPower2# 32#Int64 t#) `using` parTuple3 rpar rseq rseq -- //FIXME not any faster boxing inside called functions
+          --     !(# tA_, tCFx# #) = (# tAa# `bigNatAdd` tAb#, tCFx_# #)
+          !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
+          -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+          -- weirdly the above and below are both about the same
+          !itr_ =
+            if isTrue# (cl# `ltInt8#` 3#Int8)
+              then Itr (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #))
+              else Itr cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+       in itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
       where
-        step k = (k + n `quot` k) `quot` 2
-        go k
-            | m < k     = go m
-            | otherwise = k
-              where
-                m = step k
+        yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
+        yTildeFinalFx## (# !w64#, !fx# #) = case fx# == zeroFx# of
+          True -> if isTrue# (w64# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w64#
+          !_ -> fx#
+        {-# INLINEABLE yTildeFinalFx## #-}
+    -- spl :: Word# -> BigNat
+    -- spl w_# =
+    --   let !i1 = w_# `uncheckedShiftRL#` 32# -- max of either of them is 2^32-1
+    --       !i2 = w_# `and#` 0xffffffff## -- max of either of them is 2^32-1
+    --       !x1 = i1 `shiftL#` 32#
+    --       !r = bigNatFromWord# x1 `bigNatAddWord'#` i2
+    --    in BN# r
+    -- {-# INLINEABLE spl #-}
+    -- mul2To64 :: BigNat# -> BigNat
+    -- mul2To64 x_ = BN# (x_ `bigNatShiftL#` 64##)
+    -- {-# INLINEABLE mul2To64 #-}
 
--- Find a fairly good approximation to the square root.
--- At most one off for small Integers, about 48 bits should be correct
--- for large Integers.
-appSqrt :: Integer -> Integer
-appSqrt (IS i#) = IS (double2Int# (sqrtDouble# (int2Double# i#)))
-appSqrt n@(IP bn#)
-    | isTrue# (bigNatSize# bn# <# thresh#) =
-          floor (sqrt $ fromInteger n :: Double)
-    | otherwise = case integerLog2# n of
-#ifdef MIN_VERSION_integer_gmp
-                    l# -> case uncheckedIShiftRA# l# 1# -# 47# of
-                            h# -> case shiftRInteger n (2# *# h#) of
-                                    m -> case floor (sqrt $ fromInteger m :: Double) of
-                                            r -> shiftLInteger r h#
-#else
-                    l# -> case uncheckedShiftRL# l# 1# `minusWord#` 47## of
-                            h# -> case integerShiftR# n (2## `timesWord#` h#) of
-                                    m -> case floor (sqrt $ fromInteger m :: Double) of
-                                            r -> integerShiftL# r h#
-#endif
-    where
-        -- threshold for shifting vs. direct fromInteger
-        -- we shift when we expect more than 256 bits
-        thresh# :: Int#
-        thresh# = if finiteBitSize (0 :: Word) == 64 then 5# else 9#
--- There's already a check for negative in integerSquareRoot,
--- but integerSquareRoot' is exported directly too.
-appSqrt _ = error "integerSquareRoot': negative argument"
+    rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
+    rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
+      let !sbtnd# = subtrahend# ycScaledbn# yTilde#
+          !ytrdr = case ta# `bigNatSub'` sbtnd# of
+            (# | res# #) -> (# ycScaledbn# `bigNatAddWord'#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
+            _ ->
+              -- bigNat thankfully returns a zero if they are equal and it would go into above branch
+              let !res# = sbtnd# `bigNatSubUnsafe` ta# -- since we know resTrial < 0 and this is safe
+               in let !adjyt = yTilde# `subWord64#` 1#Word64
+                      !adjacc = ycScaledbn# `bigNatAddWord'#` word64ToWord# adjyt
+                      !adjres = (adjacc `bigNatMulWord'#` 2## `bigNatAddWord'#` 1##) `bigNatSubUnsafe` res#
+                   in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
+       in ytrdr
+    {-# INLINEABLE rmdrDgt #-}
 
+    subtrahend# :: BigNat# -> Word64# -> BigNat#
+    subtrahend# !yScaled# !yTilde# = let !wyTilde# = word64ToWord# yTilde# in ((yScaled# `bigNatAdd` yScaled#) `bigNatAddWord'#` wyTilde#) `bigNatMulWord'#` wyTilde#
+    {-# INLINEABLE subtrahend# #-}
+
+nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
+nxtDgtNatW64## !bn# !tcfx#
+  | isTrue# (ln# `geWord#` threshW##) = computFxW64# (preComputFx## bn# ln# tcfx#) -- note the gtWord
+  | otherwise = (# nxtDgtDoubleFxW64## (bigNatEncodeDouble'# bn# 0#) tcfx#, zeroFx# #) -- only ~8 cases land here in tests
+  where
+    !ln# = bigNatLog2'# bn#
+    !(W# threshW##) = threshWMaxDouble -- if finiteBitSize (0 :: Word) == 64 then 8# else 14#
+{-# INLINEABLE nxtDgtNatW64## #-}
+
+nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
+nxtDgtDoubleFxW64## !pa# !tcfx# = case preComput pa# tcfx# of (# a_#, c#, r# #) -> computDoubleW64# a_# c# r#
+{-# INLINE nxtDgtDoubleFxW64## #-}
+
+preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
+preComput !ax# !tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDouble# c# c# ax# #)
+{-# INLINE preComput #-}
+
+computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
+computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDoubleInt (D# (coreD# tAFX# tCFX# radFX#)) of (I# iI#) -> wordToWord64# (int2Word# iI#)
+
+coreD# :: Double# -> Double# -> Double# -> Double#
+coreD# !da# !dc# !dr# = da# /## (sqrtDouble# dr# +## dc#)
+
+preComputFx## :: BigNat# -> Word# -> FloatingX# -> (# FloatingX#, FloatingX#, FloatingX# #)
+preComputFx## !tA__bn# !lgn# !tCFX# = case unsafeGtWordbn2Fx## tA__bn# lgn# of tAFX# -> (# tAFX#, tCFX#, tCFX# !**+## tAFX# #) -- last item is radFX# and uses custom fx# based fused square (multiply) and add
+{-# INLINE preComputFx## #-}
+
+computFxW64# :: (# FloatingX#, FloatingX#, FloatingX# #) -> (# Word64#, FloatingX# #)
+computFxW64# (# !tAFX#, !tCFX#, !radFX# #) = let !w64Fx# = coreFx# (# tAFX#, tCFX#, radFX# #) in (# floorXW64## w64Fx#, w64Fx# #)
+{-# INLINE computFxW64# #-}
+
+coreFx# :: (# FloatingX#, FloatingX#, FloatingX# #) -> FloatingX#
+coreFx# (# !tAFX#, !tCFX#, !radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
+{-# INLINE coreFx# #-}
 
 -- Integer square root with remainder, using the Karatsuba Square Root
 -- algorithm from
@@ -93,7 +235,7 @@ karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
     | lgN < 2300 =
-        let s = isqrtA n in (s, n - s * s)
+        let s = isqrtB_ n in (s, n - s * s)
     | otherwise =
         if lgN .&. 2 /= 0 then
             karatsubaStep k (karatsubaSplit k n)
