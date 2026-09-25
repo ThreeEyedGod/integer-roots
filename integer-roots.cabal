@@ -35,13 +35,17 @@ library
     build-depends: ghc-bignum < 1.5
   exposed-modules:
     Math.NumberTheory.Roots
+    Math.NumberTheory.Roots_
   other-modules:
     Math.NumberTheory.Primes.Small
     Math.NumberTheory.Roots.Cubes
     Math.NumberTheory.Roots.Fourth
     Math.NumberTheory.Roots.General
+    Math.NumberTheory.Roots.General_
     Math.NumberTheory.Roots.Squares
+    Math.NumberTheory.Roots.Squares_
     Math.NumberTheory.Roots.Squares.Internal
+    Math.NumberTheory.Roots.Squares.Internal_
     Math.NumberTheory.Utils.BitMask
     Math.NumberTheory.Utils.FromIntegral
     Math.NumberTheory.Utils.ArthMtic_
