@@ -59,6 +59,8 @@ test-suite integer-roots-tests
     Math.NumberTheory.Roots.FourthTests
     Math.NumberTheory.Roots.GeneralTests
     Math.NumberTheory.Roots.SquaresTests
+    Math.NumberTheory.Roots.GeneralTests_
+    Math.NumberTheory.Roots.SquaresTests_
     Math.NumberTheory.TestUtils
     Math.NumberTheory.TestUtils.Wrappers
   type: exitcode-stdio-1.0
