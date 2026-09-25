@@ -22,6 +22,12 @@ module Math.NumberTheory.TestUtils.Wrappers
   ( AnySign(..)
   , Power(..)
   , Huge(..)
+  , Humoungous(..)
+  , Gargantuan(..)
+  , Googolplex(..)
+  , FZeight(..)
+  , Boogol(..)
+  , BoogolZeight(..)
   ) where
 
 import Control.Applicative
@@ -100,6 +106,142 @@ instance Ord1 Huge where
 
 instance Show1 Huge where
   liftShowsPrec shw _ p (Huge a) = shw p a
+
+
+-------------------------------------------------------------------------------
+-- Humoungous
+
+newtype Humoungous a = Humoungous { getHumoungous :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (Humoungous a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ Humoungous $ foldl1 (\acc n -> acc * 2 ^ (127 :: Int) + n) ds
+
+instance Eq1 Humoungous where
+  liftEq eq (Humoungous a) (Humoungous b) = a `eq` b
+
+instance Ord1 Humoungous where
+  liftCompare cmp (Humoungous a) (Humoungous b) = a `cmp` b
+
+instance Show1 Humoungous where
+  liftShowsPrec shw _ p (Humoungous a) = shw p a
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- Gargantuan
+
+newtype Gargantuan a = Gargantuan { getGargantuan :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (Gargantuan a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ Gargantuan $ foldl1 (\acc n -> acc * 2 ^ (255 :: Int) + n) ds
+
+instance Eq1 Gargantuan where
+  liftEq eq (Gargantuan a) (Gargantuan b) = a `eq` b
+
+instance Ord1 Gargantuan where
+  liftCompare cmp (Gargantuan a) (Gargantuan b) = a `cmp` b
+
+instance Show1 Gargantuan where
+  liftShowsPrec shw _ p (Gargantuan a) = shw p a
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- Googolplex
+
+newtype Googolplex a = Googolplex { getGoogolplex :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (Googolplex a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ Googolplex $ foldl1 (\acc n -> acc * 2 ^ (511 :: Int) + n) ds
+
+instance Eq1 Googolplex where
+  liftEq eq (Googolplex a) (Googolplex b) = a `eq` b
+
+instance Ord1 Googolplex where
+  liftCompare cmp (Googolplex a) (Googolplex b) = a `cmp` b
+
+instance Show1 Googolplex where
+  liftShowsPrec shw _ p (Googolplex a) = shw p a
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- FZeight
+
+newtype FZeight a = FZeight { getFZeight :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (FZeight a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ FZeight $ foldl1 (\acc n -> acc * 2 ^ (1023 :: Int) + n) ds
+
+instance Eq1 FZeight where
+  liftEq eq (FZeight a) (FZeight b) = a `eq` b
+
+instance Ord1 FZeight where
+  liftCompare cmp (FZeight a) (FZeight b) = a `cmp` b
+
+instance Show1 FZeight where
+  liftShowsPrec shw _ p (FZeight a) = shw p a
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- Boogol
+
+newtype Boogol a = Boogol { getBoogol :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (Boogol a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ Boogol $ foldl1 (\acc n -> acc * 2 ^ (2046 :: Int) + n) ds
+
+instance Eq1 Boogol where
+  liftEq eq (Boogol a) (Boogol b) = a `eq` b
+
+instance Ord1 Boogol where
+  liftCompare cmp (Boogol a) (Boogol b) = a `cmp` b
+
+instance Show1 Boogol where
+  liftShowsPrec shw _ p (Boogol a) = shw p a
+
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- BoogolZeight
+
+newtype BoogolZeight a = BoogolZeight { getBoogolZeight :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (BoogolZeight a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ BoogolZeight $ foldl1 (\acc n -> acc * 2 ^ (4096 :: Int) + n) ds 
+
+instance Eq1 BoogolZeight where
+  liftEq eq (BoogolZeight a) (BoogolZeight b) = a `eq` b
+
+instance Ord1 BoogolZeight where
+  liftCompare cmp (BoogolZeight a) (BoogolZeight b) = a `cmp` b
+
+instance Show1 BoogolZeight where
+  liftShowsPrec shw _ p (BoogolZeight a) = shw p a
+
+-------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------
 -- Power
