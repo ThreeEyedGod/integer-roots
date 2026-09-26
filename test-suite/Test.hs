@@ -16,7 +16,7 @@ main
     (\(QuickCheckTests n) -> QuickCheckTests (max n 10000))
   $ adjustOption
     (\(SmallCheckDepth n) -> SmallCheckDepth (max n 100))
-  $ tests
+  $ tests_
 
 tests :: TestTree
 tests = testGroup "All"
