@@ -71,11 +71,11 @@ import Math.NumberTheory.Utils.FloatingX_
 isqrtB_ :: (Integral a) => a -> a
 isqrtB_ 0 = 0
 isqrtB_ n = fromInteger . newappsqrt_ . fromIntegral $ n
-{-# INLINEABLE [1] isqrtB_ #-}
+{-# INLINE [1] isqrtB_ #-}
 
 
 data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
-
+-- //FIXME: USE TIMESWORD2 WHEREVER POSSIBLE
 newappsqrt_ :: Integer -> Integer
 newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
 newappsqrt_ n@(IP nbn#)
