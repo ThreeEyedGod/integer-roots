@@ -289,7 +289,19 @@ jobs:
           $CABAL v2-build $ARG_COMPILER $ARG_TESTS $ARG_BENCH all --write-ghc-environment-files=always
       - name: tests
         run: |
+          start_ns=$(date +%s%N)
+          set +e
           $CABAL v2-test $ARG_COMPILER $ARG_TESTS $ARG_BENCH all --test-show-details=direct
+          test_status=$?
+          end_ns=$(date +%s%N)
+          elapsed_ms=$(((end_ns - start_ns) / 1000000))
+          minutes=$((elapsed_ms / 60000))
+          seconds=$(((elapsed_ms % 60000) / 1000))
+          milliseconds=$((elapsed_ms % 1000))
+          if [ "$test_status" -eq 0 ]; then result=PASS; else result=FAIL; fi
+          printf '### Tests\n\n- Result: %s\n- Duration: %d:%02d.%03d\n' \
+            "$result" "$minutes" "$seconds" "$milliseconds" >> "$GITHUB_STEP_SUMMARY"
+          exit "$test_status"
       - name: docspec
         run: |
           $CABAL v2-build $ARG_COMPILER $ARG_TESTS $ARG_BENCH all
