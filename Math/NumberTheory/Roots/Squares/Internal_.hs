@@ -49,14 +49,11 @@ import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL
 
 -- \*********** BEGIN NEW IMPORTS
 
-import Control.Parallel.Strategies (parTuple2, rpar, rseq, using)
-import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import qualified Data.Vector.Unboxed as VU
 import GHC.Exts (Double (..), Double#, Int (..), Int64#, Int8#, Word (..), Word#, Word64#, and#, eqWord64#, fmaddDouble#, geWord#, int2Word#, int64ToWord64#, isTrue#, ltInt64#, ltInt8#, plusInt64#, plusInt8#, shiftL#, sqrtDouble#, subInt64#, subWord64#, timesInt64#, timesWord64#, uncheckedShiftRL#, word2Int#, word64ToInt64#, word64ToWord#, wordToWord64#, (+#), (+##), (-#), (/##), (>#))
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Natural (Natural (..), naturalToInteger)
 import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatShiftL#, bigNatSubUnsafe)
-import GHC.Num.Integer (Integer (..), integerLog2#)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
 
@@ -85,7 +82,7 @@ newappsqrt_ n@(IP nbn#)
     (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     isTrue# (sz# ># 1#) =
       let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
-          !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#)) `using` parTuple2 rseq rpar -- do first iteration in parallel with building the rest of the word list for next iterations
+          !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
        in tniP tfi_ wBExs
   | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
 newappsqrt_ _ = error "newappsqrt_: negative argument"
