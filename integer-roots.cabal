@@ -56,7 +56,7 @@ library
     Math.NumberTheory.Utils.FloatingX_
   default-language: Haskell2010
   if flag(test-library-options)
-     ghc-options: 
+   ghc-options: 
                -Wall 
                -Widentities 
                -Wcompat 
@@ -79,11 +79,8 @@ library
                -optc-O3
                -optc-ffast-math
                -optc-march=native
-               -rtsopts 
-               -with-rtsopts=-N6 -w
-               -fforce-recomp
   else
-     ghc-options: -Wall -Widentities -Wcompat
+   ghc-options: -Wall -Widentities -Wcompat
 
 test-suite integer-roots-tests
   build-depends:
@@ -97,7 +94,9 @@ test-suite integer-roots-tests
     tasty-smallcheck >=0.8 && <0.9
   other-modules:
     Math.NumberTheory.Roots.CubesTests
+    Math.NumberTheory.Roots.CubesTests_
     Math.NumberTheory.Roots.FourthTests
+    Math.NumberTheory.Roots.FourthTests_
     Math.NumberTheory.Roots.GeneralTests
     Math.NumberTheory.Roots.SquaresTests
     Math.NumberTheory.Roots.GeneralTests_

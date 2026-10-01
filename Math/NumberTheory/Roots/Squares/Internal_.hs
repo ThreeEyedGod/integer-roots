@@ -19,6 +19,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 -- {-# LANGUAGE Strict #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 -- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
@@ -68,7 +69,7 @@ import Math.NumberTheory.Utils.FloatingX_
 isqrtB_ :: (Integral a) => a -> a
 isqrtB_ 0 = 0
 isqrtB_ n = fromInteger . newappsqrt_ . fromIntegral $ n
-{-# INLINE [1] isqrtB_ #-}
+{-# INLINEABLE [1] isqrtB_ #-}
 
 
 data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
@@ -225,7 +226,7 @@ coreFx# (# !tAFX#, !tCFX#, !radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
 -- algorithm from
 -- Paul Zimmermann. Karatsuba Square Root. [Research Report] RR-3805, 1999,
 -- pp.8. <inria-00072854>
-
+{-# INLINEABLE karatsubaSqrt #-}
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
@@ -251,6 +252,7 @@ karatsubaSqrt n
     lgN = I# (word2Int# (integerLog2# n))
 #endif
 
+{-# INLINEABLE karatsubaStep #-}
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)
     | r >= 0 = (s, r)
@@ -261,8 +263,9 @@ karatsubaStep k (a3, a2, a1, a0)
     (q, u) = cat r' a1 `quotRem` double s'
     (s', r') = karatsubaSqrt (cat a3 a2)
     cat x y = x `unsafeShiftL` k .|. y
-    {-# INLINE cat #-}
+    {-# INLINEABLE cat #-}
 
+{-# INLINEABLE karatsubaSplit #-}
 karatsubaSplit :: Int -> Integer -> (Integer, Integer, Integer, Integer)
 karatsubaSplit k n0 = (a3, a2, a1, a0)
   where
