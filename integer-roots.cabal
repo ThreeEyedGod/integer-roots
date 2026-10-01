@@ -23,6 +23,10 @@ source-repository head
   type: git
   location: https://github.com/Bodigrim/integer-roots
 
+flag test-library-options
+  default: False
+  manual: True
+
 library
   build-depends:
     base >=4.9 && <5
@@ -51,7 +55,35 @@ library
     Math.NumberTheory.Utils.ArthMtic_
     Math.NumberTheory.Utils.FloatingX_
   default-language: Haskell2010
-  ghc-options: -Wall -Widentities -Wcompat
+  if flag(test-library-options)
+     ghc-options: 
+               -Wall 
+               -Widentities 
+               -Wcompat 
+               -Wno-type-defaults
+               -Wno-unused-top-binds
+               -Wno-unused-matches
+               -Wno-missed-specialisations 
+               -O2 
+               -- turn threaded off when using weigh 
+               -threaded 
+              --  -fllvm 
+               -fstrictness
+               -funfolding-use-threshold=50
+               -- no need to place {-# UNPACK #-} on every field manually
+               -funbox-small-strict-fields
+               -mfma 
+               -fproc-alignment=64
+               -funbox-strict-fields
+               -fliberate-case
+               -optc-O3
+               -optc-ffast-math
+               -optc-march=native
+               -rtsopts 
+               -with-rtsopts=-N6 -w
+               -fforce-recomp
+  else
+     ghc-options: -Wall -Widentities -Wcompat
 
 test-suite integer-roots-tests
   build-depends:
@@ -81,3 +113,48 @@ test-suite integer-roots-tests
                -rtsopts 
                -with-rtsopts=-N6 -w
 
+benchmark integer-roots-benchmark
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      bench
+  main-is:             BenchIntegerRoots.hs
+  build-depends:       base
+                     , integer-roots
+                     , criterion >= 1.6.4.1
+                     , random >= 1.3.1
+  default-language:    Haskell2010
+  ghc-options:
+                       -fproc-alignment=64 
+                       -threaded
+                       -rtsopts
+                       -with-rtsopts=-N6-w-H512m-A128m
+
+benchmark weigh
+  type            : exitcode-stdio-1.0
+  default-language: Haskell2010
+  ghc-options     : -O2 
+                    -fforce-recomp 
+                    -- -threaded
+                    -- -rtsopts
+                    -- -with-rtsopts=-N6 -w
+  main-is         : Main.hs
+  hs-source-dirs  : bench/Weigh
+  build-depends: base >= 4.15
+               , integer-roots
+               , random >= 1.3.1
+               , time >= 1.12.2 && <= 1.15
+               , weigh
+
+executable integer-roots-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  build-depends:       base >= 4.15 
+                     , integer-roots
+                     , random >= 1.3.1
+                     , time >= 1.12.2 && <= 1.15
+  default-language:    Haskell2010
+  ghc-options:         -O2 -fforce-recomp
+                       -Wall
+                       -fproc-alignment=64 
+                       -threaded
+                       -rtsopts                       
+                       -with-rtsopts=-N6 -w 
