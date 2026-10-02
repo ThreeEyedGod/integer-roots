@@ -114,7 +114,7 @@ test-suite integer-roots-tests
 
 benchmark integer-roots-benchmark
   type:                exitcode-stdio-1.0
-  hs-source-dirs:      bench
+  hs-source-dirs:      Bench
   main-is:             BenchIntegerRoots.hs
   build-depends:       base
                      , integer-roots
@@ -136,7 +136,7 @@ benchmark weigh
                     -- -rtsopts
                     -- -with-rtsopts=-N6 -w
   main-is         : Main.hs
-  hs-source-dirs  : bench/Weigh
+  hs-source-dirs  : Bench/Weigh
   build-depends: base >= 4.15
                , integer-roots
                , random >= 1.3.1
