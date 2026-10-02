@@ -291,7 +291,7 @@ jobs:
         run: |
           start_ns=$(date +%s%N)
           set +e
-          $CABAL v2-test $ARG_COMPILER $ARG_TESTS $ARG_BENCH all --test-show-details=direct
+          $CABAL v2-test -f+test-library-options $ARG_COMPILER $ARG_TESTS $ARG_BENCH all --test-show-details=direct
           test_status=$?
           end_ns=$(date +%s%N)
           elapsed_ms=$(((end_ns - start_ns) / 1000000))
