@@ -130,7 +130,7 @@ tfi !evnLen !w# =
     fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
     {-# INLINEABLE fixRemainder# #-}
 
-{-# INLINEABLE tniP #-}
+-- {-# INLINEABLE tniP #-}
 tniP :: Itr -> VU.Vector Word -> Integer
 tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (VU.foldl' go (Itr cli# yCAcci_ tAi ti#) wBExsRest))
   where
