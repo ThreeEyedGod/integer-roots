@@ -12,11 +12,29 @@
 #
 # REGENDATA ("0.19.20251118",["github","integer-roots.cabal"])
 #
-name: Haskell-CI
+
+# name: Haskell-CI-Parallel Jobs 
+# on: [push]
+
+# jobs:
+#   job_one:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Run first task
+#         run: echo "This is job one running."
+
+#   job_two:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Run second task
+#         run: echo "This is job two running at the same time."
+
+name: Haskell-CI-tests
 on:
-  - push
-  - pull_request
-  - merge_group
+  push:
+  pull_request:
+  merge_group:
+
 jobs:
   linux:
     name: Haskell-CI - Linux - ${{ matrix.compiler }}
@@ -291,7 +309,7 @@ jobs:
         run: |
           start_ns=$(date +%s%N)
           set +e
-          $CABAL v2-test -f+test-library-options $ARG_COMPILER $ARG_TESTS $ARG_BENCH all --test-show-details=direct
+          $CABAL v2-test -f+test-library-options $ARG_COMPILER $ARG_TESTS $ARG_BENCH --test-options="tests --hide-successes --min-duration-to-report=0ms" all --test-show-details=direct
           test_status=$?
           end_ns=$(date +%s%N)
           elapsed_ms=$(((end_ns - start_ns) / 1000000))
@@ -302,6 +320,8 @@ jobs:
           printf '### Tests\n\n- Result: %s\n- Duration: %d:%02d.%03d\n' \
             "$result" "$minutes" "$seconds" "$milliseconds" >> "$GITHUB_STEP_SUMMARY"
           exit "$test_status"
+        env:
+          TEST_SUITE: ${{ inputs.test_suite }}
       - name: docspec
         run: |
           $CABAL v2-build $ARG_COMPILER $ARG_TESTS $ARG_BENCH all

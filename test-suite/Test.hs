@@ -1,5 +1,6 @@
 import Control.Monad (unless)
-import System.Exit (exitFailure)
+import System.Environment (getArgs, withArgs)
+import System.Exit (die, exitFailure)
 
 import Test.Tasty
 import Test.Tasty.QuickCheck
@@ -15,19 +16,30 @@ import qualified Math.NumberTheory.Roots.SquaresTests as Squares_
 
 main :: IO ()
 main = do
+  args <- getArgs
+  let selectors = filter (`elem` ["tests", "tests_"]) args
+      tastyArgs = filter (`notElem` ["tests", "tests_"]) args
+  (suites, optionSuite) <- case selectors of
+    [] -> pure ([tests, tests_], alltests)
+    ["tests"] -> pure ([tests], tests)
+    ["tests_"] -> pure ([tests_], tests_)
+    _ -> die "Specify at most one test suite: tests or tests_"
+  withArgs tastyArgs $ runSuites suites optionSuite
+
+runSuites :: [TestTree] -> TestTree -> IO ()
+runSuites suites optionSuite = do
   let ingredients = defaultIngredients
       withTestOptions suite = adjustOption
         (\(QuickCheckTests n) -> QuickCheckTests (max n 10000))
         $ adjustOption
           (\(SmallCheckDepth n) -> SmallCheckDepth (max n 100))
           suite
-  options <- parseOptions ingredients (withTestOptions alltests)
+  options <- parseOptions ingredients (withTestOptions optionSuite)
   let runSuite suite = case tryIngredients ingredients options (withTestOptions suite) of
         Just run -> run
         Nothing -> pure False
-  testsPassed <- runSuite tests
-  testsPassed_ <- runSuite tests_
-  unless (testsPassed && testsPassed_) exitFailure
+  testsPassed <- mapM runSuite suites
+  unless (and testsPassed) exitFailure
 
 tests :: TestTree
 tests = testGroup "All"
@@ -37,8 +49,8 @@ tests = testGroup "All"
   , General.testSuite
   ]
 
-alltests :: TestTree 
-alltests = sequentialTestGroup "BOTH " AllFinish [tests, tests_] 
+alltests :: TestTree
+alltests = sequentialTestGroup "BOTH " AllFinish [tests, tests_]
 
 tests_ :: TestTree
 tests_ = testGroup "Root Tests"
