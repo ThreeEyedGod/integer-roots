@@ -309,7 +309,7 @@ jobs:
         run: |
           start_ns=$(date +%s%N)
           set +e
-          $CABAL v2-test -f+test-library-options $ARG_COMPILER $ARG_TESTS $ARG_BENCH --test-options="tests --hide-successes --min-duration-to-report=0ms" all --test-show-details=direct
+          $CABAL v2-test -f+test-library-options $ARG_COMPILER $ARG_TESTS $ARG_BENCH --test-options="tests" all --test-show-details=direct
           test_status=$?
           end_ns=$(date +%s%N)
           elapsed_ms=$(((end_ns - start_ns) / 1000000))
@@ -617,7 +617,7 @@ jobs:
         run: |
           start_ns=$(date +%s%N)
           set +e
-          $CABAL v2-test -f+test-library-options $ARG_COMPILER $ARG_TESTS $ARG_BENCH --test-options="tests_ --hide-successes --min-duration-to-report=0ms" all --test-show-details=direct
+          $CABAL v2-test -f+test-library-options $ARG_COMPILER $ARG_TESTS $ARG_BENCH --test-options="tests_" all --test-show-details=direct
           test_status=$?
           end_ns=$(date +%s%N)
           elapsed_ms=$(((end_ns - start_ns) / 1000000))
