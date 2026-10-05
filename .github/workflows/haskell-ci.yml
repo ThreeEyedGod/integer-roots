@@ -13,22 +13,6 @@
 # REGENDATA ("0.19.20251118",["github","integer-roots.cabal"])
 #
 
-# name: Haskell-CI-Parallel Jobs 
-# on: [push]
-
-# jobs:
-#   job_one:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Run first task
-#         run: echo "This is job one running."
-
-#   job_two:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Run second task
-#         run: echo "This is job two running at the same time."
-
 name: Haskell-CI-tests
 on:
   push:
