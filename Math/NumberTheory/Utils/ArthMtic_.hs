@@ -49,6 +49,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     bigNatShiftR'#,
     bigNatEncodeDouble'#,
     bigNatSub',
+    bigNatSubUnsafe',
     quot2,
     bigNatToWordVec_,
     threshWMaxDouble,
@@ -92,10 +93,12 @@ import GHC.Exts
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
-import GHC.Internal.Bignum.Backend.Native (bignat_encode_double)
+import GHC.Internal.Bignum.Backend.Native (bignat_encode_double, bignat_sub)
 import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex, bigNatIndex#, bigNatIsOne, bigNatIsZero, bigNatLog2#, bigNatMulWord#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatZero#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.QuoteQuot (quoteQuot)
+import GHC.Internal.Bignum.WordArray
+import GHC.Internal.Bignum.Primitives
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -312,7 +315,7 @@ bigNatMulWord'# a w = bigNatMulWord# a w
 bigNatAdd' :: BigNat# -> BigNat# -> BigNat#
 bigNatAdd' (bigNatIsZero -> True) b = b
 bigNatAdd' a (bigNatIsZero -> True) = a
-bigNatAdd' a b = bigNatAdd a b
+bigNatAdd' a b = bigNatAdd a b 
 
 {-# INLINE bigNatShiftR'# #-}
 
@@ -329,6 +332,21 @@ bigNatSub' :: BigNat# -> BigNat# -> (# (# #) | BigNat# #)
 bigNatSub' a (bigNatIsZero -> True) = (# | a #)
 bigNatSub' a b@(\x -> isTrue# (bigNatSize# a <# bigNatSize# x) -> True) = (# (# #) | #)
 bigNatSub' a b = bigNatSub a b
+
+{-# INLINE bigNatSubUnsafe' #-}
+-- | Subtract two BigNat (don't check if a >= b)
+bigNatSubUnsafe' :: BigNat# -> BigNat# -> BigNat#
+bigNatSubUnsafe' a b
+   | bigNatIsZero b = a
+   | otherwise =
+      let szA = wordArraySize# a
+      in withNewWordArrayTrimmed# szA \mwa s->
+            case inline bignat_sub mwa a b s of
+               (# s', 1# #) -> s'
+               (# s', _  #) -> case raiseUnderflow of
+                                 !_ -> s'
+                                 -- see Note [ghc-bignum exceptions] in
+                                 -- GHC.Num.Primitives
 
 {-# INLINE bigNatEncodeDouble'# #-}
 

@@ -175,10 +175,10 @@ tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (VU.foldl' go (It
             (# | res# #) -> (# ycScaledbn# `bigNatAddWord'#` word64ToWord# yTilde#, res#, yTilde#, yTildeFx# #)
             _ ->
               -- bigNat thankfully returns a zero if they are equal and it would go into above branch
-              let !res# = sbtnd# `bigNatSubUnsafe` ta# -- since we know resTrial < 0 and this is safe
+              let !res# = sbtnd# `bigNatSubUnsafe'` ta# -- since we know resTrial < 0 and this is safe
                in let !adjyt = yTilde# `subWord64#` 1#Word64
                       !adjacc = ycScaledbn# `bigNatAddWord'#` word64ToWord# adjyt
-                      !adjres = (adjacc `bigNatMulWord'#` 2## `bigNatAddWord'#` 1##) `bigNatSubUnsafe` res#
+                      !adjres = (adjacc `bigNatMulWord'#` 2## `bigNatAddWord'#` 1##) `bigNatSubUnsafe'` res#
                    in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
        in ytrdr
     {-# INLINEABLE rmdrDgt #-}
