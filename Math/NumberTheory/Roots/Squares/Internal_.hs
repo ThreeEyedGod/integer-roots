@@ -34,7 +34,7 @@ module Math.NumberTheory.Roots.Squares.Internal_
 
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 
-import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#))
+import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#), quotWord#)
 #ifdef MIN_VERSION_integer_gmp
 import GHC.Exts (uncheckedIShiftRA#, (*#), (-#))
 import GHC.Integer.GMP.Internals (Integer(..), shiftLInteger, shiftRInteger, sizeofBigNat#)
@@ -44,7 +44,7 @@ import GHC.Integer.Logarithms (integerLog2#)
 #define bigNatSize sizeofBigNat
 #else
 import GHC.Exts (uncheckedShiftRL#, word2Int#, minusWord#, timesWord#)
-import GHC.Num.BigNat (bigNatSize#)
+import GHC.Num.BigNat (bigNatSize#, bigNatIsPowerOf2#, bigNatZero#, bigNatMul, bigNatCtz#)
 import GHC.Num.Integer (Integer(..), integerLog2#, integerShiftR#, integerShiftL#)
 #endif
 
@@ -77,9 +77,10 @@ data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, 
 newappsqrt_ :: Integer -> Integer
 newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
 newappsqrt_ n@(IP nbn#)
+  | yesEven <- even n,
+    (# isPow2, root #) <- if yesEven then evenBnPowerOf2Sqrt'# nbn# else (# False, bigNatZero# (# #) #),
+    isPow2 = IP root
   | szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
-  -- (# !evnLen, !sz# #) <- let szi# = word2Int# szT# `quotInt#` 2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
-  -- (# !evnLen, !sz# #) <- let !szi# = word2Int# (szT# `shiftRL#` 1#) in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     isTrue# (sz# ># 1#) =
       let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
@@ -88,6 +89,24 @@ newappsqrt_ n@(IP nbn#)
   | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
 newappsqrt_ _ = error "newappsqrt_: negative argument"
 {-# INLINE newappsqrt_ #-}
+
+evenBnPowerOf2Sqrt'# :: BigNat# -> (# Bool, BigNat# #)
+evenBnPowerOf2Sqrt'# nbn# = case evenBnPowerOf2Sqrt'# nbn# of
+                          (#  True, bnSqrt# #) -> (# True, bnSqrt# #) --(#  True, bnSqrt# `bigNatMul` bnmSqrt #) 
+                          _ -> evenBnSquareRoot# nbn# --(# False, bigNatZero# (# #) #) -- not a power of 2
+
+evenBnSquareRoot# :: BigNat# -> (# Bool, BigNat# #)
+evenBnSquareRoot# nbn# = let 
+          !wK# = bigNatCtz# nbn#
+          !evenK = even (W# wK#)
+          halfKw# = wK# `quotWord#` 2##
+          halfKInteger = toInteger (W# halfKw#)
+          bnM# = bigNatShiftR'# nbn# wK#
+          m = IP bnM# -- this will be odd
+          bnmSqrt = integerToBigNat# (isqrtB_ m) -- it will not come into the even branch again
+          sqrtK = 2 ^ halfKInteger
+          sqrtKTimesSqrt2 = round (fromInteger sqrtK * sqrtOf2)
+         in if evenK then (# True, integerToBigNat# sqrtK `bigNatMul` bnmSqrt #) else (# True, integerToBigNat# sqrtKTimesSqrt2 `bigNatMul` bnmSqrt #)
 
 {-# INLINEABLE tfi #-}
 tfi :: Bool -> Word# -> Itr

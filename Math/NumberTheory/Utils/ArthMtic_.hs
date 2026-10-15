@@ -7,6 +7,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DataKinds #-}
 
 -- {-# LANGUAGE Strict #-}
 
@@ -53,6 +54,9 @@ module Math.NumberTheory.Utils.ArthMtic_
     quot2,
     bigNatToWordVec_,
     threshWMaxDouble,
+    evenBnPowerOf2Sqrt#,
+    integerToBigNat#,
+    sqrtOf2
   )
 where
 
@@ -89,16 +93,17 @@ import GHC.Exts
     wordToWord64#,
     (+#),
     (-#),
-    (<#), minusWord#, and#, not#,
+    (<#), minusWord#, and#, not#, quotWord#,
   )
 import GHC.Float.RealFracMethods (floorDoubleInt)
 import GHC.Int (Int64 (I64#))
 import GHC.Internal.Bignum.Backend.Native (bignat_encode_double, bignat_sub)
-import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex, bigNatIndex#, bigNatIsOne, bigNatIsZero, bigNatLog2#, bigNatMulWord#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatZero#)
+import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatAddWord#, bigNatFromWord#, bigNatFromWord2#, bigNatFromWord64#, bigNatIndex, bigNatIndex#, bigNatIsOne, bigNatIsZero, bigNatLog2#, bigNatMulWord#, bigNatShiftR#, bigNatSize#, bigNatSub, bigNatZero#, bigNatIsPowerOf2#)
 import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.QuoteQuot (quoteQuot)
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Primitives
+import GHC.Internal.Bignum.Integer
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -239,8 +244,8 @@ split# d# =
 -- secndPlaceW32Radix :: (Integral a) => a
 -- secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 
--- sqrtOf2 :: Double
--- sqrtOf2 = 1.4142135623730950488016887242097
+sqrtOf2 :: Double
+sqrtOf2 = 1.4142135623730950488016887242097
 
 -- maxDouble :: Double
 -- maxDouble = 1.7976931348623157e308
@@ -282,6 +287,18 @@ checkFinite = not . isInfinite
 -- | Threshold for max Double = 512 for 64 bit Word, 14 for 32 bit Word. This is used to determine if a BigNat can be converted to Double without losing precision.
 threshWMaxDouble :: Word
 threshWMaxDouble = let wordSize = finiteBitSize (0 :: Word) in let numW = if wordSize == 64 then 8 else 14 in let !(I# x#) = wordSize * numW in W# (int2Word# x#)
+
+evenBnPowerOf2Sqrt# :: BigNat# -> (# Bool, BigNat# #)
+evenBnPowerOf2Sqrt# nbn# = case bigNatIsPowerOf2# nbn# of
+            (# | wTwoPwr# #) ->
+              let !pow2 = wTwoPwr# `quotWord#` 2##
+               in (# True, bigNatFromWord# (1## `uncheckedShiftL#` word2Int# pow2) #)
+            _ -> (# False, bigNatZero# (# #) #) -- not a power of 2
+
+integerToBigNat# :: Integer -> BigNat#
+integerToBigNat# (IS i#) = bigNatFromWord# (int2Word# i#)
+integerToBigNat# (IP nbn#) = nbn#
+integerToBigNat# _ = error "integerToBigNat#: negative argument"
 
 -- -----************** INLINED VERSIONS OF A FEW BIGNAT FUNCTONS ---------
 
