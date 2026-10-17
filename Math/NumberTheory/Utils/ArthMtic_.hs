@@ -56,11 +56,19 @@ module Math.NumberTheory.Utils.ArthMtic_
     threshWMaxDouble,
     evenBnPowerOf2Sqrt#,
     integerToBigNat#,
-    sqrtOf2
+    bigNatIsPowerOf2'#
   )
 where
 
 -- \*********** BEGIN NEW IMPORTS
+#include "MachDeps.h"
+#if WORD_SIZE_IN_BITS == 64
+#define WORD_SIZE_BITS_SHIFT 6
+#elif WORD_SIZE_IN_BITS == 32
+#define WORD_SIZE_BITS_SHIFT 5
+#else
+#error Unsupported word size
+#endif
 
 import Data.Bits (finiteBitSize, unsafeShiftL)
 import qualified Data.Vector.Unboxed as VU
@@ -288,12 +296,13 @@ checkFinite = not . isInfinite
 threshWMaxDouble :: Word
 threshWMaxDouble = let wordSize = finiteBitSize (0 :: Word) in let numW = if wordSize == 64 then 8 else 14 in let !(I# x#) = wordSize * numW in W# (int2Word# x#)
 
-evenBnPowerOf2Sqrt# :: BigNat# -> (# Bool, BigNat# #)
-evenBnPowerOf2Sqrt# nbn# = case bigNatIsPowerOf2# nbn# of
-            (# | wTwoPwr# #) ->
+{-# INLINE evenBnPowerOf2Sqrt# #-}
+evenBnPowerOf2Sqrt# :: BigNat# -> (# Bool, BigNat#, Word#, Int# #)
+evenBnPowerOf2Sqrt# nbn# = case bigNatIsPowerOf2'# nbn# of
+            (# (# | wTwoPwr# #), msw, sz #) ->
               let !pow2 = wTwoPwr# `quotWord#` 2##
-               in (# True, bigNatFromWord# (1## `uncheckedShiftL#` word2Int# pow2) #)
-            _ -> (# False, bigNatZero# (# #) #) -- not a power of 2
+               in (# True, bigNatFromWord# (1## `uncheckedShiftL#` word2Int# pow2), msw, sz #)
+            (# (# (# #) | #), msw, sz #) -> (# False, bigNatZero# (# #), msw, sz #) -- not a power of 2
 
 integerToBigNat# :: Integer -> BigNat#
 integerToBigNat# (IS i#) = bigNatFromWord# (int2Word# i#)
@@ -301,6 +310,29 @@ integerToBigNat# (IP nbn#) = nbn#
 integerToBigNat# _ = error "integerToBigNat#: negative argument"
 
 -- -----************** INLINED VERSIONS OF A FEW BIGNAT FUNCTONS ---------
+
+
+{-# INLINE bigNatIsPowerOf2'# #-}
+-- | Indicate if the value is a power of two and which one
+bigNatIsPowerOf2'# :: BigNat# -> (# (# (# #) | Word# #), Word#, Int# #)
+bigNatIsPowerOf2'# a
+   | bigNatIsZero a                      = (# (# (# #) | #), 0##, 0# #)
+   | otherwise =
+    let
+      msw  = bigNatIndex# a imax
+      sz   = bigNatSize# a
+      imax = sz -# 1#
+      checkAllZeroes i
+         | isTrue# (i <# 0#) = 1#
+         | otherwise = case bigNatIndex# a i of
+                     0## -> checkAllZeroes (i -# 1#)
+                     _   -> 0#
+    in case wordIsPowerOf2# msw of
+               (# (# #) | #) -> (# (# (# #) | #), msw, sz #)
+               (# | c  #) -> case checkAllZeroes (imax -# 1#) of
+                  0# -> (# (# (# #) | #), msw, sz #)
+                  _  -> (# (# | c `plusWord#`
+                              (int2Word# imax `uncheckedShiftL#` WORD_SIZE_BITS_SHIFT#) #), msw, sz #)
 
 -- | Add a bigNat and a Word#
 {-# INLINE bigNatAddWord'# #-}
