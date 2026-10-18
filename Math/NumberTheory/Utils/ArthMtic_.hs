@@ -252,9 +252,6 @@ split# d# =
 -- secndPlaceW32Radix :: (Integral a) => a
 -- secndPlaceW32Radix = 18446744073709551616 -- radixW32 * radixW32
 
-sqrtOf2 :: Double
-sqrtOf2 = 1.4142135623730950488016887242097
-
 -- maxDouble :: Double
 -- maxDouble = 1.7976931348623157e308
 
