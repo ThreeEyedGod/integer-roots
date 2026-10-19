@@ -28,6 +28,7 @@ module Math.NumberTheory.TestUtils.Wrappers
   , FZeight(..)
   , Boogol(..)
   , BoogolZeight(..)
+  , Asamkheya(..)
   ) where
 
 import Control.Applicative
@@ -230,7 +231,7 @@ instance (Num a, Arbitrary a) => Arbitrary (BoogolZeight a) where
   arbitrary = do
     Positive l <- arbitrary
     ds <- vector l
-    return $ BoogolZeight $ foldl1 (\acc n -> acc * 2 ^ (4096 :: Int) + n) ds 
+    return $ BoogolZeight $ foldl1 (\acc n -> acc * 2 ^ (4092 :: Int) + n) ds 
 
 instance Eq1 BoogolZeight where
   liftEq eq (BoogolZeight a) (BoogolZeight b) = a `eq` b
@@ -242,6 +243,29 @@ instance Show1 BoogolZeight where
   liftShowsPrec shw _ p (BoogolZeight a) = shw p a
 
 -------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- Asamkheya
+
+newtype Asamkheya a = Asamkheya { getAsamkheya :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (Asamkheya a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ Asamkheya $ foldl1 (\acc n -> acc * 2 ^ (8184 :: Int) + n) ds
+
+instance Eq1 Asamkheya where
+  liftEq eq (Asamkheya a) (Asamkheya b) = a `eq` b
+
+instance Ord1 Asamkheya where
+  liftCompare cmp (Asamkheya a) (Asamkheya b) = a `cmp` b
+
+instance Show1 Asamkheya where
+  liftShowsPrec shw _ p (Asamkheya a) = shw p a
+
+-------------------------------------------------------------------------------
+
 
 -------------------------------------------------------------------------------
 -- Power

@@ -87,8 +87,8 @@ newappsqrt_ n@(IP nbn#)
   | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
  where
       !(# !isPow2, !root, !msw, !sz #) = evenBnPowerOf2Sqrt# nbn#
-
 newappsqrt_ _ = error "newappsqrt_: negative argument"
+
 {-# INLINE newappsqrt_ #-}
 
 {-# INLINEABLE tfi #-}
