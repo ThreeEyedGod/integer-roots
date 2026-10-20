@@ -32,6 +32,8 @@ main = do
   iGoogolplex <- getRndMInt (iRange 511)
   iFZeight <- getRndMInt (iRange 1023)
   iBoogol <- getRndMInt (iRange 2046)
+  iBoogolZeight <- getRndMInt (iRange 4092)
+  iAsamkheya <- getRndMInt (iRange 8192)
   mainWith $ do
     setColumns [Case, Allocated, Max, Live, GCs, MaxOS, WallTime] -- new
     value "()" ()
@@ -55,6 +57,10 @@ main = do
     func "New FZeight Integer " New.integerSquareRoot iFZeight
     func "Old Boogol Integer " Old.integerSquareRoot iBoogol
     func "New Boogol Integer " New.integerSquareRoot iBoogol
+    func "Old BoogolZeight Integer " Old.integerSquareRoot iBoogolZeight
+    func "New BoogolZeight Integer " New.integerSquareRoot iBoogolZeight
+    func "Old Asamkheya Integer " Old.integerSquareRoot iAsamkheya
+    func "New Asamkheya Integer " New.integerSquareRoot iAsamkheya
 
 -- | Helper function
 timeit :: IO a -> IO (Maybe a, NominalDiffTime)

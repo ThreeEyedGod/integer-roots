@@ -134,8 +134,9 @@ tfi !evnLen !w# =
 
 -- {-# INLINEABLE tniP #-}
 tniP :: Itr -> VU.Vector Word -> Integer
-tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (VU.foldl' go (Itr cli# yCAcci_ tAi ti#) wBExsRest))
+tniP itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
   where
+    !(Itr !cli# !yCAcci_ !tAi !ti#) = itr
     go :: Itr -> Word -> Itr
     go (Itr !cl# !yCAcc_ !tA !t#) wBEx@(W# w#) =
       let !tA_ =

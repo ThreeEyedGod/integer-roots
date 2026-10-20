@@ -253,7 +253,7 @@ instance (Num a, Arbitrary a) => Arbitrary (Asamkheya a) where
   arbitrary = do
     Positive l <- arbitrary
     ds <- vector l
-    return $ Asamkheya $ foldl1 (\acc n -> acc * 2 ^ (8184 :: Int) + n) ds
+    return $ Asamkheya $ foldl1 (\acc n -> acc * 2 ^ (8192 :: Int) + n) ds
 
 instance Eq1 Asamkheya where
   liftEq eq (Asamkheya a) (Asamkheya b) = a `eq` b

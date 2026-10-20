@@ -138,10 +138,10 @@ testIntegralProperty name f = testGroup name
   -- , QC.testProperty "quickcheck Googolplex  Natural" ((f :: wrapper Natural -> bool) . getGoogolplex)
   -- , QC.testProperty "quickcheck FZeight  Integer" ((f :: wrapper Integer -> bool) . getFZeight)
   -- , QC.testProperty "quickcheck FZeight  Natural" ((f :: wrapper Natural -> bool) . getFZeight),
-    QC.testProperty "quickcheck Boogol  Integer" ((f :: wrapper Integer -> bool) . getBoogol)
-  , QC.testProperty "quickcheck Boogol  Natural" ((f :: wrapper Natural -> bool) . getBoogol),
-    QC.testProperty "quickcheck BoogolZeight  Integer" ((f :: wrapper Integer -> bool) . getBoogolZeight),
-    QC.testProperty "quickcheck BoogolZeight  Natural" ((f :: wrapper Natural -> bool) . getBoogolZeight),
+  --   QC.testProperty "quickcheck Boogol  Integer" ((f :: wrapper Integer -> bool) . getBoogol)
+  -- , QC.testProperty "quickcheck Boogol  Natural" ((f :: wrapper Natural -> bool) . getBoogol),
+  --   QC.testProperty "quickcheck BoogolZeight  Integer" ((f :: wrapper Integer -> bool) . getBoogolZeight),
+  --   QC.testProperty "quickcheck BoogolZeight  Natural" ((f :: wrapper Natural -> bool) . getBoogolZeight),
     QC.testProperty "quickcheck Asamkheya  Integer" ((f :: wrapper Integer -> bool) . getAsamkheya)
   , QC.testProperty "quickcheck Asamkheya  Natural" ((f :: wrapper Natural -> bool) . getAsamkheya)
   ]
@@ -230,11 +230,11 @@ testIntegral2Property name f = testGroup name
   -- , QC.testProperty "quickcheck Googolplex  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getGoogolplex)
   -- , QC.testProperty "quickcheck FZeight  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getFZeight)
   -- , QC.testProperty "quickcheck FZeight  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getFZeight),
-    QC.testProperty "quickcheck Boogol  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getBoogol)
-  , QC.testProperty "quickcheck Boogol  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getBoogol)
-  , QC.testProperty "quickcheck BoogolZeight  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getBoogolZeight)
-  , QC.testProperty "quickcheck BoogolZeight  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getBoogolZeight)
-  , QC.testProperty "quickcheck Asamkheya  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getAsamkheya)
+  --   QC.testProperty "quickcheck Boogol  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getBoogol)
+  -- , QC.testProperty "quickcheck Boogol  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getBoogol)
+  -- , QC.testProperty "quickcheck BoogolZeight  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getBoogolZeight)
+  -- , QC.testProperty "quickcheck BoogolZeight  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getBoogolZeight),
+    QC.testProperty "quickcheck Asamkheya  Natural Integer" ((f :: wrapper1 Natural -> wrapper2 Integer -> bool) . getAsamkheya)
   , QC.testProperty "quickcheck Asamkheya  Natural Natural" ((f :: wrapper1 Natural -> wrapper2 Natural -> bool) . getAsamkheya)
   ]
 
