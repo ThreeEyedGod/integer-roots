@@ -7,6 +7,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LinearTypes #-}
 
 -- {-# LANGUAGE Strict #-}
 
@@ -205,7 +206,8 @@ _oddInt64# = _evenInt64#
 {-# INLINEABLE _evenInt64# #-}
 {-# INLINEABLE _oddInt64# #-}
 
-fromInt64 :: Int64 -> Int64#
+{-# INLINEABLE fromInt64 #-}
+fromInt64 :: Int64 %1 -> Int64# 
 fromInt64 (I64# x#) = x#
 
 {-# INLINE upLiftDouble# #-}
