@@ -14,8 +14,8 @@ main = do
   iGargantuan <- getRndMInt (iRange 257)
   iGoogolplex <- getRndMInt (iRange 511)
   iFZeight <- getRndMInt (iRange 1023)
-  iBoogol <- getRndMInt (iRange 2046)
-  iBoogolZeight <- getRndMInt (iRange 4096)
+  iBoogol <- getRndMInt (iRange 2047)
+  iBoogolZeight <- getRndMInt (iRange 4095)
   defaultMain
     [ bgroup
         "IntegerSquare Roots"

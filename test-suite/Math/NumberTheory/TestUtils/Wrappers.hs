@@ -206,7 +206,7 @@ instance (Num a, Arbitrary a) => Arbitrary (Boogol a) where
   arbitrary = do
     Positive l <- arbitrary
     ds <- vector l
-    return $ Boogol $ foldl1 (\acc n -> acc * 2 ^ (2046 :: Int) + n) ds
+    return $ Boogol $ foldl1 (\acc n -> acc * 2 ^ (2047 :: Int) + n) ds
 
 instance Eq1 Boogol where
   liftEq eq (Boogol a) (Boogol b) = a `eq` b
@@ -230,7 +230,7 @@ instance (Num a, Arbitrary a) => Arbitrary (BoogolZeight a) where
   arbitrary = do
     Positive l <- arbitrary
     ds <- vector l
-    return $ BoogolZeight $ foldl1 (\acc n -> acc * 2 ^ (4096 :: Int) + n) ds 
+    return $ BoogolZeight $ foldl1 (\acc n -> acc * 2 ^ (4095 :: Int) + n) ds 
 
 instance Eq1 BoogolZeight where
   liftEq eq (BoogolZeight a) (BoogolZeight b) = a `eq` b

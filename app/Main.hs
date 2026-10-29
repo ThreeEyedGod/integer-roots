@@ -31,7 +31,8 @@ main = do
   iGargantuan <- getRndMInt (iRange 257)
   iGoogolplex <- getRndMInt (iRange 511)
   iFZeight <- getRndMInt (iRange 1023)
-  iBoogol <- getRndMInt (iRange 2046)
+  iBoogol <- getRndMInt (iRange 2047)
+  iBoogolZeight <- getRndMInt (iRange 4095)
   printNatSize (fromInteger iBoogol)
   -- putStrLn "iHumongous Old"
   x2 <- timeit (pure $ Old.integerSquareRoot iHumongous)
