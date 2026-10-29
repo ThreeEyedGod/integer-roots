@@ -132,10 +132,10 @@ tfi !evnLen !w# =
 
 -- {-# INLINEABLE tniP #-}
 tniP :: Itr -> VU.Vector Word -> Integer
-tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (VU.foldl' go (Itr cli# yCAcci_ tAi ti#) wBExsRest))
+tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
   where
     go :: Itr -> Word -> Itr
-    go (Itr !cl# !yCAcc_ !tA !t#) wBEx@(W# w#) =
+    go itrGo wBEx@(W# w#) =
       let !tA_ =
             let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
              in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd'` bigNatFromWord# x1 `bigNatAddWord'#` i2w32# -- unparallized version of the below, which is about the same speed as the parallel version, but the parallel version is more scalable and faster for larger inputs
@@ -151,6 +151,7 @@ tniP itr@(Itr !cli# !yCAcci_ !tAi !ti#) wBExsRest = IP (yaccbn (VU.foldl' go (It
               else Itr cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
        in itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
       where
+        Itr !cl# !yCAcc_ !tA !t# = itrGo -- using Idiom: Unpack large patterns using a where clause 
         yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
         yTildeFinalFx## (# !w64#, !fx# #) = case fx# == zeroFx# of
           True -> if isTrue# (w64# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w64#

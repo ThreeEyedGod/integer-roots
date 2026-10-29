@@ -1,5 +1,6 @@
 *.hi
 *.o
+*.tix
 stack.yaml
 dist
 dist-newstyle
