@@ -484,13 +484,15 @@ jobs:
         run: |
           curl -LO https://downloads.haskell.org/ghc/9.14.2-rc2/ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz
           tar -xf ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz
-          cd ghc-9.14.1.20260916 || exit 1
-          ./configure --prefix="$HOME/.local/ghc/9.14.1.20260916"
+          EXTRACTED_DIR=$(tar -tf ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz | head -n 1 | cut -d/ -f1)
+          cd "$EXTRACTED_DIR" || exit 1
+          INSTALL_PREFIX="$HOME/.local/ghc/9.14.1.20260916"
+          ./configure --prefix="$INSTALL_PREFIX"
           make install
-          echo "$HOME/.local/ghc/9.14.1.20260916/bin" >> "$GITHUB_PATH"
-          HC=$("$HOME/.ghcup/bin/ghcup" whereis ghc "$HCVER")
-          HCPKG=$(echo "$HC" | sed 's#ghc$#ghc-pkg#')
-          HADDOCK=$(echo "$HC" | sed 's#ghc$#haddock#')
+          echo "$INSTALL_PREFIX/bin" >> "$GITHUB_PATH"
+          HC="$INSTALL_PREFIX/bin/ghc"
+          HCPKG="$INSTALL_PREFIX/bin/ghc-pkg"
+          HADDOCK="$INSTALL_PREFIX/bin/haddock"
           echo "HC=$HC" >> "$GITHUB_ENV"
           echo "HCPKG=$HCPKG" >> "$GITHUB_ENV"
           echo "HADDOCK=$HADDOCK" >> "$GITHUB_ENV"
