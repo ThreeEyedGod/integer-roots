@@ -35,7 +35,8 @@ jobs:
             compilerKind: ghc
             compilerVersion: 9.14.1.20260916
             # setup-method: ghcup
-            setup-method: ghcup-prerelease
+            # setup-method: ghcup-prerelease
+            setup-method: curl-prerelease
             allow-failure: false
           # - compiler: ghc-9.14.0.20251104
           #   compilerKind: ghc
@@ -141,6 +142,24 @@ jobs:
         run: |
           "$HOME/.ghcup/bin/ghcup" config add-release-channel prereleases
           "$HOME/.ghcup/bin/ghcup" install ghc "$HCVER" || (cat "$HOME"/.ghcup/logs/*.* && false)
+          HC=$("$HOME/.ghcup/bin/ghcup" whereis ghc "$HCVER")
+          HCPKG=$(echo "$HC" | sed 's#ghc$#ghc-pkg#')
+          HADDOCK=$(echo "$HC" | sed 's#ghc$#haddock#')
+          echo "HC=$HC" >> "$GITHUB_ENV"
+          echo "HCPKG=$HCPKG" >> "$GITHUB_ENV"
+          echo "HADDOCK=$HADDOCK" >> "$GITHUB_ENV"
+        env:
+          HCKIND: ${{ matrix.compilerKind }}
+          HCNAME: ${{ matrix.compiler }}
+          HCVER: ${{ matrix.compilerVersion }}
+      - name: Install GHC (Curl prerelease)
+        if: matrix.setup-method == 'curl-prerelease'
+        run: |
+          "$HOME/curl -LO https://downloads.haskell.org/ghc/9.14.2-rc2/ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz" use curl to download the GHC tarball
+          "$HOME/tar -xf ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz" install ghc "$HCVER" 
+          "$HOME/make install" make it
+          "$HOME/./configure --prefix="$HOME/.local/ghc/9.14.1.20260916" configure it
+          "$HOME/fish_add_path $HOME/.local/ghc/9.14.1.20260916/bin" add path to fish shell
           HC=$("$HOME/.ghcup/bin/ghcup" whereis ghc "$HCVER")
           HCPKG=$(echo "$HC" | sed 's#ghc$#ghc-pkg#')
           HADDOCK=$(echo "$HC" | sed 's#ghc$#haddock#')
