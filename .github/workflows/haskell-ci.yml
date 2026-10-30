@@ -155,14 +155,17 @@ jobs:
       - name: Install GHC (Curl prerelease)
         if: matrix.setup-method == 'curl-prerelease'
         run: |
-          curl -LO https://downloads.haskell.org/ghc/9.14.2-rc2/ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz 
-          tar -xf ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz
+          curl -LO https://downloads.haskell.org/ghc/9.14.2-rc2/ghc-9.14.1.20260916-x86_64-deb10-linux.tar.xz
+          tar -xf ghc-9.14.1.20260916-x86_64-deb10-linux.tar.xz
+          EXTRACTED_DIR=$(tar -tf ghc-9.14.1.20260916-x86_64-deb10-linux.tar.xz | head -n 1 | cut -d/ -f1)
+          cd "$EXTRACTED_DIR" || exit 1
+          INSTALL_PREFIX="$HOME/.local/ghc/9.14.1.20260916"
+          ./configure --prefix="$INSTALL_PREFIX"
           make install
-          "$HOME/./configure --prefix="$HOME/.local/ghc/9.14.1.20260916" configure it
-          "$HOME/fish_add_path $HOME/.local/ghc/9.14.1.20260916/bin" add path to fish shell
-          HC=$("$HOME/.ghcup/bin/ghcup" whereis ghc "$HCVER")
-          HCPKG=$(echo "$HC" | sed 's#ghc$#ghc-pkg#')
-          HADDOCK=$(echo "$HC" | sed 's#ghc$#haddock#')
+          echo "$INSTALL_PREFIX/bin" >> "$GITHUB_PATH"
+          HC="$INSTALL_PREFIX/bin/ghc"
+          HCPKG="$INSTALL_PREFIX/bin/ghc-pkg"
+          HADDOCK="$INSTALL_PREFIX/bin/haddock"
           echo "HC=$HC" >> "$GITHUB_ENV"
           echo "HCPKG=$HCPKG" >> "$GITHUB_ENV"
           echo "HADDOCK=$HADDOCK" >> "$GITHUB_ENV"
@@ -312,7 +315,7 @@ jobs:
         run: |
           start_ns=$(date +%s%N)
           set +e
-          $CABAL v2-test -f+test-library-options $ARG_COMPILER $ARG_TESTS $ARG_BENCH --test-options="tests" all --test-show-details=direct
+          $CABAL v2-test  $ARG_COMPILER $ARG_TESTS $ARG_BENCH --test-options="tests" all --test-show-details=direct
           test_status=$?
           end_ns=$(date +%s%N)
           elapsed_ms=$(((end_ns - start_ns) / 1000000))
@@ -642,7 +645,7 @@ jobs:
         run: |
           start_ns=$(date +%s%N)
           set +e
-          $CABAL v2-test -f+test-library-options $ARG_COMPILER $ARG_TESTS $ARG_BENCH --test-options="tests_" all --test-show-details=direct
+          $CABAL v2-test $ARG_COMPILER $ARG_TESTS $ARG_BENCH --test-options="tests_" all --test-show-details=direct
           test_status=$?
           end_ns=$(date +%s%N)
           elapsed_ms=$(((end_ns - start_ns) / 1000000))
