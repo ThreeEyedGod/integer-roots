@@ -360,8 +360,8 @@ jobs:
         include:
           - compiler: ghc-9.14.1
             compilerKind: ghc
-            compilerVersion: 9.14.1
-            # setup-method: ghcup
+            # compilerVersion: 9.14.1
+            compilerVersion: 9.14.1.20260916
             # setup-method: ghcup-prerelease
             setup-method: curl-prerelease
             allow-failure: false
@@ -486,7 +486,7 @@ jobs:
           tar -xf ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz
           make install
           "$HOME/./configure --prefix="$HOME/.local/ghc/9.14.1.20260916" configure it
-          "$HOME/fish_add_path $HOME/.local/ghc/9.14.1.20260916/bin" add path to fish shell
+          echo $HOME/.local/ghc/9.14.1.20260916/bin" >> $GITHUB_PATH
           HC=$("$HOME/.ghcup/bin/ghcup" whereis ghc "$HCVER")
           HCPKG=$(echo "$HC" | sed 's#ghc$#ghc-pkg#')
           HADDOCK=$(echo "$HC" | sed 's#ghc$#haddock#')
