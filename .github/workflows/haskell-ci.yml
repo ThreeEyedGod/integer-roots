@@ -482,11 +482,12 @@ jobs:
       - name: Install GHC (Curl prerelease)
         if: matrix.setup-method == 'curl-prerelease'
         run: |
-          curl -LO https://downloads.haskell.org/ghc/9.14.2-rc2/ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz 
+          curl -LO https://downloads.haskell.org/ghc/9.14.2-rc2/ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz
           tar -xf ghc-9.14.1.20260916-aarch64-apple-darwin.tar.xz
+          cd ghc-9.14.1.20260916 || exit 1
+          ./configure --prefix="$HOME/.local/ghc/9.14.1.20260916"
           make install
-          "$HOME/./configure --prefix="$HOME/.local/ghc/9.14.1.20260916" configure it
-          echo $HOME/.local/ghc/9.14.1.20260916/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/ghc/9.14.1.20260916/bin" >> "$GITHUB_PATH"
           HC=$("$HOME/.ghcup/bin/ghcup" whereis ghc "$HCVER")
           HCPKG=$(echo "$HC" | sed 's#ghc$#ghc-pkg#')
           HADDOCK=$(echo "$HC" | sed 's#ghc$#haddock#')
