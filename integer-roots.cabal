@@ -74,6 +74,7 @@ library
                -optc-O3
                -optc-ffast-math
                -optc-march=native
+              --  -optc-mcpu=apple-m1
   -- ghc-options: -Wall -Widentities -Wcompat
 
 test-suite integer-roots-tests

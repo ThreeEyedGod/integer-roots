@@ -134,6 +134,7 @@ tfi !evnLen !w# =
 tniP :: Itr -> VU.Vector Word -> Integer
 tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
   where
+    Itr !cl# !yCAcc_ !tA !t# = itr
     go :: Itr -> Word -> Itr
     go itrGo wBEx@(W# w#) =
       let !tA_ =
