@@ -32,6 +32,7 @@ module Math.NumberTheory.Roots.Squares.Internal_
   , isqrtB_
   ) where
 
+import Control.Parallel.Strategies (rpar, rseq, runEval)
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 
 import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#))
@@ -77,7 +78,7 @@ data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, 
 newappsqrt_ :: Integer -> Integer
 newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
 newappsqrt_ n@(IP nbn#)
-  | szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
+  | !szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
   -- (# !evnLen, !sz# #) <- let szi# = word2Int# szT# `quotInt#` 2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
   -- (# !evnLen, !sz# #) <- let !szi# = word2Int# (szT# `shiftRL#` 1#) in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
@@ -134,7 +135,6 @@ tfi !evnLen !w# =
 tniP :: Itr -> VU.Vector Word -> Integer
 tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
   where
-    Itr !cl# !yCAcc_ !tA !t# = itr
     go :: Itr -> Word -> Itr
     go itrGo wBEx@(W# w#) =
       let !tA_ =
@@ -232,7 +232,7 @@ coreFx# (# !tAFX#, !tCFX#, !radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
-    | lgN < 2300 =
+    | lgN < 100 =
         let s = isqrtB_ n in (s, n - s * s)
     | otherwise =
         if lgN .&. 2 /= 0 then
@@ -254,6 +254,13 @@ karatsubaSqrt n
     lgN = I# (word2Int# (integerLog2# n))
 #endif
 
+{-# INLINEABLE parKaratsubaSqrt #-}
+parKaratsubaSqrt :: Integer -> (Integer, Integer)
+parKaratsubaSqrt n = runEval $ do
+    v <- rpar (karatsubaSqrt n)
+    rseq v
+    pure v
+
 {-# INLINEABLE karatsubaStep #-}
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)
@@ -263,7 +270,7 @@ karatsubaStep k (a3, a2, a1, a0)
     r = cat u a0 - q * q
     s = s' `unsafeShiftL` k + q
     (q, u) = cat r' a1 `quotRem` double s'
-    (s', r') = karatsubaSqrt (cat a3 a2)
+    (s', r') = parKaratsubaSqrt (cat a3 a2)
     cat x y = x `unsafeShiftL` k .|. y
     {-# INLINEABLE cat #-}
 

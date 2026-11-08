@@ -34,10 +34,11 @@ import GHC.Exts
     Double#,
     Int (I#),
     Int64#,
-    Word#,
-    Word64#,
-    eqInt64#,
-    fmaddDouble#,
+  Int8#,
+  Word#,
+  Word64#,
+  eqInt64#,
+  eqInt8#,    fmaddDouble#,
     gtInt64#,
     int2Word#,
     int64ToInt#,
@@ -80,6 +81,7 @@ data FloatingX# = FloatingX# {signif# :: Double#, expnnt# :: Int64#} deriving (E
 {-# INLINE zeroFx# #-}
 zeroFx# :: FloatingX#
 zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
+
 
 {-# INLINE (!+##) #-}
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#

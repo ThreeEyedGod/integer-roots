@@ -28,6 +28,8 @@ module Math.NumberTheory.TestUtils.Wrappers
   , FZeight(..)
   , Boogol(..)
   , BoogolZeight(..)
+  , Giggol(..)
+  , GiggolPlex(..)
   ) where
 
 import Control.Applicative
@@ -242,6 +244,55 @@ instance Show1 BoogolZeight where
   liftShowsPrec shw _ p (BoogolZeight a) = shw p a
 
 -------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- Giggol
+
+newtype Giggol a = Giggol { getGiggol :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (Giggol a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ Giggol $ foldl1 (\acc n -> acc * 2 ^ (8191 :: Int) + n) ds 
+
+instance Eq1 Giggol where
+  liftEq eq (Giggol a) (Giggol b) = a `eq` b
+
+instance Ord1 Giggol where
+  liftCompare cmp (Giggol a) (Giggol b) = a `cmp` b
+
+instance Show1 Giggol where
+  liftShowsPrec shw _ p (Giggol a) = shw p a
+
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- GiggolPlex
+
+newtype GiggolPlex a = GiggolPlex { getGiggolPlex :: a }
+  deriving (Eq, Ord, Read, Show, Num, Enum, Bounded, Integral, Real, Functor, Foldable, Traversable)
+
+instance (Num a, Arbitrary a) => Arbitrary (GiggolPlex a) where
+  arbitrary = do
+    Positive l <- arbitrary
+    ds <- vector l
+    return $ GiggolPlex $ foldl1 (\acc n -> acc * 2 ^ (16383 :: Int) + n) ds 
+
+instance Eq1 GiggolPlex where
+  liftEq eq (GiggolPlex a) (GiggolPlex b) = a `eq` b
+
+instance Ord1 GiggolPlex where
+  liftCompare cmp (GiggolPlex a) (GiggolPlex b) = a `cmp` b
+
+instance Show1 GiggolPlex where
+  liftShowsPrec shw _ p (GiggolPlex a) = shw p a
+
+-------------------------------------------------------------------------------
+
 
 -------------------------------------------------------------------------------
 -- Power
