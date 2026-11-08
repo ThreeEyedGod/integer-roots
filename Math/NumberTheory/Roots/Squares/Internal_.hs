@@ -232,7 +232,7 @@ coreFx# (# !tAFX#, !tCFX#, !radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
-    | lgN < 100 =
+    | lgN < 2300 =
         let s = isqrtB_ n in (s, n - s * s)
     | otherwise =
         if lgN .&. 2 /= 0 then
