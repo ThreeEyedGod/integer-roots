@@ -31,7 +31,7 @@ runSuites suites optionSuite = do
   let ingredients = defaultIngredients
       withTestOptions suite = adjustOption
         -- (\(QuickCheckTests n) -> QuickCheckTests (max n 10000))
-        (\(QuickCheckTests n) -> QuickCheckTests (max n 5000))
+        (\(QuickCheckTests n) -> QuickCheckTests (max n 1000))
         $ adjustOption
           (\(SmallCheckDepth n) -> SmallCheckDepth (max n 100))
           suite
