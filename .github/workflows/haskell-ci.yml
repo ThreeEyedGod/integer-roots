@@ -33,7 +33,7 @@ jobs:
         include:
           - compiler: ghc-9.14.1
             compilerKind: ghc
-            compilerVersion: 9.14.1.20260916
+            compilerVersion: 9.14.1.20261110
             # setup-method: ghcup
             # setup-method: ghcup-prerelease
             setup-method: curl-prerelease
@@ -364,7 +364,7 @@ jobs:
           - compiler: ghc-9.14.1
             compilerKind: ghc
             # compilerVersion: 9.14.1
-            compilerVersion: 9.14.1.20260916
+            compilerVersion: 9.14.1.20261110
             # setup-method: ghcup-prerelease
             setup-method: curl-prerelease
             allow-failure: false
