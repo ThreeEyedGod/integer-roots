@@ -22,7 +22,7 @@ on:
 jobs:
   linux:
     name: Haskell-CI - Linux - ${{ matrix.compiler }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes:
       360
     container:
@@ -352,7 +352,7 @@ jobs:
 
   linux-New:
     name: Haskell-CI - Linux - ${{ matrix.compiler }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes:
       360
     container:
