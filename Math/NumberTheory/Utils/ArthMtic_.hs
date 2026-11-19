@@ -9,6 +9,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LinearTypes #-}
 
+
 -- {-# LANGUAGE Strict #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -ddump-stg #-}
@@ -58,7 +59,6 @@ module Math.NumberTheory.Utils.ArthMtic_
 where
 
 -- \*********** BEGIN NEW IMPORTS
-
 import Data.Bits (finiteBitSize, unsafeShiftL)
 import qualified Data.Vector.Unboxed as VU
 import GHC.Exts
@@ -333,7 +333,8 @@ bigNatShiftR'# a n = bigNatShiftR# a n
 bigNatSub' :: BigNat# -> BigNat# -> (# (# #) | BigNat# #)
 bigNatSub' a (bigNatIsZero -> True) = (# | a #)
 bigNatSub' a b@(\x -> isTrue# (bigNatSize# a <# bigNatSize# x) -> True) = (# (# #) | #)
-bigNatSub' a b = bigNatSub a b
+bigNatSub' a b = let x = inline bigNatSubUnsafe' a b in (# | x #) -- can be used since the previous line coves the bad case
+-- bigNatSub' a b = bigNatSub a b 
 
 {-# INLINE bigNatSubUnsafe' #-}
 -- | Subtract two BigNat (don't check if a >= b)

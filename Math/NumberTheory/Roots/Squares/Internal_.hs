@@ -131,7 +131,7 @@ tfi !evnLen !w# =
     fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
     {-# INLINEABLE fixRemainder# #-}
 
--- {-# INLINEABLE tniP #-}
+{-# INLINEABLE tniP #-}
 tniP :: Itr -> VU.Vector Word -> Integer
 tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
   where
@@ -196,7 +196,7 @@ nxtDgtNatW64## !bn# !tcfx#
   where
     !ln# = bigNatLog2'# bn#
     !(W# threshW##) = threshWMaxDouble -- if finiteBitSize (0 :: Word) == 64 then 8# else 14#
-{-# INLINEABLE nxtDgtNatW64## #-}
+{-# INLINEABLE nxtDgtNatW64## #-} -- this keeping it as inlineable seems better than making it inline 
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## !pa# !tcfx# = case preComput pa# tcfx# of (# a_#, c#, r# #) -> computDoubleW64# a_# c# r#
@@ -228,7 +228,7 @@ coreFx# (# !tAFX#, !tCFX#, !radFX# #) = tAFX# !/## (sqrtFX# radFX# !+## tCFX#)
 -- algorithm from
 -- Paul Zimmermann. Karatsuba Square Root. [Research Report] RR-3805, 1999,
 -- pp.8. <inria-00072854>
-{-# INLINEABLE karatsubaSqrt #-}
+{-# INLINE karatsubaSqrt #-}
 karatsubaSqrt :: Integer -> (Integer, Integer)
 karatsubaSqrt 0 = (0, 0)
 karatsubaSqrt n
@@ -254,14 +254,14 @@ karatsubaSqrt n
     lgN = I# (word2Int# (integerLog2# n))
 #endif
 
-{-# INLINEABLE parKaratsubaSqrt #-}
+{-# INLINE parKaratsubaSqrt #-}
 parKaratsubaSqrt :: Integer -> (Integer, Integer)
 parKaratsubaSqrt n = runEval $ do
     v <- rpar (karatsubaSqrt n)
     rseq v
     pure v
 
-{-# INLINEABLE karatsubaStep #-}
+{-# INLINE karatsubaStep #-}
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
 karatsubaStep k (a3, a2, a1, a0)
     | r >= 0 = (s, r)
@@ -272,9 +272,9 @@ karatsubaStep k (a3, a2, a1, a0)
     (q, u) = cat r' a1 `quotRem` double s'
     (s', r') = parKaratsubaSqrt (cat a3 a2)
     cat x y = x `unsafeShiftL` k .|. y
-    {-# INLINEABLE cat #-}
+    {-# INLINE cat #-}
 
-{-# INLINEABLE karatsubaSplit #-}
+{-# INLINE karatsubaSplit #-}
 karatsubaSplit :: Int -> Integer -> (Integer, Integer, Integer, Integer)
 karatsubaSplit k n0 = (a3, a2, a1, a0)
   where
