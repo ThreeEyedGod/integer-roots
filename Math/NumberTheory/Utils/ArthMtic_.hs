@@ -55,6 +55,7 @@ module Math.NumberTheory.Utils.ArthMtic_
     quot2,
     bigNatToWordVec_,
     threshWMaxDouble,
+    bigNatToUnboxedVector_
   )
 where
 
@@ -100,6 +101,15 @@ import GHC.Word (Word32 (..), Word64 (..))
 import Numeric.QuoteQuot (quoteQuot)
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Primitives
+
+
+-- ** For zero-copy view of a BigNat#'s Word# limbs as a Primitive Vector Word.
+import Data.Primitive.ByteArray (ByteArray(..))
+import qualified Data.Vector.Primitive as VP
+-- import qualified Data.Vector.Unboxed as VU
+import GHC.Exts (Int(..), Word(..), unsafeCoerce#, touch#)
+-- import GHC.Num.BigNat (BigNat#, bigNatSize#)
+import GHC.ST (ST(..), runST)
 
 -- // Fixed floor missing specialization leading to not inlining of properFractionDouble
 -- floorDoubleInteger only gets you to Integer , not Word. Hence if Floor to Integer and then to Word solves the not-inlining issue.
@@ -162,6 +172,35 @@ bigNatToWordList_ = go
     go 0## bn_ n = bigNatIndex bn_ (n -# 1#) : go 0## bn_ (n -# 1#)
     go m bn_ n = W# m : go 0## bn_ (n -# 1#)
 {-# INLINE bigNatToWordList_ #-}
+
+bigNatToPrimVector :: BigNat# -> VP.Vector Word
+bigNatToPrimVector bn# = runST $ ST $ \s0 ->
+  let len = I# (bigNatSize# bn#)
+      ba = ByteArray (unsafeCoerce# bn#)
+      s1 = touch# bn# s0
+  in (# s1, VP.Vector 0 len ba #)
+
+bigNatToPrimVector_ :: BigNat# -> Int# -> VP.Vector Word
+bigNatToPrimVector_ bn# i# = runST $ ST $ \s0 ->
+  let len = I# i#
+      ba = ByteArray (unsafeCoerce# bn#)
+      s1 = touch# bn# s0
+  in (# s1, VP.Vector 0 len ba #)
+
+{-# INLINE bigNatToPrimVector #-}
+{-# INLINE bigNatToPrimVector_ #-}
+bigNatToUnboxedVector :: BigNat# -> VU.Vector Word
+bigNatToUnboxedVector bn# =
+  let !(VP.Vector off len ba) = bigNatToPrimVector bn#
+  in unsafeCoerce# (VP.Vector off len ba)
+
+{-# INLINE bigNatToUnboxedVector #-}
+{-# INLINE bigNatToUnboxedVector_ #-}
+bigNatToUnboxedVector_ :: BigNat# -> Int# -> VU.Vector Word
+bigNatToUnboxedVector_ bn# i# =
+  let !(VP.Vector off len ba) = bigNatToPrimVector_ bn# i#
+  in unsafeCoerce# (VP.Vector off len ba)
+
 
 -- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
 bigNatToWordVec_ :: Word# -> BigNat# -> Int# -> VU.Vector Word

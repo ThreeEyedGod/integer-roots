@@ -84,13 +84,14 @@ newappsqrt_ n@(IP nbn#)
     (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     isTrue# (sz# ># 1#) =
       let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
-          !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
+          -- !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
+          !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToUnboxedVector_ nbn# sz#))
        in tniP tfi_ wBExs
   | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
 newappsqrt_ _ = error "newappsqrt_: negative argument"
 {-# INLINE newappsqrt_ #-}
 
-{-# INLINEABLE tfi #-}
+{-# INLINE tfi #-}
 tfi :: Bool -> Word# -> Itr
 tfi !evnLen !w# =
   let !i# = word64FromWordRvsrdTuple## (# w# `and#` 0xffffffff##, w# `uncheckedShiftRL#` 32# #)
@@ -131,7 +132,7 @@ tfi !evnLen !w# =
     fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
     {-# INLINEABLE fixRemainder# #-}
 
-{-# INLINEABLE tniP #-}
+{-# INLINE tniP #-}
 tniP :: Itr -> VU.Vector Word -> Integer
 tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
   where
