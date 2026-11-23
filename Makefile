@@ -4,7 +4,7 @@ all_butno_package: build test doc
 build:
 	@echo "_______________Build___________"
 	@rm -rf ./build/*
-	@rm -rf *.tix
+	@rm -f weigh.tix integer-roots-benchmark.tix
 	@rm -rf hpc*.html
 	cabal clean
 	cabal update
@@ -22,6 +22,7 @@ doc:
 
 benchmark:
 	@echo "creating benchmarks"
+	@rm -f integer-roots-benchmark.tix
 # 	cabal bench --benchmark-options='--timeout 10000000' --benchmark-options='+RTS -I0 -A16m -N3 -H24m'
 	cabal bench integer-roots-benchmark --benchmark-options "+RTS -I0 -K256m -A16m -N8 -H24m -T -w -RTS --output=integer-roots.html"
 	hpc report integer-roots-benchmark 
@@ -29,6 +30,7 @@ benchmark:
 
 bench_weigh:
 	@echo "creating benchmarks weigh"
+	@rm -f weigh.tix
 	cabal bench weigh
 
 profile:

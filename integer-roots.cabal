@@ -63,7 +63,7 @@ library
                -Wno-missed-specialisations 
                -O2
                -- turn threaded off when using weigh 
-               -threaded 
+              --  -threaded 
               --  -fllvm 
                -fstrictness
                -funfolding-use-threshold=50
