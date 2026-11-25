@@ -63,7 +63,7 @@ library
                -Wno-missed-specialisations 
                -O2
                -- turn threaded off when using weigh 
-              --  -threaded 
+               -threaded 
               --  -fllvm 
                -fstrictness
                -funfolding-use-threshold=50
@@ -106,7 +106,7 @@ test-suite integer-roots-tests
   ghc-options: -Wall -Widentities -Wcompat
                -threaded 
                -rtsopts 
-               -with-rtsopts=-N6 -w
+               -with-rtsopts=-A64m-N6 -w
 
 benchmark integer-roots-benchmark
   type:                exitcode-stdio-1.0

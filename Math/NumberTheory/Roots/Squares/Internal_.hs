@@ -197,15 +197,14 @@ nxtDgtNatW64## !bn# !tcfx#
   where
     !ln# = bigNatLog2'# bn#
     !(W# threshW##) = threshWMaxDouble -- if finiteBitSize (0 :: Word) == 64 then 8# else 14#
-{-# INLINEABLE nxtDgtNatW64## #-} -- this keeping it as inlineable seems better than making it inline 
+{-# INLINE nxtDgtNatW64## #-} -- this keeping it as inlineable seems better than making it inline 
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## !pa# !tcfx# = case preComput pa# tcfx# of (# a_#, c#, r# #) -> computDoubleW64# a_# c# r#
-{-# INLINE nxtDgtDoubleFxW64## #-}
+{-# INLINEABLE nxtDgtDoubleFxW64## #-}
 
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
 preComput !ax# !tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDouble# c# c# ax# #)
-{-# INLINE preComput #-}
 
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
 computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDoubleInt (D# (coreD# tAFX# tCFX# radFX#)) of (I# iI#) -> wordToWord64# (int2Word# iI#)
@@ -290,4 +289,3 @@ karatsubaSplit k n0 = (a3, a2, a1, a0)
 
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
-{-# INLINE double #-}
