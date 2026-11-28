@@ -251,4 +251,5 @@ isqrtInteger = fst . karatsubaSqrt
 {-# INLINE isqrtNatural #-}
 isqrtNatural :: Natural -> Natural
 isqrtNatural (NS nWrd#) = fromIntegral $ isqrtWord (W# nWrd#)
-isqrtNatural n@(NB _) = fromIntegral . fst . karatsubaSqrt $ toInteger n
+-- isqrtNatural n@(NB _) = fromIntegral . fst . karatsubaSqrt $ toInteger n
+isqrtNatural n@(NB _) = fst $ karatsubaSqrtNat n

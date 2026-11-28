@@ -19,7 +19,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 -- {-# LANGUAGE Strict #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}
-{-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
+-- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 
 -- {-# OPTIONS -ddump-simpl -ddump-to-file -dsuppress-all  #-}
 -- -ddump-stg-final -dverbose-core2core -dsuppress-all -ddump-prep -dsuppress-idinfo -ddump-stg
@@ -29,6 +29,7 @@
 
 module Math.NumberTheory.Roots.Squares.Internal_
   ( karatsubaSqrt
+  , karatsubaSqrtNat
   , isqrtB_
   ) where
 
@@ -58,6 +59,8 @@ import GHC.Natural (Natural (..), naturalToInteger)
 import GHC.Num.BigNat (BigNat#, bigNatAdd, bigNatFromWord#, bigNatFromWord64#, bigNatIndex#, bigNatShiftL#, bigNatSubUnsafe)
 import Math.NumberTheory.Utils.ArthMtic_
 import Math.NumberTheory.Utils.FloatingX_
+import GHC.Num.Natural (naturalShiftR, naturalShiftL, naturalQuotRem, naturalLog2)
+import GHC.Num.Natural (Natural(..), naturalFromBigNat#)
 
 -- *********** END NEW IMPORTS
 
@@ -67,6 +70,9 @@ import Math.NumberTheory.Utils.FloatingX_
 --- A square root algorithm faster than Newton's method for multiprecision numbers, using floating-point arithmetic
 
 {-# SPECIALIZE isqrtB_ :: Integer -> Integer #-}
+{-# RULES
+"isqrtB_/Natural"     isqrtB_ = newappsqrtNat_
+  #-}
 isqrtB_ :: (Integral a) => a -> a
 isqrtB_ 0 = 0
 isqrtB_ n = fromInteger . newappsqrt_ . fromIntegral $ n
@@ -89,6 +95,20 @@ newappsqrt_ n@(IP nbn#)
   | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
 newappsqrt_ _ = error "newappsqrt_: negative argument"
 {-# INLINE newappsqrt_ #-}
+
+newappsqrtNat_ :: Natural -> Natural
+newappsqrtNat_ (NS nWrd#) = fromIntegral $ isqrtWord (W# nWrd#)
+newappsqrtNat_ n@(NB nbn#) 
+  | !szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
+    (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
+    isTrue# (sz# ># 1#) =
+      let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
+          -- !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
+          !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToUnboxedVector_ nbn# sz#))
+       in tniPNat tfi_ wBExs
+  | otherwise = newappsqrtNat_ n -- this is a word since the previous guard ensures that sz# <= 1, so we can use the NS constructor
+{-# INLINE newappsqrtNat_ #-}
+
 
 {-# INLINE tfi #-}
 tfi :: Bool -> Word# -> Itr
@@ -134,41 +154,41 @@ tfi !evnLen !w# =
 {-# INLINE tniP #-}
 tniP :: Itr -> VU.Vector Word -> Integer
 tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
+
+go :: Itr -> Word -> Itr
+go itrGo wBEx@(W# w#) =
+  let !tA_ =
+        let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
+          in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd'` bigNatFromWord# x1 `bigNatAddWord'#` i2w32# -- unparallized version of the below, which is about the same speed as the parallel version, but the parallel version is more scalable and faster for larger inputs
+      !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
+      -- let !(BN# tAb#, BN# tAa#, tCFx_#) = (spl w#, mul2To64 tA, scaleByPower2# 32#Int64 t#) `using` parTuple3 rpar rseq rseq -- //FIXME not any faster boxing inside called functions
+      --     !(# tA_, tCFx# #) = (# tAa# `bigNatAdd` tAb#, tCFx_# #)
+      !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
+      -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+      -- weirdly the above and below are both about the same
+      !itr_ =
+        if isTrue# (cl# `ltInt8#` 3#Int8)
+          then Itr (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #))
+          else Itr cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
+    in itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
   where
-    go :: Itr -> Word -> Itr
-    go itrGo wBEx@(W# w#) =
-      let !tA_ =
-            let !(# i1w32#, i2w32# #) = (# w# `uncheckedShiftRL#` 32#, w# `and#` 0xffffffff## #) -- max of either of them is 2^32-1
-             in let !x1 = i1w32# `shiftL#` 32# in (tA `bigNatShiftL#` 64##) `bigNatAdd'` bigNatFromWord# x1 `bigNatAddWord'#` i2w32# -- unparallized version of the below, which is about the same speed as the parallel version, but the parallel version is more scalable and faster for larger inputs
-          !tCFx# = scaleByPower2# 32#Int64 t# -- sqrtF previous digits being scaled right here
-          -- let !(BN# tAb#, BN# tAa#, tCFx_#) = (spl w#, mul2To64 tA, scaleByPower2# 32#Int64 t#) `using` parTuple3 rpar rseq rseq -- //FIXME not any faster boxing inside called functions
-          --     !(# tA_, tCFx# #) = (# tAa# `bigNatAdd` tAb#, tCFx_# #)
-          !(# !ycUpdated#, !remFinal#, !yTildeFinal#, yTildeFinalFx# #) = let !yt = nxtDgtNatW64## tA_ tCFx# in rmdrDgt (bigNatShiftL# yCAcc_ 32##) yt tA_ -- (bigNatMulWord# yCAcc_ 0x100000000##) === 0x100000000## = 2^32 = radixW32
-          -- !tcfx# = if isTrue# (cl# <# 3#) then tCFx# !+## unsafeword64ToFloatingX## yTildeFinal# else tCFx# -- tcfx is already scaled by 32. Do not use normalize here
-          -- weirdly the above and below are both about the same
-          !itr_ =
-            if isTrue# (cl# `ltInt8#` 3#Int8)
-              then Itr (cl# `plusInt8#` 1#Int8) ycUpdated# remFinal# (tCFx# !+## yTildeFinalFx## (# yTildeFinal#, yTildeFinalFx# #))
-              else Itr cl# ycUpdated# remFinal# tCFx# -- tcfx is already scaled by 32. Do not use normalize here
-       in itr_ -- \| Early termination of tcfx# if more than the 3rd digit or if digit is 0. Also dont bother to increment it, once => 3Int8#.
-      where
-        Itr !cl# !yCAcc_ !tA !t# = itrGo -- using Idiom: Unpack large patterns using a where clause 
-        yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
-        yTildeFinalFx## (# !w64#, !fx# #) = case fx# == zeroFx# of
-          True -> if isTrue# (w64# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w64#
-          !_ -> fx#
-        {-# INLINE yTildeFinalFx## #-}
-    -- spl :: Word# -> BigNat
-    -- spl w_# =
-    --   let !i1 = w_# `uncheckedShiftRL#` 32# -- max of either of them is 2^32-1
-    --       !i2 = w_# `and#` 0xffffffff## -- max of either of them is 2^32-1
-    --       !x1 = i1 `shiftL#` 32#
-    --       !r = bigNatFromWord# x1 `bigNatAddWord'#` i2
-    --    in BN# r
-    -- {-# INLINEABLE spl #-}
-    -- mul2To64 :: BigNat# -> BigNat
-    -- mul2To64 x_ = BN# (x_ `bigNatShiftL#` 64##)
-    -- {-# INLINEABLE mul2To64 #-}
+    Itr !cl# !yCAcc_ !tA !t# = itrGo -- using Idiom: Unpack large patterns using a where clause 
+    yTildeFinalFx## :: (# Word64#, FloatingX# #) -> FloatingX#
+    yTildeFinalFx## (# !w64#, !fx# #) = case fx# == zeroFx# of
+      True -> if isTrue# (w64# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w64#
+      !_ -> fx#
+    {-# INLINE yTildeFinalFx## #-}
+-- spl :: Word# -> BigNat
+-- spl w_# =
+--   let !i1 = w_# `uncheckedShiftRL#` 32# -- max of either of them is 2^32-1
+--       !i2 = w_# `and#` 0xffffffff## -- max of either of them is 2^32-1
+--       !x1 = i1 `shiftL#` 32#
+--       !r = bigNatFromWord# x1 `bigNatAddWord'#` i2
+--    in BN# r
+-- {-# INLINEABLE spl #-}
+-- mul2To64 :: BigNat# -> BigNat
+-- mul2To64 x_ = BN# (x_ `bigNatShiftL#` 64##)
+-- {-# INLINEABLE mul2To64 #-}
 
     rmdrDgt :: BigNat# -> (# Word64#, FloatingX# #) -> BigNat# -> (# BigNat#, BigNat#, Word64#, FloatingX# #)
     rmdrDgt !ycScaledbn# (# yTilde#, yTildeFx# #) ta# =
@@ -178,16 +198,21 @@ tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
             _ ->
               -- bigNat thankfully returns a zero if they are equal and it would go into above branch
               let !res# = sbtnd# `bigNatSubUnsafe'` ta# -- since we know resTrial < 0 and this is safe
-               in let !adjyt = yTilde# `subWord64#` 1#Word64
-                      !adjacc = ycScaledbn# `bigNatAddWord'#` word64ToWord# adjyt
-                      !adjres = (adjacc `bigNatMulWord'#` 2## `bigNatAddWord'#` 1##) `bigNatSubUnsafe'` res#
-                   in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
-       in ytrdr
+                in let !adjyt = yTilde# `subWord64#` 1#Word64
+                       !adjacc = ycScaledbn# `bigNatAddWord'#` word64ToWord# adjyt
+                       !adjres = (adjacc `bigNatMulWord'#` 2## `bigNatAddWord'#` 1##) `bigNatSubUnsafe'` res#
+                    in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
+        in ytrdr
     {-# INLINE rmdrDgt #-}
 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
     subtrahend# !yScaled# !yTilde# = let !wyTilde# = word64ToWord# yTilde# in ((yScaled# `bigNatAdd` yScaled#) `bigNatAddWord'#` wyTilde#) `bigNatMulWord'#` wyTilde#
     {-# INLINE subtrahend# #-}
+
+
+{-# INLINE tniPNat #-}
+tniPNat :: Itr -> VU.Vector Word -> Natural
+tniPNat !itr wBExsRest = NB (yaccbn (VU.foldl' go itr wBExsRest))
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## !bn# !tcfx#
@@ -256,12 +281,48 @@ karatsubaSqrt n
     lgN = I# (word2Int# (integerLog2# n))
 #endif
 
+
+{-# INLINE karatsubaSqrtNat #-}
+karatsubaSqrtNat :: Natural -> (Natural, Natural)
+karatsubaSqrtNat 0 = (0, 0)
+karatsubaSqrtNat n
+    | lgN < 2300 =
+        let s = isqrtB_ n in (s, n - s * s)
+    | otherwise =
+        if lgN .&. 2 /= 0 then
+            karatsubaStepNat k (karatsubaSplitNat k n)
+        else
+            -- before we split n into 4 part we must ensure that the first part
+            -- is at least 2^k/4, since this doesn't happen here we scale n by
+            -- multiplying it by 4
+            let n' = n `naturalShiftL` 2
+                (s, r) = karatsubaStepNat k (karatsubaSplitNat k n')
+                r' | s .&. 1 == 0 = r
+                   | otherwise = r + doubleNat s - 1
+            in  (s `naturalShiftR` 1, r' `naturalShiftR` 2)
+  where
+    k = lgN `unsafeShiftR` 2 + 1
+#ifdef MIN_VERSION_integer_gmp
+    lgN = naturalLog2 n
+#else
+    lgN = naturalLog2 n
+#endif
+
+
 {-# INLINE parKaratsubaSqrt #-}
 parKaratsubaSqrt :: Integer -> (Integer, Integer)
 parKaratsubaSqrt n = runEval $ do
     v <- rpar (karatsubaSqrt n)
     rseq v
     pure v
+
+{-# INLINE parKaratsubaSqrtNat #-}
+parKaratsubaSqrtNat :: Natural -> (Natural, Natural)
+parKaratsubaSqrtNat n = runEval $ do
+    v <- rpar (karatsubaSqrtNat n)
+    rseq v
+    pure v
+
 
 {-# INLINE karatsubaStep #-}
 karatsubaStep :: Int -> (Integer, Integer, Integer, Integer) -> (Integer, Integer)
@@ -276,6 +337,20 @@ karatsubaStep k (a3, a2, a1, a0)
     cat x y = x `unsafeShiftL` k .|. y
     {-# INLINE cat #-}
 
+{-# INLINE karatsubaStepNat #-}
+karatsubaStepNat :: Word -> (Natural, Natural, Natural, Natural) -> (Natural, Natural)
+karatsubaStepNat k (a3, a2, a1, a0)
+    | r >= 0 = (s, r)
+    | otherwise = (s - 1, r + doubleNat s - 1)
+  where
+    r = cat u a0 - q * q
+    s = s' `naturalShiftL` k + q
+    (q, u) = cat r' a1 `naturalQuotRem` doubleNat s'
+    (s', r') = parKaratsubaSqrtNat (cat a3 a2)
+    cat x y = x `naturalShiftL` k .|. y
+    {-# INLINE cat #-}
+
+
 {-# INLINE karatsubaSplit #-}
 karatsubaSplit :: Int -> Integer -> (Integer, Integer, Integer, Integer)
 karatsubaSplit k n0 = (a3, a2, a1, a0)
@@ -289,5 +364,22 @@ karatsubaSplit k n0 = (a3, a2, a1, a0)
     a0 = n0 .&. m
     m = 1 `unsafeShiftL` k - 1
 
+
+{-# INLINE karatsubaSplitNat #-}
+karatsubaSplitNat :: Word -> Natural -> (Natural, Natural, Natural, Natural)
+karatsubaSplitNat k n0 = (a3, a2, a1, a0)
+  where
+    a3 = n3
+    n3 = n2 `naturalShiftR` k
+    a2 = n2 .&. m
+    n2 = n1 `naturalShiftR` k
+    a1 = n1 .&. m
+    n1 = n0 `naturalShiftR` k
+    a0 = n0 .&. m
+    m = 1 `naturalShiftL` k - 1
+
 double :: Integer -> Integer
 double x = x `unsafeShiftL` 1
+
+doubleNat :: Natural -> Natural
+doubleNat x = x `naturalShiftL` 1
