@@ -87,7 +87,7 @@ newappsqrt_ n@(IP nbn#)
   -- (# !evnLen, !sz# #) <- let szi# = word2Int# szT# `quotInt#` 2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
   -- (# !evnLen, !sz# #) <- let !szi# = word2Int# (szT# `shiftRL#` 1#) in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
-    isTrue# (sz# ># 1#) =
+    isTrue# (sz# ># 1#) = -- it could be not an Int could yet still be a word 
       let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
           -- !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
           !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToUnboxedVector_ nbn# sz#))
@@ -98,17 +98,15 @@ newappsqrt_ _ = error "newappsqrt_: negative argument"
 
 newappsqrtNat_ :: Natural -> Natural
 newappsqrtNat_ (NS nWrd#) = fromIntegral $ isqrtWord (W# nWrd#)
-newappsqrtNat_ n@(NB nbn#) 
-  | !szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
-    (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
-    isTrue# (sz# ># 1#) =
-      let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
-          -- !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
-          !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToUnboxedVector_ nbn# sz#))
-       in tniPNat tfi_ wBExs
-  | otherwise = newappsqrtNat_ n -- this is a word since the previous guard ensures that sz# <= 1, so we can use the NS constructor
+newappsqrtNat_ n@(NB nbn#) = 
+  let 
+    !szT# = bigNatSizeInBase4294967296# nbn# -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required    
+    (# !evnLen, !sz# #) = let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #)
+    !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
+    -- !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
+    !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToUnboxedVector_ nbn# sz#))
+  in tniPNat tfi_ wBExs
 {-# INLINE newappsqrtNat_ #-}
-
 
 {-# INLINE tfi #-}
 tfi :: Bool -> Word# -> Itr
