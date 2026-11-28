@@ -33,7 +33,7 @@ module Math.NumberTheory.Roots.Squares.Internal_
   , isqrtB_
   ) where
 
-import Control.Parallel.Strategies (rpar, rseq, runEval)
+import Control.Parallel.Strategies (rpar, rseq, runEval, using, rdeepseq, parTuple2)
 import Data.Bits (finiteBitSize, unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 
 import GHC.Exts (Int(..), Int#, isTrue#, int2Double#, sqrtDouble#, double2Int#, (<#))
@@ -83,14 +83,11 @@ data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, 
 newappsqrt_ :: Integer -> Integer
 newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
 newappsqrt_ n@(IP nbn#)
-  | !szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
-    (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
+  | (# !evnLen, !sz# #) <- attrBN# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
     isTrue# (sz# ># 1#) = -- it could be not an Int could yet still be a word 
-      let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
-          -- !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
-          !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToUnboxedVector_ nbn# sz#))
+      let !(tfi_, wBExs) = mkInitItrVector nbn# evnLen sz# 
        in tniP tfi_ wBExs
-  | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#) -- \[(2^{64}-1)-(2^{63}-1)=2^{63} = 2^63 numbers to capture here
+  | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#) -- NEEDED \[(2^{64}-1)-(2^{63}-1)=2^{63} = 2^63 numbers to capture here
 newappsqrt_ _ = error "newappsqrt_: negative argument"
 {-# INLINE newappsqrt_ #-}
 
@@ -98,13 +95,18 @@ newappsqrtNat_ :: Natural -> Natural
 newappsqrtNat_ (NS nWrd#) = fromIntegral $ isqrtWord (W# nWrd#)
 newappsqrtNat_ n@(NB nbn#) = 
   let 
-    !szT# = bigNatSizeInBase4294967296# nbn# -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required    
-    (# !evnLen, !sz# #) = let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #)
-    !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
-    -- !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
-    !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToUnboxedVector_ nbn# sz#))
+    (# !evnLen, !sz# #) = attrBN# nbn#
+    !(tfi_, wBExs) = mkInitItrVector nbn# evnLen sz#
   in tniPNat tfi_ wBExs
 {-# INLINE newappsqrtNat_ #-}
+
+attrBN# :: BigNat# -> (# Bool, Int# #)
+attrBN# !bn# = let !szT# = bigNatSizeInBase4294967296# bn# in let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #)
+{-# INLINE attrBN# #-} 
+
+mkInitItrVector :: BigNat# -> Bool -> Int# -> (Itr, VU.Vector Word)
+mkInitItrVector !bn# evnLen !sz# = let msbWrd = bigNatIndex# bn# (sz# -# 1#) in (tfi evnLen msbWrd, VU.tail (bigNatToUnboxedVector_ bn# sz#)) `using` parTuple2 rpar rseq
+{-# INLINE mkInitItrVector #-}
 
 {-# INLINE tfi #-}
 tfi :: Bool -> Word# -> Itr
