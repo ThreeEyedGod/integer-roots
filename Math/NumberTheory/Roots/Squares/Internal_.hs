@@ -72,7 +72,6 @@ isqrtB_ 0 = 0
 isqrtB_ n = fromInteger . newappsqrt_ . fromIntegral $ n
 {-# INLINEABLE [1] isqrtB_ #-}
 
-
 data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 -- //FIXME: USE TIMESWORD2 WHEREVER POSSIBLE
 newappsqrt_ :: Integer -> Integer
@@ -107,7 +106,7 @@ tfi !evnLen !w# =
                 diff = word64ToInt64# w `subInt64#` word64ToInt64# (y `timesWord64#` y)
              in (# y, diff #)
        in handleFirstRemBN## (qr w_#)
-    {-# INLINEABLE evenFirstRmdrBN# #-}
+    {-# INLINE evenFirstRmdrBN# #-}
     oddFirstRmdrBN# :: Word64# -> (# BigNat#, Word64#, BigNat# #)
     oddFirstRmdrBN# !w_# =
       let qr w =
@@ -115,7 +114,7 @@ tfi !evnLen !w# =
                 diff = w `subWord64#` (y `timesWord64#` y) -- no chance this will be negative
              in (# bigNatFromWord64# y, y, bigNatFromWord64# diff #)
        in qr w_#
-    {-# INLINEABLE oddFirstRmdrBN# #-}
+    {-# INLINE oddFirstRmdrBN# #-}
     handleFirstRemBN## :: (# Word64#, Int64# #) -> (# BigNat#, Word64#, BigNat# #)
     handleFirstRemBN## (# yi64#, ri_ #) =
       let qr y r
@@ -125,12 +124,12 @@ tfi !evnLen !w# =
                  in (# bigNatFromWord64# y_, y_, bigNatFromWord64# rdr #) -- IterRes nextDownDgt0 $ calcRemainder iArgs iArgs_ nextDownDgt0 -- handleRems (pos, yCurrList, yi - 1, ri + 2 * b * tB + 2 * fromIntegral yi + 1, tA, tB, acc1 + 1, acc2) -- the quotient has to be non-zero too for the required adjustment
             | otherwise = (# bigNatFromWord64# y, y, bigNatFromWord64# (int64ToWord64# r) #)
        in qr yi64# ri_
-    {-# INLINEABLE handleFirstRemBN## #-}
+    {-# INLINE handleFirstRemBN## #-}
 
     -- -- Fix remainder accompanying a 'next downed digit' see algorithm
     fixRemainder# :: Word64# -> Int64# -> Word64#
     fixRemainder# !newYc# !rdr# = let x = rdr# `plusInt64#` 2#Int64 `timesInt64#` word64ToInt64# newYc# `plusInt64#` 1#Int64 in if isTrue# (x `ltInt64#` 0#Int64) then 0#Word64 else int64ToWord64# x
-    {-# INLINEABLE fixRemainder# #-}
+    {-# INLINE fixRemainder# #-}
 
 {-# INLINE tniP #-}
 tniP :: Itr -> VU.Vector Word -> Integer
@@ -158,7 +157,7 @@ tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
         yTildeFinalFx## (# !w64#, !fx# #) = case fx# == zeroFx# of
           True -> if isTrue# (w64# `eqWord64#` 0#Word64) then zeroFx# else unsafeword64ToFloatingX## w64#
           !_ -> fx#
-        {-# INLINEABLE yTildeFinalFx## #-}
+        {-# INLINE yTildeFinalFx## #-}
     -- spl :: Word# -> BigNat
     -- spl w_# =
     --   let !i1 = w_# `uncheckedShiftRL#` 32# -- max of either of them is 2^32-1
@@ -184,11 +183,11 @@ tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
                       !adjres = (adjacc `bigNatMulWord'#` 2## `bigNatAddWord'#` 1##) `bigNatSubUnsafe'` res#
                    in (# adjacc, adjres, adjyt, unsafeword64ToFloatingX## adjyt #) -- aligned fx# value to updated yTilde#
        in ytrdr
-    {-# INLINEABLE rmdrDgt #-}
+    {-# INLINE rmdrDgt #-}
 
     subtrahend# :: BigNat# -> Word64# -> BigNat#
     subtrahend# !yScaled# !yTilde# = let !wyTilde# = word64ToWord# yTilde# in ((yScaled# `bigNatAdd` yScaled#) `bigNatAddWord'#` wyTilde#) `bigNatMulWord'#` wyTilde#
-    {-# INLINEABLE subtrahend# #-}
+    {-# INLINE subtrahend# #-}
 
 nxtDgtNatW64## :: BigNat# -> FloatingX# -> (# Word64#, FloatingX# #)
 nxtDgtNatW64## !bn# !tcfx#
@@ -197,18 +196,21 @@ nxtDgtNatW64## !bn# !tcfx#
   where
     !ln# = bigNatLog2'# bn#
     !(W# threshW##) = threshWMaxDouble -- if finiteBitSize (0 :: Word) == 64 then 8# else 14#
-{-# INLINE nxtDgtNatW64## #-} -- this keeping it as inlineable seems better than making it inline 
+{-# INLINE nxtDgtNatW64## #-}
 
 nxtDgtDoubleFxW64## :: Double# -> FloatingX# -> Word64#
 nxtDgtDoubleFxW64## !pa# !tcfx# = case preComput pa# tcfx# of (# a_#, c#, r# #) -> computDoubleW64# a_# c# r#
-{-# INLINEABLE nxtDgtDoubleFxW64## #-}
+{-# INLINE nxtDgtDoubleFxW64## #-}
 
+{-# INLINE preComput #-}
 preComput :: Double# -> FloatingX# -> (# Double#, Double#, Double# #)
 preComput !ax# !tcfx# = case unsafefx2Double## tcfx# of c# -> (# ax#, c#, fmaddDouble# c# c# ax# #)
 
+{-# INLINE computDoubleW64# #-}
 computDoubleW64# :: Double# -> Double# -> Double# -> Word64#
 computDoubleW64# !tAFX# !tCFX# !radFX# = case floorDoubleInt (D# (coreD# tAFX# tCFX# radFX#)) of (I# iI#) -> wordToWord64# (int2Word# iI#)
 
+{-# INLINE coreD# #-}
 coreD# :: Double# -> Double# -> Double# -> Double#
 coreD# !da# !dc# !dr# = da# /## (sqrtDouble# dr# +## dc#)
 

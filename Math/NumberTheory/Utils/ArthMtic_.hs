@@ -127,7 +127,7 @@ isqrtInt' n
   | otherwise = r
   where
     !r = (truncate :: Double -> Int) . sqrt $ fromIntegral n
-{-# INLINEABLE isqrtInt' #-}
+{-# INLINE isqrtInt' #-}
 
 isqrtWord :: Word -> Word
 isqrtWord x
@@ -138,7 +138,7 @@ isqrtWord x
   | otherwise = r
   where
     !r = (fromIntegral :: Int -> Word) . (truncate :: Double -> Int) . sqrt $ fromIntegral x
-{-# INLINEABLE isqrtWord #-}
+{-# INLINE isqrtWord #-}
 
 -- Equivalent to (`quot` 32).
 quot32 :: Word -> Word
@@ -161,7 +161,7 @@ bigNatSizeInBase4294967296# a
 -- | Logarithm for a 2^32 base
 bigNatLogBaseWord4294967296# :: BigNat# -> Word#
 bigNatLogBaseWord4294967296# bn# = let !(W# w#) = quot32 (W# (bigNatLog2'# bn#)) in w# -- bigNatLog2# bn# `quotWord#` 32##
-{-# INLINEABLE bigNatLogBaseWord4294967296# #-}
+{-# INLINE bigNatLogBaseWord4294967296# #-}
 
 -- | Convert a BigNat into a list of non-zero Words (most-significant first) w/size supplied
 bigNatToWordList_ :: Word# -> BigNat# -> Int# -> [Word]
@@ -242,10 +242,10 @@ largestNSqLTE## w# = case floorDoubleInt (sqrt (fromIntegral (W64# w#)) :: Doubl
 _evenInt64#, _oddInt64# :: Int64# -> (# Bool, Int64# #)
 _evenInt64# n# = (# isTrue# (remInt64# n# 2#Int64 `eqInt64#` 0#Int64), n# `quotInt64#` 2#Int64 #)
 _oddInt64# = _evenInt64#
-{-# INLINEABLE _evenInt64# #-}
-{-# INLINEABLE _oddInt64# #-}
+{-# INLINE _evenInt64# #-}
+{-# INLINE _oddInt64# #-}
 
-{-# INLINEABLE fromInt64 #-}
+{-# INLINE fromInt64 #-}
 fromInt64 :: Int64 %1 -> Int64# 
 fromInt64 (I64# x#) = x#
 
@@ -319,6 +319,7 @@ bnToFxGtWord# !bn# !lgn# =
 
 checkFinite :: Double -> Bool
 checkFinite = not . isInfinite
+{-# INLINE checkFinite #-}
 
 -- | Threshold for max Double = 512 for 64 bit Word, 14 for 32 bit Word. This is used to determine if a BigNat can be converted to Double without losing precision.
 threshWMaxDouble :: Word

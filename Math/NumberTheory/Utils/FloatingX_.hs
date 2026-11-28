@@ -87,6 +87,7 @@ zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
 (!+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!+##) !x !y = x `addFx#` y
 
+{-# INLINE (!*##) #-}
 (!*##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!*##) !x !y = x `mulFx#` y
 
@@ -99,8 +100,9 @@ zeroFx# = let !(I64# mb#) = minBound :: Int64 in FloatingX# 0.0## mb#
   | isTrue# (xe# `eqInt64#` ye#) = isTrue# (x# <## y#)
   | isTrue# (xe# `ltInt64#` ye#) = isTrue# (x# <## y#)
   | otherwise = False
+{-# INLINE (!<##) #-}
 
-{-# INLINEABLE (!**+##) #-}
+{-# INLINE (!**+##) #-}
 (!**+##) :: FloatingX# -> FloatingX# -> FloatingX#
 (!**+##) !x !y = x `fsqraddFloatingX#` y
 
@@ -122,6 +124,7 @@ addFx# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
           !resSignif# = sBig# +## scaledLittle#
        in FloatingX# resSignif# expBig#
 
+{-# INLINE addFxNorm# #-}
 addFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
 addFxNorm# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
   -- \| a == zero# = b
@@ -141,9 +144,11 @@ addFxNorm# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
             then FloatingX# (resSignif# *## 0.5##) (expBig# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# expBig#
 
+{-# INLINE mulFx# #-}
 mulFx# :: FloatingX# -> FloatingX# -> FloatingX#
 mulFx# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#) = FloatingX# (sA# *## sB#) (expA# `plusInt64#` expB#)
 
+{-# INLINE mulFx_# #-}
 mulFx_# :: FloatingX# -> FloatingX# -> FloatingX#
 mulFx_# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
   | isTrue# (sA# ==## 0.00##) = zeroFx#
@@ -155,6 +160,7 @@ mulFx_# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
           !resSignif# = sA# *## sB#
        in FloatingX# resSignif# resExp#
 
+{-# INLINE mulFxNorm# #-}
 mulFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
 mulFxNorm# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
   | isTrue# (sA# ==## 0.00##) = zeroFx#
@@ -168,6 +174,7 @@ mulFxNorm# a@(FloatingX# !sA# !expA#) b@(FloatingX# !sB# !expB#)
             then FloatingX# (resSignif# *## 0.5##) (resExp# `plusInt64#` 1#Int64)
             else FloatingX# resSignif# resExp#
 
+{-# INLINE divFxNorm# #-}
 divFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
 divFxNorm# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
   | d == FloatingX# 1.0## (fromInt64 0) = n
@@ -189,6 +196,7 @@ divFxNorm# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
             then zeroFx#
             else FloatingX# finalSignif# finalExp#
 
+{-# INLINE unsafeDivFxNorm# #-}
 unsafeDivFxNorm# :: FloatingX# -> FloatingX# -> FloatingX#
 unsafeDivFxNorm# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) =
   -- \| d == FloatingX# 1.0## (fromInt64 0) = n
@@ -233,6 +241,7 @@ unsafeDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#)
 
 unsafestDivFx# :: FloatingX# -> FloatingX# -> FloatingX#
 unsafestDivFx# n@(FloatingX# !s1# !e1#) d@(FloatingX# !s2# !e2#) = FloatingX# (s1# /## s2#) (e1# `subInt64#` e2#)
+{-# INLINE unsafestDivFx# #-}
 
 {-# INLINE fsqraddFloatingX# #-}
 fsqraddFloatingX# :: FloatingX# -> FloatingX# -> FloatingX#
@@ -243,7 +252,7 @@ fsqraddFloatingX# (FloatingX# !sA# !expA#) (FloatingX# !sC# !expC#) = case upLif
     !twoTimesExpA# = 2#Int64 `timesInt64#` expA#
     !diff# = expC# `subInt64#` twoTimesExpA#
 
-{-# INLINEABLE sqrtFX# #-}
+{-# INLINE sqrtFX# #-}
 sqrtFX# :: FloatingX# -> FloatingX#
 sqrtFX# fx@(FloatingX# !s# !e#) = case unsafeSqrtFxSplitDbl## fx of (# sX#, eX# #) -> FloatingX# sX# eX# -- let !(D# sX#, I64# eX#) = sqrtSplitDbl (FloatingX (D# s#) (I64# e#)) in FloatingX# sX# eX#
 
@@ -273,24 +282,25 @@ sqrtFxSplitDbl## (FloatingX# !d# !e#)
   | otherwise = (# sqrtDouble# 2.0## *## d#, quo64# #) -- odd sqrt2 times sqrt d# ---//FIXME what's he right thing to do here
   where
     !(# yesEven, quo64# #) = _evenInt64# e#
-{-# INLINEABLE sqrtFxSplitDbl## #-}
+{-# INLINE sqrtFxSplitDbl## #-}
 
 -- | actual sqrt call to the hardware for custom type happens here
 -- note that the exponent is halved. When the custom floatinXis made it is made sure it is even.
 -- so no need to check for its evenness here. The sqrt of the significand is taken and the exponent is halved.
 unsafeSqrtFxSplitDbl## :: FloatingX# -> (# Double#, Int64# #)
 unsafeSqrtFxSplitDbl## (FloatingX# !d# !e#) = (# sqrtDouble# d#, e# `quotInt64#` 2#Int64 #)
-{-# INLINEABLE unsafeSqrtFxSplitDbl## #-}
+{-# INLINE unsafeSqrtFxSplitDbl## #-}
 
 unsafefx2Double## :: FloatingX# -> Double#
 unsafefx2Double## (FloatingX# !d# 0#Int64) = d#
 unsafefx2Double## (FloatingX# !d# !e#) = upLiftDouble# d# (int64ToInt# e#)
 {-# INLINE unsafefx2Double## #-}
 
-{-# INLINEABLE double2Fx# #-}
+{-# INLINE double2Fx# #-}
 double2Fx# :: Double -> FloatingX#
 double2Fx# (D# d#) = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 
+{-# INLINE double2Fx## #-}
 double2Fx## :: Double# -> FloatingX#
 double2Fx## !d# = case split# d# of (# s#, e# #) -> FloatingX# s# e#
 

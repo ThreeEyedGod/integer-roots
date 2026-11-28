@@ -26,8 +26,9 @@ module Math.NumberTheory.Roots.Squares_
 import Data.Bits (finiteBitSize, (.&.))
 import Data.Int (Int64)
 import Data.Word (Word64)
-import GHC.Exts (Ptr(..))
+import GHC.Exts (Ptr(..), Word(..), Word# )
 import Numeric.Natural (Natural)
+import GHC.Num.Natural (Natural(..))
 
 import Math.NumberTheory.Roots.Squares.Internal_
 import Math.NumberTheory.Utils.BitMask (indexBitSet)
@@ -62,7 +63,8 @@ integerSquareRoot n
 "integerSquareRoot'/Int64"   integerSquareRoot' = isqrtInt64'
 "integerSquareRoot'/Word64"  integerSquareRoot' = isqrtWord64
 "integerSquareRoot'/Integer" integerSquareRoot' = isqrtInteger
-"integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
+"integerSquareRoot'/Natural" integerSquareRoot' = isqrtNatural
+-- "integerSquareRoot'/Natural" integerSquareRoot' = fromInteger . isqrtInteger . toInteger
   #-}
 {-# INLINE [1] integerSquareRoot' #-}
 integerSquareRoot' :: Integral a => a -> a
@@ -245,3 +247,8 @@ isqrtWord64 n
 {-# INLINE isqrtInteger #-}
 isqrtInteger :: Integer -> Integer
 isqrtInteger = fst . karatsubaSqrt
+
+{-# INLINE isqrtNatural #-}
+isqrtNatural :: Natural -> Natural
+isqrtNatural (NS nWrd#) = fromIntegral $ isqrtWord (W# nWrd#)
+isqrtNatural n@(NB _) = fromIntegral . fst . karatsubaSqrt $ toInteger n
