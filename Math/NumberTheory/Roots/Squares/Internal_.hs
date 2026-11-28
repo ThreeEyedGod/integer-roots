@@ -76,7 +76,7 @@ import GHC.Num.Natural (Natural(..), naturalFromBigNat#)
 isqrtB_ :: (Integral a) => a -> a
 isqrtB_ 0 = 0
 isqrtB_ n = fromInteger . newappsqrt_ . fromIntegral $ n
-{-# INLINEABLE [1] isqrtB_ #-}
+{-# INLINE [1] isqrtB_ #-}
 
 data Itr = Itr {a# :: {-# UNPACK #-} !Int8#, yaccbn :: {-# UNPACK #-} !BigNat#, iRbn :: {-# UNPACK #-} !BigNat#, tbn# :: {-# UNPACK #-} !FloatingX#}
 -- //FIXME: USE TIMESWORD2 WHEREVER POSSIBLE
@@ -84,15 +84,13 @@ newappsqrt_ :: Integer -> Integer
 newappsqrt_ (IS i#) = let !(I# i_#) = isqrtInt' (I# i#) in IS i_#
 newappsqrt_ n@(IP nbn#)
   | !szT# <- bigNatSizeInBase4294967296# nbn#, --     -- size it once in base 2^32 then compute it in 2^64 words which is bigNatSize# bn# for processing and repurpose as required
-  -- (# !evnLen, !sz# #) <- let szi# = word2Int# szT# `quotInt#` 2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
-  -- (# !evnLen, !sz# #) <- let !szi# = word2Int# (szT# `shiftRL#` 1#) in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     (# !evnLen, !sz# #) <- let !szi# = let !(W# szT2#) = quot2 (W# szT#) in word2Int# szT2# in if even (W# szT#) then (# True, szi# #) else (# False, 1# +# szi# #),
     isTrue# (sz# ># 1#) = -- it could be not an Int could yet still be a word 
       let !msbWrd = bigNatIndex# nbn# (sz# -# 1#)
           -- !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToWordVec_ msbWrd nbn# sz#))
           !(tfi_, wBExs) = (tfi evnLen msbWrd, VU.tail (bigNatToUnboxedVector_ nbn# sz#))
        in tniP tfi_ wBExs
-  | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#)
+  | otherwise = let !(W# wo#) = isqrtWord (fromInteger n) in naturalToInteger (NatS# wo#) -- \[(2^{64}-1)-(2^{63}-1)=2^{63} = 2^63 numbers to capture here
 newappsqrt_ _ = error "newappsqrt_: negative argument"
 {-# INLINE newappsqrt_ #-}
 
@@ -153,6 +151,7 @@ tfi !evnLen !w# =
 tniP :: Itr -> VU.Vector Word -> Integer
 tniP !itr wBExsRest = IP (yaccbn (VU.foldl' go itr wBExsRest))
 
+{-# INLINE go #-}
 go :: Itr -> Word -> Itr
 go itrGo wBEx@(W# w#) =
   let !tA_ =
